@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLL Unearthed™ — Sistema de Competencia</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F0E8;--surface:#fff;--surface2:#EDE8DC;--border:#D4C9B0;--border2:#BFB49A;
+  --text:#1C1A14;--text2:#6B6248;--text3:#9A8F78;
+  --green:#3B6D11;--green-l:#EAF3DE;--green-b:#97C459;
+  --amber:#854F0B;--amber-l:#FAEEDA;
+  --red:#A32D2D;--red-l:#FCEBEB;--red-b:#E24B4A;
+  --blue:#185FA5;--blue-l:#E6F1FB;--blue-b:#378ADD;
+  --r:10px;--rs:6px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── HEADER ── */
+.hdr{background:var(--text);color:#fff;padding:13px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.hdr h1{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.pill{font-size:11px;background:var(--green);color:#fff;padding:3px 10px;border-radius:20px;font-weight:500}
+
+/* ── TABS ── */
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;position:sticky;top:49px;z-index:199;overflow-x:auto}
+.tabs::-webkit-scrollbar{height:0}
+.tbtn{padding:10px 14px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;border:none;background:none;color:var(--text3);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap;flex-shrink:0}
+.tbtn.active{color:var(--text);border-bottom-color:var(--green)}
+
+.main{max-width:860px;margin:0 auto;padding:18px 14px 80px}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.form-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:14px}
+.sec-lbl{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.field-lbl{font-size:12px;color:var(--text3);margin-bottom:5px;font-weight:500}
+.fg{margin-bottom:10px}
+
+/* ── SUB-TABS ── */
+.sub-tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
+.sub-tbtn{padding:6px 14px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;border:1px solid var(--border2);border-radius:20px;background:var(--surface2);color:var(--text3);cursor:pointer}
+.sub-tbtn.active{background:var(--text);color:#fff;border-color:var(--text)}
+
+/* ── INPUTS ── */
+input[type=text],input[type=number],select{padding:9px 12px;font-size:14px;font-family:'Barlow',sans-serif;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface);color:var(--text);width:100%}
+input:focus,select:focus{outline:2px solid var(--green);outline-offset:1px}
+input[type=checkbox]{width:20px;height:20px;cursor:pointer;accent-color:var(--green);flex-shrink:0}
+
+/* ── BUTTONS ── */
+.btn{padding:9px 16px;font-size:14px;font-family:'Barlow',sans-serif;border:1px solid var(--border2);border-radius:var(--rs);cursor:pointer;background:var(--surface);color:var(--text);white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn-green{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-green:hover{background:#2d530c}
+.btn-red{background:none;color:var(--red);border-color:var(--red)}
+.btn-red:hover{background:var(--red-l)}
+.btn-amber{background:none;color:var(--amber);border-color:var(--amber)}
+.btn-amber:hover{background:var(--amber-l)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-lg{padding:14px 28px;font-size:17px;font-weight:500}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ── BASES ── */
+.bases-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.bbox{border-radius:var(--rs);padding:11px 13px}
+.bbox.azul{background:var(--blue-l);border:1px solid var(--blue-b)}
+.bbox.roja{background:var(--red-l);border:1px solid var(--red-b)}
+.btit{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:5px;margin-bottom:7px}
+.btit.azul{color:var(--blue)}.btit.roja{color:var(--red)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.dot.azul{background:var(--blue)}.dot.roja{background:var(--red)}
+.pair-sel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+
+/* ── METRICS ── */
+.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.metric-box{background:var(--surface2);border-radius:var(--rs);padding:10px 12px}
+.metric-box .val{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700}
+.metric-box .val.good{color:var(--green)}
+.metric-box .lbl{font-size:11px;color:var(--text3)}
+
+/* ── TIMER SCREENS ── */
+.timer-screen{display:flex;flex-direction:column;align-items:center;padding:10px 14px}
+.timer-info{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;width:100%;max-width:420px}
+.timer-wrap{position:relative;width:260px;height:260px;margin:0 auto 20px;flex-shrink:0}
+.timer-wrap svg{width:260px;height:260px;display:block}
+.timer-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;width:200px}
+.timer-digits{font-family:'Barlow Condensed',sans-serif;font-size:58px;font-weight:700;line-height:1;color:var(--text)}
+.timer-sublabel{font-size:12px;color:var(--text3);margin-top:4px}
+.timer-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;width:100%;max-width:420px}
+
+/* ── COUNTDOWN ── */
+@keyframes cdpop{0%{transform:scale(1.8);opacity:0}60%{transform:scale(0.92)}100%{transform:scale(1);opacity:1}}
+.cd-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:56vh;padding:20px;text-align:center}
+.cd-num{font-family:'Barlow Condensed',sans-serif;font-size:150px;font-weight:700;line-height:1;animation:cdpop .5s ease-out both}
+.cd-sub{font-size:14px;color:var(--text3);margin-top:14px}
+
+/* ── MISSION ENTRY ── */
+/* Score header is NOT sticky — avoids blocking taps on overlapping elements */
+.score-hdr{background:var(--text);color:#fff;border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap}
+.score-big{font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:700;line-height:1}
+.mcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px}
+.mcard-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.mcode{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:#fff;background:var(--green);padding:2px 8px;border-radius:4px;flex-shrink:0;letter-spacing:.5px}
+.mcode.am{background:var(--amber)}
+.mtitle{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;flex:1;min-width:80px}
+.mpts{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;margin-left:auto}
+.mpts.yes{color:var(--green)}.mpts.no{color:var(--text3)}
+.neq{font-size:10px;color:var(--red);background:var(--red-l);border:1px solid #F7C1C1;padding:2px 5px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.btag{font-size:10px;font-weight:700;background:var(--blue-l);color:var(--blue);padding:1px 5px;border-radius:3px;margin-right:4px}
+.hint{font-size:11px;color:var(--text3);margin-top:2px}
+/* param row */
+.prow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--surface2)}
+.pleft{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.pdesc{font-size:13px;color:var(--text2);cursor:pointer;flex:1}
+.ppts-lbl{font-size:12px;color:var(--text3);white-space:nowrap}
+/* counter — large touch targets */
+.ctr{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.cbtn{width:36px;height:36px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface2);cursor:pointer;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--text);user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.cbtn:active{background:var(--border)}
+.cval{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;min-width:26px;text-align:center}
+/* token buttons */
+.tok-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.tbtn2{padding:5px 10px;border:1px solid var(--border2);border-radius:var(--rs);cursor:pointer;font-size:12px;font-family:'Barlow Condensed',sans-serif;font-weight:700;background:var(--surface2);color:var(--text2);user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.tbtn2.on{background:var(--green);color:#fff;border-color:var(--green)}
+
+/* ── HUB ── */
+.hub-btn{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:10px;cursor:pointer;width:100%;text-align:left}
+.hub-btn:hover{background:var(--surface2)}
+.hub-btn-title{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;margin-bottom:4px}
+.hub-btn-sub{font-size:13px;color:var(--text3)}
+
+/* ── TRAINING ── */
+.tr-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px}
+.tr-row.done{border-left:4px solid var(--green)}
+.tr-row.next{border-left:4px solid var(--amber);background:var(--amber-l)}
+.trr-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.trr-num{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700}
+.sbadge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;font-family:'Barlow Condensed',sans-serif}
+.sbadge.done{background:var(--green-l);color:var(--green);border:1px solid var(--green-b)}
+.sbadge.pending{background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
+.sbadge.next{background:var(--amber-l);color:var(--amber);border:1px solid #F5C4B3}
+
+/* ── PILLS ── */
+.bpill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;font-family:'Barlow Condensed',sans-serif}
+.bpill.azul{background:var(--blue-l);color:var(--blue);border:1px solid var(--blue-b)}
+.bpill.roja{background:var(--red-l);color:var(--red);border:1px solid var(--red-b)}
+.mpills{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+.mpill{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;padding:2px 6px;border-radius:3px}
+.mpill.done{background:var(--green-l);color:var(--green);border:1px solid var(--green-b)}
+.mpill.fail{background:#f0f0ec;color:var(--text3);border:1px solid var(--border);text-decoration:line-through}
+
+/* ── STATS ENTITY ── */
+.entity-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:14px;overflow:hidden}
+.entity-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.entity-name{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700}
+.entity-sub{font-size:12px;color:var(--text3);margin-top:2px}
+.entity-body{padding:12px 16px}
+.rcard{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;margin-bottom:8px}
+.rcard:last-child{margin-bottom:0}
+.rcard-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap}
+.rcard-lbl{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700}
+.rcard-score{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--green);flex-shrink:0}
+
+/* ── EFFECTIVENESS ── */
+.eff-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.eff-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.eff-title{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;flex:1}
+.eff-pct{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700}
+.eff-bar-bg{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-bottom:8px;border:1px solid var(--border)}
+.eff-bar{height:100%;border-radius:4px}
+.eff-stats{display:flex;gap:14px;font-size:12px;color:var(--text3)}
+.fail-chip{font-size:11px;background:var(--red-l);color:var(--red);border:1px solid var(--red-b);border-radius:4px;padding:2px 7px;font-family:'Barlow Condensed',sans-serif;font-weight:700;display:inline-block;margin:2px}
+
+/* ── MISC ── */
+/* collapsible stats cards */
+.coll-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px;overflow:hidden}
+.coll-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:10px;flex-wrap:wrap;user-select:none;-webkit-tap-highlight-color:transparent}
+.coll-hdr:hover{background:var(--surface2)}
+.coll-arrow{width:20px;height:20px;flex-shrink:0;transition:transform .2s;color:var(--text3)}
+.coll-arrow.open{transform:rotate(180deg)}
+.coll-body{padding:12px 14px;border-top:1px solid var(--border)}
+/* inner tabs (smaller than sub-tabs) */
+.inner-tabs{display:flex;gap:3px;margin-bottom:12px;flex-wrap:wrap}
+.inner-tbtn{padding:4px 11px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;border:1px solid var(--border2);border-radius:20px;background:var(--surface2);color:var(--text3);cursor:pointer;letter-spacing:.3px}
+.inner-tbtn.active{background:var(--text);color:#fff;border-color:var(--text)}
+.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:4px;font-weight:500}
+.tag-green{background:var(--green-l);color:var(--green);border:1px solid var(--green-b)}
+.tag-blue{background:var(--blue-l);color:var(--blue);border:1px solid var(--blue-b)}
+.rk{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--text3);min-width:28px}
+.rk.gold{color:#B8860B}.rk.silver{color:#888}.rk.bronze{color:#8B4513}
+.conf{background:var(--red-l);border:1px solid var(--red-b);border-radius:var(--rs);padding:9px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;flex-wrap:wrap}
+.conf span{font-size:13px;color:var(--red)}
+.empty{text-align:center;color:var(--text3);font-size:14px;padding:36px 0}
+.sec-divider{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;margin:16px 0 10px;display:flex;align-items:center;gap:8px}
+.sec-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--text);color:#fff;padding:9px 18px;border-radius:30px;font-size:14px;opacity:0;transition:all .25s;pointer-events:none;z-index:999;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── LOGIN SCREEN ── */
+.login-wrap{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:28px 24px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.login-logo{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text);text-align:center;margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--text3);text-align:center;margin-bottom:24px}
+.login-lbl{font-size:12px;color:var(--text3);font-weight:500;margin-bottom:5px}
+.login-fg{margin-bottom:14px}
+.pin-row{display:flex;gap:8px}
+.pin-input{width:52px;height:52px;text-align:center;font-size:22px;font-weight:700;font-family:'Barlow Condensed',sans-serif;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface);color:var(--text)}
+.pin-input:focus{outline:2px solid var(--green);outline-offset:1px}
+.login-err{font-size:13px;color:var(--red);background:var(--red-l);border:1px solid var(--red-b);border-radius:var(--rs);padding:8px 12px;margin-bottom:12px;display:none}
+.login-err.show{display:block}
+.team-badge{background:var(--green-l);border:1px solid var(--green-b);border-radius:var(--rs);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
+.team-badge-name{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--green)}
+/* loading overlay */
+.loading-wrap{position:fixed;inset:0;background:var(--bg);z-index:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-left:6px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+@media(max-width:560px){
+  .bases-grid,.pair-sel-grid,.metric-grid{grid-template-columns:1fr}
+  .timer-digits{font-size:44px}.cd-num{font-size:100px}
+}
+</style>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div class="loading-wrap" id="loading-wrap">
+  <div class="spinner"></div>
+  <div style="font-size:14px;color:var(--text3)">Conectando con Firebase…</div>
+</div>
+
+<!-- Login screen -->
+<div class="login-wrap" id="login-wrap" style="display:none">
+  <div class="login-box">
+    <div class="login-logo">🏗 FLL Unearthed™</div>
+    <div class="login-sub">Temporada 2025–2026 · Acceso por equipo</div>
+
+    <!-- Team name field -->
+    <div id="login-step-name">
+      <div class="login-fg">
+        <div class="login-lbl">Nombre del equipo</div>
+        <input type="text" id="inp-team" placeholder="ej. Los Constructores" oninput="loginNameInput()" onkeydown="if(event.key==='Enter')loginNext()">
+      </div>
+      <div class="login-err" id="login-err-name"></div>
+      <button class="btn btn-green" style="width:100%;margin-top:4px" onclick="loginNext()">Continuar →</button>
+    </div>
+
+    <!-- PIN entry -->
+    <div id="login-step-pin" style="display:none">
+      <div class="team-badge">
+        <span class="team-badge-name" id="login-team-display"></span>
+        <button class="btn btn-sm" onclick="loginBack()">Cambiar</button>
+      </div>
+      <div class="login-fg">
+        <div class="login-lbl" id="pin-label">PIN del equipo (4 dígitos)</div>
+        <div class="pin-row">
+          <input class="pin-input" id="pin0" type="tel" maxlength="1" oninput="pinInput(0)" onkeydown="pinKey(event,0)">
+          <input class="pin-input" id="pin1" type="tel" maxlength="1" oninput="pinInput(1)" onkeydown="pinKey(event,1)">
+          <input class="pin-input" id="pin2" type="tel" maxlength="1" oninput="pinInput(2)" onkeydown="pinKey(event,2)">
+          <input class="pin-input" id="pin3" type="tel" maxlength="1" oninput="pinInput(3)" onkeydown="pinKey(event,3)">
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px" id="pin-hint"></div>
+      </div>
+      <div class="login-err" id="login-err-pin"></div>
+      <button class="btn btn-green" style="width:100%;margin-top:4px" id="login-btn-enter" onclick="loginEnter()">Entrar al equipo</button>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--text3);margin-top:20px;text-align:center">
+    Los datos se guardan en la nube · Accede desde cualquier dispositivo
+  </div>
+</div>
+<header class="hdr">
+  <h1>FLL Unearthed™</h1>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="hdr-team" style="font-size:12px;opacity:.7;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <span class="pill" id="hdr-sync">● En línea</span>
+    <button id="hdr-logout" onclick="logout()" style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:var(--rs);padding:4px 10px;font-size:12px;cursor:pointer;display:none">Salir</button>
+  </div>
+</header>
+<div class="tabs" id="tabs-bar">
+  <button class="tbtn active" data-tab="ronda"          onclick="switchTab('ronda')">Ronda</button>
+  <button class="tbtn"        data-tab="entrenamientos" onclick="switchTab('entrenamientos')">Entrenamientos</button>
+  <button class="tbtn"        data-tab="parrilla"       onclick="switchTab('parrilla')">Parrilla</button>
+  <button class="tbtn"        data-tab="parejas"        onclick="switchTab('parejas')">Parejas</button>
+  <button class="tbtn"        data-tab="estadisticas"   onclick="switchTab('estadisticas')">Estadísticas</button>
+  <button class="tbtn"        data-tab="efectividad"    onclick="switchTab('efectividad')">Efectividad</button>
+</div>
+<div class="main" id="main"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════════ */
+const TOKEN_SCORES={6:50,5:50,4:35,3:25,2:15,1:10,0:0};
+const MAX_SCORE=545;
+const TIMER_TOTAL=150; // 2:30 in seconds
+const CIRC=+(2*Math.PI*110).toFixed(2); // r=110
+
+const MISSIONS=[
+  {code:'INS',name:'Inspección de Equipo',amber:true,params:[
+    {id:'ins_ok',label:'Equipo cabe en una sola área de lanzamiento (≤305mm)',pts:20,type:'check'}]},
+  {code:'M01',name:'Cepillado de superficie',noEquip:true,params:[
+    {id:'m01_sed',label:'Sedimentos retirados completamente, tocando el tapete',pts:10,type:'counter',max:2,perItem:'10 c/u'},
+    {id:'m01_cep',label:'El cepillo NO toca el sitio de excavación',pts:10,type:'check'}]},
+  {code:'M02',name:'Revelación de mapa',params:[
+    {id:'m02_sec',label:'Secciones de capa superficial retiradas completamente',pts:10,type:'counter',max:3,perItem:'10 c/u'}]},
+  {code:'M03',name:'Exploración de minas',params:[
+    {id:'m03_cart',label:'Carro de mina de tu equipo en terreno del oponente',pts:30,type:'check'},
+    {id:'m03_bonus',label:'Bono: Carro del oponente en tu terreno',pts:10,type:'check',bonus:true,requires:'m03_cart'}]},
+  {code:'M04',name:'Recuperación cuidadosa',noEquip:true,params:[
+    {id:'m04_art',label:'Artefacto valioso no toca la mina',pts:30,type:'check'},
+    {id:'m04_sop',label:'Dos estructuras de soporte de pie',pts:10,type:'check'}]},
+  {code:'M05',name:'¿Quiénes vivieron aquí?',params:[
+    {id:'m05_sue',label:'Suelo en la estructura completamente horizontal',pts:30,type:'check'}]},
+  {code:'M06',name:'Forja',params:[
+    {id:'m06_min',label:'Bloques de mineral que no tocan la forja',pts:10,type:'counter',max:3,perItem:'10 c/u'}]},
+  {code:'M07',name:'Levantamiento de cargas pesadas',params:[
+    {id:'m07_mol',label:'Piedra de molino ya no toca su base',pts:30,type:'check'}]},
+  {code:'M08',name:'Silo',params:[
+    {id:'m08_pie',label:'Piezas preservadas fuera del silo',pts:10,type:'counter',max:3,perItem:'10 c/u'}]},
+  {code:'M09',name:'¿Qué hay a la venta?',noEquip:true,params:[
+    {id:'m09_tec',label:'Techo completamente levantado',pts:20,type:'check'},
+    {id:'m09_art',label:'Artículos del mercado levantados',pts:10,type:'check'}]},
+  {code:'M10',name:'Inclinación de balanza',params:[
+    {id:'m10_inc',label:'Balanza inclinada y toca el tapete',pts:20,type:'check'},
+    {id:'m10_pla',label:'Platillo con loop retirado',pts:10,type:'check'}]},
+  {code:'M11',name:'Artefactos para pesca',noEquip:true,params:[
+    {id:'m11_art',label:'Artefactos elevados sobre el cúmulo de tierra',pts:20,type:'check'},
+    {id:'m11_ban',label:'Bono: Banderín azul hacia abajo',pts:10,type:'check',bonus:true,requires:'m11_art'}]},
+  {code:'M12',name:'Operación de salvamento',noEquip:true,params:[
+    {id:'m12_are',label:'Arena removida completamente',pts:20,type:'check'},
+    {id:'m12_bal',label:'Balsa levantada completamente',pts:10,type:'check'}]},
+  {code:'M13',name:'Reconstrucción de estatua',noEquip:true,params:[
+    {id:'m13_est',label:'Estatua completamente levantada',pts:30,type:'check'}]},
+  {code:'M14',name:'Foro',noEquip:true,params:[
+    {id:'m14_foro',label:'Artefactos en el foro tocando el tapete',pts:5,type:'counter',max:7,perItem:'5 c/u',
+     hint:'Cepillo · Capa de suelo · Artefacto valioso · Carro oponente · Mineral fosilizado · Piedra molino · Platillo'}]},
+  {code:'M15',name:'Banderines de sitio',params:[
+    {id:'m15_ban',label:'Sitios con banderín dentro y tocando tapete',pts:10,type:'counter',max:3,perItem:'10 c/u'}]},
+  {code:'FP',name:'Fichas de precisión',amber:true,params:[
+    {id:'fp_tok',label:'Fichas restantes al final de la partida',pts:0,type:'token'}]},
+];
+
+/* ═══════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════ */
+let tab='ronda';
+let statsSubTab='global';
+// Inner tab per outer section: 'ranking'|'jugadores'|'parejas'|'cuadrillas'
+let statsInner={'global':'ranking','rondas-sueltas':'ranking','entrenamientos':'ranking'};
+// Per-training inner tab (keyed by training id)
+let statsTrainInner={};
+// Collapse state: key → true=open, false=collapsed
+let statsOpen={};
+let effSubTab='global';
+
+// roundMode: 'hub'|'loose-config'|'training-start'|'ready'|'countdown'|'timer'|'missions'
+let roundMode='hub';
+let pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',trainingId:null,trainingRoundId:null};
+let mState={}; // mission state for current run
+let activeTrainingId=null;
+let editingTR=null; // {trainingId, roundId}
+let editTRData={};
+// State for adding a new round to an existing training
+let addingRoundToTraining=null; // trainingId
+let newRoundData={label:'',azulPairId:'',rojaPairId:''};
+
+// ── TIMER (wall-clock, no drift) ──
+let timerRemaining=TIMER_TOTAL;
+let timerEndAt=0;       // Date.now() when timer hits 0
+let timerRunning=false;
+let _ticker=null;       // 250ms setInterval handle
+let cdVal=3;            // countdown value: 3→2→1→0(LEGO)
+let _cdTicker=null;     // 1s countdown interval
+
+// Data
+let players=[]; // [{id,name}]
+let pairs=[];   // [{id,name,p1,p2}]
+let trainings=[];// [{id,name,ts,status,rounds:[{id,order,label,azulPairId,rojaPairId,completed}]}]
+let runs=[];    // [{id,roundName,note,azulPairId,rojaPairId,missions,score,ts,trainingId,trainingRoundId}]
+
+// UI helpers
+let confDel={};
+let editingId={};
+let editData={};
+let nPlayerName='';
+let nPairName='',nPairP1='',nPairP2='';
+let nTrainName='',nTrainRounds=3,nTrainPairs=[];
+
+/* ═══════════════════════════════════════════
+   FIREBASE CONFIG & INIT
+═══════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAP3r7hdCaiTJNr7MaSycOpk5V8HO87t3U",
+  authDomain: "fll-unearthed-2026-6ff40.firebaseapp.com",
+  databaseURL: "https://fll-unearthed-2026-6ff40-default-rtdb.firebaseio.com",
+  projectId: "fll-unearthed-2026-6ff40",
+  storageBucket: "fll-unearthed-2026-6ff40.firebasestorage.app",
+  messagingSenderId: "1076126436793",
+  appId: "1:1076126436793:web:f9fb2460e53a6aa1713a68"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let currentTeamId = null;   // slug used as Firebase key
+let currentTeamName = null;
+let syncTimeout = null;
+
+/* ── Team ID generation ── */
+function teamSlug(name){
+  return name.trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'_')
+    .replace(/^_|_$/g,'')
+    .slice(0,40) || 'equipo';
+}
+
+/* ── Firebase save (debounced 800ms) ── */
+function save(){
+  if(!currentTeamId) return;
+  clearTimeout(syncTimeout);
+  // Show syncing indicator
+  const dot = document.getElementById('hdr-sync');
+  if(dot) dot.textContent = '↑ Guardando…';
+  syncTimeout = setTimeout(async ()=>{
+    try{
+      await db.ref('teams/'+currentTeamId+'/data').set({players,pairs,trainings,runs});
+      if(dot) dot.textContent = '● En línea';
+    } catch(e){
+      console.error('Firebase save error',e);
+      if(dot) dot.textContent = '⚠ Sin conexión';
+    }
+  }, 800);
+}
+
+/* ── Load team data from Firebase ── */
+async function loadTeamData(){
+  const snap = await db.ref('teams/'+currentTeamId+'/data').get();
+  if(snap.exists()){
+    const d = snap.val();
+    players  = d.players   || [];
+    pairs    = d.pairs     || [];
+    trainings= d.trainings || [];
+    runs     = d.runs      || [];
+  } else {
+    players=[]; pairs=[]; trainings=[]; runs=[];
+  }
+}
+
+/* ── Real-time listener: update if another device saves ── */
+let realtimeListener = null;
+function startRealtimeSync(){
+  if(realtimeListener) realtimeListener();
+  realtimeListener = db.ref('teams/'+currentTeamId+'/data').on('value', snap=>{
+    // Only update if we're not mid-edit (no pending save)
+    if(syncTimeout) return;
+    if(snap.exists()){
+      const d = snap.val();
+      players  = d.players   || [];
+      pairs    = d.pairs     || [];
+      trainings= d.trainings || [];
+      runs     = d.runs      || [];
+      render();
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════
+   LOGIN LOGIC
+═══════════════════════════════════════════ */
+let loginTeamName = '';
+let loginIsNew = false;
+
+function loginNameInput(){
+  document.getElementById('login-err-name').classList.remove('show');
+}
+
+function loginNext(){
+  const name = document.getElementById('inp-team').value.trim();
+  if(!name){ showLoginErr('name','Escribe el nombre del equipo'); return; }
+  loginTeamName = name;
+  document.getElementById('login-team-display').textContent = name;
+  document.getElementById('login-step-name').style.display='none';
+  document.getElementById('login-step-pin').style.display='block';
+  // Check if team exists to set the right label
+  const slug = teamSlug(name);
+  db.ref('teams/'+slug+'/pin').get().then(snap=>{
+    loginIsNew = !snap.exists();
+    document.getElementById('pin-label').textContent = loginIsNew
+      ? 'Crear PIN del equipo (4 dígitos)'
+      : 'PIN del equipo';
+    document.getElementById('login-btn-enter').textContent = loginIsNew
+      ? 'Crear equipo'
+      : 'Entrar al equipo';
+    document.getElementById('pin-hint').textContent = loginIsNew
+      ? 'Este PIN te servirá para acceder desde cualquier dispositivo'
+      : 'Ingresa el PIN para acceder a los datos de tu equipo';
+    document.getElementById('pin0').focus();
+  });
+}
+
+function loginBack(){
+  document.getElementById('login-step-pin').style.display='none';
+  document.getElementById('login-step-name').style.display='block';
+  clearPins();
+}
+
+function pinInput(i){
+  const val = document.getElementById('pin'+i).value;
+  if(val && i < 3) document.getElementById('pin'+(i+1)).focus();
+  if(val && i===3) loginEnter();
+  document.getElementById('login-err-pin').classList.remove('show');
+}
+function pinKey(e,i){
+  if(e.key==='Backspace'&&!document.getElementById('pin'+i).value&&i>0){
+    document.getElementById('pin'+(i-1)).focus();
+  }
+}
+function clearPins(){
+  [0,1,2,3].forEach(i=>document.getElementById('pin'+i).value='');
+  document.getElementById('pin0').focus();
+}
+function getPIN(){
+  return [0,1,2,3].map(i=>document.getElementById('pin'+i).value).join('');
+}
+
+async function loginEnter(){
+  const pin = getPIN();
+  if(pin.length!==4||!/^\d{4}$/.test(pin)){
+    showLoginErr('pin','El PIN debe ser 4 dígitos numéricos'); return;
+  }
+  const slug = teamSlug(loginTeamName);
+  const btn = document.getElementById('login-btn-enter');
+  btn.textContent = 'Verificando…'; btn.disabled = true;
+  try{
+    const snap = await db.ref('teams/'+slug+'/pin').get();
+    if(!snap.exists()){
+      // New team — create it
+      await db.ref('teams/'+slug).set({pin, name: loginTeamName, created: Date.now()});
+      await enterApp(slug, loginTeamName);
+    } else {
+      // Existing team — check PIN
+      if(snap.val()!==pin){
+        showLoginErr('pin','PIN incorrecto. Inténtalo de nuevo.');
+        btn.textContent = loginIsNew?'Crear equipo':'Entrar al equipo';
+        btn.disabled = false;
+        clearPins();
+        return;
+      }
+      await enterApp(slug, loginTeamName);
+    }
+  } catch(e){
+    showLoginErr('pin','Error de conexión. Verifica tu internet.');
+    btn.textContent = loginIsNew?'Crear equipo':'Entrar al equipo';
+    btn.disabled = false;
+  }
+}
+
+async function enterApp(slug, name){
+  currentTeamId = slug;
+  currentTeamName = name;
+  // Cache in localStorage for quick re-login
+  localStorage.setItem('fll_last_team', JSON.stringify({slug, name}));
+  await loadTeamData();
+  // Hide login, show app
+  document.getElementById('login-wrap').style.display='none';
+  document.getElementById('hdr-team').textContent = name;
+  document.getElementById('hdr-logout').style.display='';
+  startRealtimeSync();
+  render();
+}
+
+function showLoginErr(field, msg){
+  const el = document.getElementById('login-err-'+field);
+  el.textContent = msg; el.classList.add('show');
+}
+
+function logout(){
+  if(!confirm('¿Salir del equipo '+currentTeamName+'?')) return;
+  if(realtimeListener){ db.ref('teams/'+currentTeamId+'/data').off('value', realtimeListener); realtimeListener=null; }
+  currentTeamId=null; currentTeamName=null;
+  players=[];pairs=[];trainings=[];runs=[];
+  localStorage.removeItem('fll_last_team');
+  document.getElementById('hdr-team').textContent='';
+  document.getElementById('hdr-logout').style.display='none';
+  document.getElementById('login-step-pin').style.display='none';
+  document.getElementById('login-step-name').style.display='block';
+  document.getElementById('inp-team').value='';
+  clearPins();
+  document.getElementById('login-wrap').style.display='flex';
+}
+
+/* ═══════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════ */
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
+function getPlayer(id){return players.find(p=>p.id===id);}
+function getPair(id){return pairs.find(p=>p.id===id);}
+function getTraining(id){return trainings.find(t=>t.id===id);}
+function pairNames(pid){
+  const p=getPair(pid);if(!p)return'—';
+  return[getPlayer(p.p1)?.name,getPlayer(p.p2)?.name].filter(Boolean).join(' & ');
+}
+function pairOpts(sel=''){
+  return`<option value="">— Sin asignar —</option>`+
+    pairs.map(p=>`<option value="${p.id}"${p.id===sel?' selected':''}>${p.name} (${pairNames(p.id)})</option>`).join('');
+}
+function runLabel(r,i){return r.roundName||r.note||`Ronda ${i+1}`;}
+function medalClass(i){return i===0?'gold':i===1?'silver':i===2?'bronze':'';}
+function showToast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2400);
+}
+function defaultMState(){
+  const s={};
+  MISSIONS.forEach(m=>m.params.forEach(p=>{
+    if(p.type==='check')s[p.id]=false;
+    else if(p.type==='counter')s[p.id]=0;
+    else if(p.type==='token')s[p.id]=6;
+  }));
+  return s;
+}
+function calcScore(ms){
+  let t=0;
+  MISSIONS.forEach(m=>m.params.forEach(p=>{
+    if(p.type==='check'){if(ms[p.id]){if(p.requires&&!ms[p.requires])return;t+=p.pts;}}
+    else if(p.type==='counter')t+=(ms[p.id]||0)*p.pts;
+    else if(p.type==='token')t+=TOKEN_SCORES[ms[p.id]??6]||0;
+  }));
+  return t;
+}
+function mScoreFor(m,ms){
+  let t=0;
+  m.params.forEach(p=>{
+    if(p.type==='check'){if(ms[p.id]){if(p.requires&&!ms[p.requires])return;t+=p.pts;}}
+    else if(p.type==='counter')t+=(ms[p.id]||0)*p.pts;
+    else if(p.type==='token')t+=TOKEN_SCORES[ms[p.id]??6]||0;
+  });
+  return t;
+}
+function getMissionResults(ms){
+  if(!ms)return null;
+  return MISSIONS.map(m=>({code:m.code,name:m.name,pts:mScoreFor(m,ms),done:mScoreFor(m,ms)>0}));
+}
+function avg(arr){return arr.length?Math.round(arr.reduce((a,b)=>a+b,0)/arr.length):null;}
+function best(arr){return arr.length?Math.max(...arr):null;}
+
+/* ═══════════════════════════════════════════
+   TIMER — WALL CLOCK (no drift, no double-tick)
+   Uses Date.now() to compute remaining each tick.
+═══════════════════════════════════════════ */
+function _stopAll(){
+  if(_ticker){clearInterval(_ticker);_ticker=null;}
+  if(_cdTicker){clearInterval(_cdTicker);_cdTicker=null;}
+}
+function stopTimerCleanup(){
+  _stopAll();
+  timerRunning=false;
+  timerRemaining=TIMER_TOTAL;
+  timerEndAt=0;
+}
+
+// Called every 250ms; updates remaining from wall clock
+function _tick(){
+  const newR=Math.max(0,Math.ceil((timerEndAt-Date.now())/1000));
+  if(newR!==timerRemaining){
+    timerRemaining=newR;
+    _updateTimerDOM();
+  }
+  if(timerRemaining<=0){
+    _stopAll();
+    timerRunning=false;
+    // Time's up → go to mission entry
+    roundMode='missions';
+    mState=defaultMState();
+    render();
+  }
+}
+
+// Start (or resume) running the timer
+function startTimer(){
+  if(timerRunning)return;
+  timerEndAt=Date.now()+timerRemaining*1000;
+  timerRunning=true;
+  if(_ticker){clearInterval(_ticker);} // guard
+  _ticker=setInterval(_tick,250);
+  _updateTimerDOM();
+}
+
+function pauseTimer(){
+  if(_ticker){clearInterval(_ticker);_ticker=null;}
+  timerRunning=false;
+  _updateTimerDOM();
+}
+
+// Updates only timer DOM elements — no full render
+function _updateTimerDOM(){
+  const m=Math.floor(timerRemaining/60);
+  const s=timerRemaining%60;
+  const disp=`${m}:${s.toString().padStart(2,'0')}`;
+  const el=document.getElementById('td');if(el)el.textContent=disp;
+  const arc=document.getElementById('tarc');
+  if(arc){
+    const off=+(CIRC*(1-timerRemaining/TIMER_TOTAL)).toFixed(2);
+    arc.setAttribute('stroke-dashoffset',off);
+    arc.setAttribute('stroke',timerRemaining>60?'#3B6D11':timerRemaining>30?'#854F0B':'#A32D2D');
+  }
+  const lbl=document.getElementById('tlbl');
+  if(lbl)lbl.textContent=timerRunning?'en curso':'pausado';
+}
+
+// Initiates 3-2-1-LEGO countdown then starts real timer
+function beginCountdown(){
+  _stopAll();
+  cdVal=3;
+  roundMode='countdown';
+  render(); // show "3"
+  _cdTicker=setInterval(()=>{
+    cdVal--;
+    // Update just the number DOM node (no full render needed)
+    const el=document.getElementById('cdnum');
+    if(el){
+      el.textContent=cdVal>0?String(cdVal):(cdVal===0?'LEGO':'');
+      el.style.color=cdVal===0?'var(--green)':'var(--text)';
+      // Re-trigger animation
+      el.style.animation='none';
+      void el.offsetWidth;
+      el.style.animation='cdpop .5s ease-out both';
+    }
+    if(cdVal<0){
+      // Countdown finished — start the real 2:30 timer
+      _stopAll();
+      timerRemaining=TIMER_TOTAL;
+      timerEndAt=Date.now()+TIMER_TOTAL*1000;
+      timerRunning=true;
+      roundMode='timer';
+      render();
+      _ticker=setInterval(_tick,250);
+    }
+  },1000);
+}
+
+/* ═══════════════════════════════════════════
+   RENDER DISPATCH
+═══════════════════════════════════════════ */
+function render(){
+  const el=document.getElementById('main');
+  if(tab==='ronda')            el.innerHTML=renderRonda();
+  else if(tab==='entrenamientos')el.innerHTML=renderEntrenamientos();
+  else if(tab==='parrilla')    el.innerHTML=renderParrilla();
+  else if(tab==='parejas')     el.innerHTML=renderParejas();
+  else if(tab==='estadisticas')el.innerHTML=renderEstadisticas();
+  else if(tab==='efectividad') el.innerHTML=renderEfectividad();
+  // Sync timer DOM if timer is running (don't restart anything)
+  if(roundMode==='timer')_updateTimerDOM();
+}
+function switchTab(t){
+  if((timerRunning||roundMode==='countdown')&&t!=='ronda'){showToast('⏱ Hay un contador activo');return;}
+  tab=t;
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  render();
+}
+function switchStatsSub(t){statsSubTab=t;render();}
+function switchEffSub(t){effSubTab=t;render();}
+
+/* ═══════════════════════════════════════════
+   TAB: RONDA
+═══════════════════════════════════════════ */
+function renderRonda(){
+  if(roundMode==='hub')           return renderHub();
+  if(roundMode==='loose-config')  return renderLooseConfig();
+  if(roundMode==='training-start')return renderTrainingStart();
+  if(roundMode==='ready')         return renderReady();
+  if(roundMode==='countdown')     return renderCountdown();
+  if(roundMode==='timer')         return renderTimerRunning();
+  if(roundMode==='missions')      return renderMissions();
+  return renderHub();
+}
+
+/* ── HUB ── */
+function renderHub(){
+  const at=trainings.find(t=>t.status==='active');
+  const banner=at?
+    `<div style="background:var(--amber-l);border:1px solid #F5C4B3;border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--amber)">ENTRENAMIENTO ACTIVO</div>
+        <div style="font-size:15px;font-weight:500">${at.name}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${at.rounds.filter(r=>r.completed).length}/${at.rounds.length} rondas completadas</div>
+      </div>
+      <button class="btn btn-amber" onclick="resumeTraining('${at.id}')">Continuar entrenamiento</button>
+    </div>`:
+    `<div style="background:var(--green-l);border:1px solid var(--green-b);border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--green)">ENTRENAMIENTO</div>
+        <div style="font-size:13px;color:var(--text2)">Planifica desde la pestaña <strong>Entrenamientos</strong></div>
+      </div>
+      <button class="btn btn-sm" onclick="switchTab('entrenamientos')">Ver entrenamientos</button>
+    </div>`;
+  return`<div style="margin-bottom:10px;font-size:13px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.5px;font-family:'Barlow Condensed',sans-serif">¿Cómo quieres lanzar?</div>
+  ${banner}
+  <button class="hub-btn" onclick="startLoose()">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:44px;height:44px;border-radius:var(--r);background:var(--blue-l);border:1px solid var(--blue-b);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#185FA5" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div>
+        <div class="hub-btn-title">Lanzada suelta</div>
+        <div class="hub-btn-sub">Sin entrenamiento — elige parejas, corre el contador y registra misiones</div>
+      </div>
+    </div>
+  </button>`;
+}
+
+function startLoose(){
+  pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',trainingId:null,trainingRoundId:null};
+  roundMode='loose-config';render();
+}
+
+/* ── LOOSE CONFIG ── */
+function renderLooseConfig(){
+  return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <button class="btn btn-sm" onclick="roundMode='hub';render()">← Volver</button>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700">Nueva lanzada suelta</div>
+  </div>
+  <div class="form-card">
+    <div class="fg">
+      <div class="field-lbl">Nombre de la ronda <span style="color:var(--red)">*</span></div>
+      <input type="text" placeholder="ej. Ronda 1, Práctica A..." value="${pendingRound.roundName}" oninput="pendingRound.roundName=this.value">
+    </div>
+    <div class="fg">
+      <div class="field-lbl">Nota adicional (opcional)</div>
+      <input type="text" placeholder="ej. segunda prueba del día..." value="${pendingRound.note}" oninput="pendingRound.note=this.value">
+    </div>
+    ${pairs.length?`
+    <div class="field-lbl">Parejas que lanzan</div>
+    <div class="bases-grid">
+      <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
+        <select onchange="pendingRound.azulPairId=this.value">${pairOpts(pendingRound.azulPairId)}</select>
+      </div>
+      <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
+        <select onchange="pendingRound.rojaPairId=this.value">${pairOpts(pendingRound.rojaPairId)}</select>
+      </div>
+    </div>`:
+    `<p style="font-size:12px;color:var(--text3);margin:8px 0">Sin parejas. <a href="#" onclick="switchTab('parejas');return false;" style="color:var(--blue)">Crear parejas</a></p>`}
+    <button class="btn btn-green btn-lg" style="width:100%;margin-top:12px" onclick="goToReady()">▶ Iniciar contador</button>
+  </div>`;
+}
+
+function goToReady(){
+  if(!pendingRound.roundName.trim()){showToast('Escribe el nombre de la ronda');return;}
+  stopTimerCleanup(); // reset cleanly
+  timerRemaining=TIMER_TOTAL;
+  roundMode='ready';
+  render();
+  // NO auto-start here — user must press "Comenzar ronda"
+}
+
+/* ── READY SCREEN (2:30 frozen, waiting for "Comenzar ronda") ── */
+function renderReady(){
+  const ap=getPair(pendingRound.azulPairId);
+  const rp=getPair(pendingRound.rojaPairId);
+  return`<div class="timer-screen">
+    <div class="timer-info">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;margin-bottom:6px">${pendingRound.roundName||'Ronda'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${ap?`<span class="bpill azul"><span class="dot azul"></span>${ap.name}</span>`:''}
+        ${rp?`<span class="bpill roja"><span class="dot roja"></span>${rp.name}</span>`:''}
+        ${!ap&&!rp?`<span style="font-size:12px;color:var(--text3)">Sin parejas asignadas</span>`:''}
+      </div>
+    </div>
+    <div class="timer-wrap">
+      <svg viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg" width="260" height="260">
+        <circle cx="140" cy="140" r="110" fill="none" stroke="#EDE8DC" stroke-width="14"/>
+        <circle cx="140" cy="140" r="110" fill="none" stroke="#3B6D11" stroke-width="14"
+          stroke-dasharray="${CIRC}" stroke-dashoffset="0"
+          stroke-linecap="round" transform="rotate(-90 140 140)"/>
+      </svg>
+      <div class="timer-center">
+        <div class="timer-digits">2:30</div>
+        <div class="timer-sublabel">listo para comenzar</div>
+      </div>
+    </div>
+    <div class="timer-actions">
+      <button class="btn btn-green btn-lg" style="font-size:18px;padding:18px 40px" onclick="beginCountdown()">▶ Comenzar ronda</button>
+      <button class="btn btn-red btn-sm" style="margin-top:4px" onclick="cancelRound()">✕ Cancelar</button>
+    </div>
+  </div>`;
+}
+
+/* ── COUNTDOWN 3-2-1-LEGO ── */
+function renderCountdown(){
+  const disp=cdVal>0?String(cdVal):(cdVal===0?'LEGO':'');
+  const col=cdVal===0?'var(--green)':'var(--text)';
+  return`<div class="cd-screen">
+    <div id="cdnum" class="cd-num" style="color:${col}">${disp}</div>
+    <div class="cd-sub">${pendingRound.roundName||''}</div>
+    ${cdVal===0?`<div style="font-size:13px;color:var(--green);margin-top:8px;font-weight:500">¡El tiempo comienza ahora!</div>`:''}
+  </div>`;
+}
+
+/* ── TIMER RUNNING ── */
+function renderTimerRunning(){
+  const ap=getPair(pendingRound.azulPairId);
+  const rp=getPair(pendingRound.rojaPairId);
+  const m=Math.floor(timerRemaining/60),s=timerRemaining%60;
+  const disp=`${m}:${s.toString().padStart(2,'0')}`;
+  const off=+(CIRC*(1-timerRemaining/TIMER_TOTAL)).toFixed(2);
+  const col=timerRemaining>60?'#3B6D11':timerRemaining>30?'#854F0B':'#A32D2D';
+  return`<div class="timer-screen">
+    <div class="timer-info">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;margin-bottom:6px">${pendingRound.roundName||'Ronda'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${ap?`<span class="bpill azul"><span class="dot azul"></span>${ap.name}</span>`:''}
+        ${rp?`<span class="bpill roja"><span class="dot roja"></span>${rp.name}</span>`:''}
+        ${!ap&&!rp?`<span style="font-size:12px;color:var(--text3)">Sin parejas</span>`:''}
+      </div>
+    </div>
+    <div class="timer-wrap" id="twrap">
+      <svg viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg" width="260" height="260">
+        <circle cx="140" cy="140" r="110" fill="none" stroke="#EDE8DC" stroke-width="14"/>
+        <circle id="tarc" cx="140" cy="140" r="110" fill="none"
+          stroke="${col}" stroke-width="14"
+          stroke-dasharray="${CIRC}" stroke-dashoffset="${off}"
+          stroke-linecap="round" transform="rotate(-90 140 140)"/>
+      </svg>
+      <div class="timer-center">
+        <div class="timer-digits" id="td">${disp}</div>
+        <div class="timer-sublabel" id="tlbl">${timerRunning?'en curso':'pausado'}</div>
+      </div>
+    </div>
+    <div class="timer-actions">
+      ${timerRunning
+        ?`<button class="btn btn-lg" onclick="pauseTimer();render()">⏸ Pausar</button>`
+        :`<button class="btn btn-green btn-lg" onclick="startTimer();render()">▶ Reanudar</button>`}
+      <button class="btn btn-lg" onclick="goToMissions()">Terminar ronda →</button>
+      <button class="btn btn-red btn-sm" style="margin-top:4px" onclick="cancelRound()">✕ Cancelar</button>
+    </div>
+  </div>`;
+}
+
+function goToMissions(){pauseTimer();roundMode='missions';mState=defaultMState();render();}
+function cancelRound(){
+  stopTimerCleanup();
+  const wasT=!!pendingRound.trainingId;
+  pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',trainingId:null,trainingRoundId:null};
+  roundMode=wasT?'training-start':'hub';
+  render();
+}
+
+/* ── MISSION ENTRY ──
+   KEY: mToggle/mCounter/mToken do NOT call render().
+   They update only the specific DOM nodes, so checkboxes
+   and buttons keep working without DOM destruction.
+*/
+function renderMissions(){
+  const score=calcScore(mState);
+  const ap=getPair(pendingRound.azulPairId);
+  const rp=getPair(pendingRound.rojaPairId);
+
+  const items=MISSIONS.map((m,mi)=>{
+    const ms=mScoreFor(m,mState);
+    const params=m.params.map(p=>{
+      if(p.type==='check'){
+        const dis=p.requires&&!mState[p.requires];
+        return`<div id="pr_${p.id}" class="prow"${dis?' style="opacity:.35;pointer-events:none"':''}>
+          <div class="pleft">
+            <input type="checkbox" id="cb_${p.id}"${mState[p.id]?' checked':''} onchange="mToggle('${p.id}')">
+            <label for="cb_${p.id}" class="pdesc">${p.bonus?`<span class="btag">BONO</span>`:''}${p.label}</label>
+          </div>
+          <span class="ppts-lbl">+${p.pts}</span>
+        </div>`;
+      }
+      if(p.type==='counter'){
+        const val=mState[p.id]||0;
+        return`<div class="prow">
+          <div style="flex:1;min-width:0">
+            <div class="pdesc">${p.label}</div>
+            ${p.hint?`<div class="hint">${p.hint}</div>`:''}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span class="ppts-lbl">${p.perItem}·máx ${p.max}</span>
+            <div class="ctr">
+              <button class="cbtn" type="button" onclick="mCounter('${p.id}',-1,${p.max})">−</button>
+              <span class="cval" id="cv_${p.id}">${val}</span>
+              <button class="cbtn" type="button" onclick="mCounter('${p.id}',1,${p.max})">+</button>
+            </div>
+          </div>
+        </div>`;
+      }
+      if(p.type==='token'){
+        const val=mState[p.id]??6;
+        return`<div class="prow" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+            <span class="pdesc">Fichas: <strong id="tok_v">${val}</strong></span>
+            <span id="tok_p" style="font-size:14px;font-weight:700;font-family:'Barlow Condensed',sans-serif;color:var(--amber)">${TOKEN_SCORES[val]} pts</span>
+          </div>
+          <div class="tok-btns" id="tok_btns">
+            ${[6,5,4,3,2,1,0].map(n=>`<button class="tbtn2${n===val?' on':''}" type="button" data-n="${n}" onclick="mToken(${n})">${n}→${TOKEN_SCORES[n]}</button>`).join('')}
+          </div>
+        </div>`;
+      }
+      return'';
+    }).join('');
+
+    return`<div class="mcard">
+      <div class="mcard-head">
+        <span class="mcode${m.amber?' am':''}">${m.code}</span>
+        <span class="mtitle">${m.name}</span>
+        ${m.noEquip?`<span class="neq">Sin equipo</span>`:''}
+        <span class="mpts${ms>0?' yes':' no'}" id="mpts_${mi}">${ms} pts</span>
+      </div>
+      ${params}
+    </div>`;
+  }).join('');
+
+  return`<div class="score-hdr">
+    <div>
+      <div style="font-size:12px;opacity:.7">${pendingRound.roundName||'Ronda'}</div>
+      <div><span class="score-big" id="mscore">${score}</span><span style="font-size:14px;opacity:.5"> / ${MAX_SCORE}</span></div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">
+        ${ap?`<span class="bpill azul"><span class="dot azul"></span>${ap.name}</span>`:''}
+        ${rp?`<span class="bpill roja"><span class="dot roja"></span>${rp.name}</span>`:''}
+      </div>
+    </div>
+    <button class="btn btn-green btn-lg" type="button" onclick="saveRun()">Guardar ronda</button>
+  </div>
+  ${items}
+  <div style="display:flex;gap:8px;margin-top:12px;padding-bottom:20px">
+    <button class="btn btn-red" type="button" onclick="cancelRound()">Cancelar</button>
+    <button class="btn btn-green" style="flex:1" type="button" onclick="saveRun()">Guardar ronda</button>
+  </div>`;
+}
+
+/* Light DOM update — called by mToggle/mCounter/mToken (no full render) */
+function _refreshMissions(){
+  const score=calcScore(mState);
+  const sc=document.getElementById('mscore');
+  if(sc)sc.textContent=score;
+  MISSIONS.forEach((m,mi)=>{
+    const ms=mScoreFor(m,mState);
+    const mEl=document.getElementById('mpts_'+mi);
+    if(mEl){mEl.textContent=ms+' pts';mEl.className='mpts '+(ms>0?'yes':'no');}
+    m.params.forEach(p=>{
+      if(p.type==='check'){
+        const cb=document.getElementById('cb_'+p.id);
+        if(cb)cb.checked=!!mState[p.id];
+        // update disabled state for bonuses
+        if(p.requires){
+          const row=document.getElementById('pr_'+p.id);
+          if(row){
+            const dis=!mState[p.requires];
+            row.style.opacity=dis?'0.35':'1';
+            row.style.pointerEvents=dis?'none':'';
+          }
+        }
+      } else if(p.type==='counter'){
+        const cv=document.getElementById('cv_'+p.id);
+        if(cv)cv.textContent=mState[p.id]||0;
+      } else if(p.type==='token'){
+        const val=mState[p.id]??6;
+        const tv=document.getElementById('tok_v');if(tv)tv.textContent=val;
+        const tp=document.getElementById('tok_p');if(tp)tp.textContent=TOKEN_SCORES[val]+' pts';
+        document.querySelectorAll('#tok_btns .tbtn2').forEach(btn=>{
+          btn.classList.toggle('on',parseInt(btn.dataset.n)===val);
+        });
+      }
+    });
+  });
+}
+
+function mToggle(id){
+  mState[id]=!mState[id];
+  if(!mState[id])MISSIONS.forEach(m=>m.params.forEach(p=>{if(p.requires===id)mState[p.id]=false;}));
+  _refreshMissions();
+}
+function mCounter(id,d,max){
+  mState[id]=Math.max(0,Math.min(max||99,(mState[id]||0)+d));
+  _refreshMissions();
+}
+function mToken(n){mState['fp_tok']=n;_refreshMissions();}
+
+function saveRun(){
+  if(!pendingRound.roundName.trim()){showToast('La ronda necesita un nombre');return;}
+  const score=calcScore(mState);
+  const snap=JSON.parse(JSON.stringify(mState));
+  const run={id:uid(),roundName:pendingRound.roundName.trim(),note:pendingRound.note.trim(),
+    azulPairId:pendingRound.azulPairId,rojaPairId:pendingRound.rojaPairId,
+    missions:snap,score,ts:Date.now(),
+    trainingId:pendingRound.trainingId||null,trainingRoundId:pendingRound.trainingRoundId||null};
+  runs.push(run);
+  if(pendingRound.trainingId&&pendingRound.trainingRoundId){
+    const t=getTraining(pendingRound.trainingId);
+    if(t){const r=t.rounds.find(x=>x.id===pendingRound.trainingRoundId);if(r)r.completed=true;}
+  }
+  save();
+  stopTimerCleanup();
+  showToast(`Guardado: ${score} pts`);
+  const wasT=!!pendingRound.trainingId;const tid=pendingRound.trainingId;
+  pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',trainingId:null,trainingRoundId:null};
+  mState={};
+  if(wasT){activeTrainingId=tid;roundMode='training-start';}else roundMode='hub';
+  render();
+}
+
+/* ── TRAINING START VIEW ── */
+function resumeTraining(id){activeTrainingId=id;roundMode='training-start';render();}
+
+function renderTrainingStart(){
+  const t=getTraining(activeTrainingId);
+  if(!t){roundMode='hub';render();return'';}
+  const next=t.rounds.find(r=>!r.completed);
+  const rows=t.rounds.map((r,i)=>{
+    const isDone=r.completed;const isNext=next&&r.id===next.id;
+    const isEd=editingTR&&editingTR.trainingId===t.id&&editingTR.roundId===r.id;
+    const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
+    const runFor=runs.find(x=>x.trainingRoundId===r.id);
+    const pairView=isEd?
+      `<div class="bases-grid" style="margin-top:8px">
+        <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
+          <select id="ea_${r.id}">${pairOpts(editTRData.azul||r.azulPairId)}</select></div>
+        <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
+          <select id="er_${r.id}">${pairOpts(editTRData.roja||r.rojaPairId)}</select></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn btn-green btn-sm" onclick="saveTREdit('${t.id}','${r.id}')">Guardar</button>
+        <button class="btn btn-sm" onclick="editingTR=null;editTRData={};render()">Cancelar</button>
+      </div>`:
+      `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        ${ap?`<span class="bpill azul"><span class="dot azul"></span>${ap.name}</span>`:'<span style="font-size:12px;color:var(--text3)">Azul: —</span>'}
+        ${rp?`<span class="bpill roja"><span class="dot roja"></span>${rp.name}</span>`:'<span style="font-size:12px;color:var(--text3)">Roja: —</span>'}
+      </div>`;
+    return`<div class="tr-row ${isDone?'done':isNext?'next':''}">
+      <div class="trr-hdr">
+        <div>
+          <div class="trr-num">Ronda ${i+1}${r.label?` — ${r.label}`:''}</div>
+          ${pairView}
+          ${isDone&&runFor?`<div style="font-size:12px;color:var(--green);margin-top:4px;font-weight:500">✓ ${runFor.score} pts</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <span class="sbadge ${isDone?'done':isNext?'next':'pending'}">${isDone?'Completada':isNext?'Siguiente':'Pendiente'}</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+            ${!isDone&&!isEd?`<button class="btn btn-amber btn-sm" onclick="editTR('${t.id}','${r.id}','${r.azulPairId||''}','${r.rojaPairId||''}')">Editar parejas</button>`:''}
+            ${isNext&&!isEd?`<button class="btn btn-green btn-sm" onclick="startTR('${t.id}','${r.id}')">▶ Iniciar</button>`:''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  const allDone=t.rounds.every(r=>r.completed);
+  const isAddingRound=addingRoundToTraining===t.id;
+
+  const addRoundForm=isAddingRound?`
+    <div class="form-card" style="margin-top:10px">
+      <div class="sec-lbl">Nueva lanzada</div>
+      <div style="margin-bottom:8px">
+        <div class="field-lbl">Etiqueta (opcional)</div>
+        <input type="text" placeholder="ej. práctica extra, tanda 2..." value="${newRoundData.label}" oninput="newRoundData.label=this.value">
+      </div>
+      <div class="field-lbl">Parejas</div>
+      <div class="bases-grid" style="margin-bottom:10px">
+        <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
+          <select onchange="newRoundData.azulPairId=this.value">${pairOpts(newRoundData.azulPairId)}</select>
+        </div>
+        <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
+          <select onchange="newRoundData.rojaPairId=this.value">${pairOpts(newRoundData.rojaPairId)}</select>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn btn-green" onclick="confirmAddRound('${t.id}')">+ Agregar lanzada</button>
+        <button class="btn btn-sm" onclick="addingRoundToTraining=null;newRoundData={label:'',azulPairId:'',rojaPairId:''};render()">Cancelar</button>
+      </div>
+    </div>`:
+    `<button class="btn btn-sm" style="margin-top:10px;width:100%" onclick="addingRoundToTraining='${t.id}';newRoundData={label:'',azulPairId:'',rojaPairId:''};render()">
+      + Agregar lanzada al entrenamiento
+    </button>`;
+
+  return`<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <button class="btn btn-sm" onclick="roundMode='hub';activeTrainingId=null;addingRoundToTraining=null;render()">← Volver</button>
+    <div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700">${t.name}</div>
+      <div style="font-size:12px;color:var(--text3)">${t.rounds.filter(r=>r.completed).length}/${t.rounds.length} rondas completadas</div>
+    </div>
+  </div>
+  ${allDone?`<div style="background:var(--green-l);border:1px solid var(--green-b);border-radius:var(--r);padding:14px;text-align:center;margin-bottom:14px">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:var(--green)">¡Entrenamiento completado!</div>
+    <div style="font-size:13px;color:var(--text2);margin-top:4px">Puedes agregar más lanzadas abajo si lo necesitas</div>
+    <button class="btn btn-sm" style="margin-top:10px" onclick="finishTraining('${t.id}')">Cerrar entrenamiento</button>
+  </div>`:''}
+  ${rows}
+  ${addRoundForm}`;
+}
+
+function editTR(tid,rid,az,rj){editingTR={trainingId:tid,roundId:rid};editTRData={azul:az,roja:rj};render();}
+function saveTREdit(tid,rid){
+  const t=getTraining(tid);if(!t)return;
+  const r=t.rounds.find(x=>x.id===rid);if(!r)return;
+  r.azulPairId=document.getElementById('ea_'+rid)?.value||'';
+  r.rojaPairId=document.getElementById('er_'+rid)?.value||'';
+  editingTR=null;editTRData={};save();showToast('Parejas actualizadas');render();
+}
+function startTR(tid,rid){
+  const t=getTraining(tid);if(!t)return;
+  const r=t.rounds.find(x=>x.id===rid);if(!r)return;
+  pendingRound={roundName:`${t.name} — Ronda ${t.rounds.indexOf(r)+1}`,note:'',
+    azulPairId:r.azulPairId||'',rojaPairId:r.rojaPairId||'',trainingId:tid,trainingRoundId:rid};
+  stopTimerCleanup();timerRemaining=TIMER_TOTAL;roundMode='ready';render();
+}
+function finishTraining(id){
+  const t=getTraining(id);if(t)t.status='completed';
+  save();activeTrainingId=null;roundMode='hub';render();
+}
+
+function confirmAddRound(tid){
+  const t=getTraining(tid);if(!t)return;
+  const newRound={
+    id:uid(),
+    order:t.rounds.length,
+    label:newRoundData.label.trim(),
+    azulPairId:newRoundData.azulPairId||'',
+    rojaPairId:newRoundData.rojaPairId||'',
+    completed:false
+  };
+  t.rounds.push(newRound);
+  // If training was completed, reopen it
+  if(t.status==='completed') t.status='active';
+  addingRoundToTraining=null;
+  newRoundData={label:'',azulPairId:'',rojaPairId:''};
+  save();showToast('Lanzada agregada');render();
+}
+
+/* ═══════════════════════════════════════════
+   TAB: ENTRENAMIENTOS
+═══════════════════════════════════════════ */
+function renderEntrenamientos(){
+  const rows=[];
+  for(let i=0;i<nTrainRounds;i++){
+    if(!nTrainPairs[i])nTrainPairs[i]={azulPairId:'',rojaPairId:'',label:''};
+    rows.push(`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700">Ronda ${i+1}</div>
+        ${nTrainRounds>1?`<button class="btn btn-red btn-sm" style="padding:2px 8px;font-size:11px" onclick="removeTrainRound(${i})">× Quitar</button>`:''}
+      </div>
+      <div style="margin-bottom:6px">
+        <div class="field-lbl">Etiqueta (opcional)</div>
+        <input type="text" placeholder="ej. práctica corta" value="${nTrainPairs[i].label||''}" oninput="nTrainPairs[${i}].label=this.value">
+      </div>
+      <div class="bases-grid">
+        <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
+          <select onchange="nTrainPairs[${i}].azulPairId=this.value">${pairOpts(nTrainPairs[i].azulPairId)}</select>
+        </div>
+        <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
+          <select onchange="nTrainPairs[${i}].rojaPairId=this.value">${pairOpts(nTrainPairs[i].rojaPairId)}</select>
+        </div>
+      </div>
+    </div>`);
+  }
+  const form=pairs.length?`<div class="form-card">
+    <div class="sec-lbl">Nuevo entrenamiento</div>
+    <div class="fg">
+      <div class="field-lbl">Nombre del entrenamiento</div>
+      <input type="text" placeholder="ej. Sesión martes, Entrenamiento 1..." value="${nTrainName}" oninput="nTrainName=this.value">
+    </div>
+    <div style="margin-bottom:10px">${rows.join('')}</div>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn btn-sm" onclick="addTrainRound()">+ Agregar ronda</button>
+      <span style="font-size:12px;color:var(--text3)">${nTrainRounds} lanzada${nTrainRounds!==1?'s':''}</span>
+    </div>
+    <button class="btn btn-green" style="width:100%" onclick="createTraining()">Crear entrenamiento</button>
+  </div>`:
+  `<div class="form-card"><p style="font-size:13px;color:var(--text3)">Primero crea <a href="#" onclick="switchTab('parejas');return false;" style="color:var(--blue)">parejas</a>.</p></div>`;
+
+  if(!trainings.length)return form+`<div class="empty">No hay entrenamientos aún.</div>`;
+
+  const list=trainings.map(t=>{
+    const done=t.rounds.filter(r=>r.completed).length;
+    const status=t.status||'planned';
+    const isDel=confDel['t_'+t.id];
+    const slabel=status==='active'?'Activo':status==='completed'?'Completado':'Planeado';
+    const scls=status==='active'?'next':status==='completed'?'done':'pending';
+    return`<div class="card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700">${t.name}</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:2px">${t.rounds.length} lanzadas · ${done} completadas</div>
+          <span class="sbadge ${scls}" style="margin-top:4px;display:inline-block">${slabel}</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${status!=='completed'?`<button class="btn btn-green btn-sm" onclick="activateTraining('${t.id}')">▶ ${status==='active'?'Continuar':'Iniciar'}</button>`:''}
+          <button class="btn btn-sm" onclick="addRoundFromList('${t.id}')">+ Lanzada</button>
+          ${!isDel?`<button class="btn btn-red btn-sm" onclick="askDel('t_${t.id}','t')">Eliminar</button>`:''}
+        </div>
+      </div>
+      <div style="margin-top:10px">${t.rounds.map((r,i)=>{
+        const run=runs.find(x=>x.trainingRoundId===r.id);
+        const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
+        const rKey='rr_'+r.id;const isRDel=confDel[rKey];
+        return`<div style="border-bottom:1px solid var(--border);padding:6px 0">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <div>
+              <span style="font-size:13px;font-weight:500">Ronda ${i+1}${r.label?` — ${r.label}`:''}</span>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">
+                ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
+                ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${run?`<span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--green)">${run.score} pts</span>`:`<span style="font-size:12px;color:var(--text3)">Pendiente</span>`}
+              ${run&&!isRDel?`<button class="btn btn-red btn-sm" style="font-size:11px;padding:2px 6px" onclick="askDel('${rKey}','rr')">× Borrar</button>`:''}
+            </div>
+          </div>
+          ${isRDel?`<div class="conf" style="margin-top:4px">
+            <span>¿Borrar resultado de Ronda ${i+1}?</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-red btn-sm" onclick="delTRResult('${t.id}','${r.id}')">Confirmar</button>
+              <button class="btn btn-sm" onclick="cancelDel('${rKey}')">Cancelar</button>
+            </div>
+          </div>`:''}
+        </div>`;
+      }).join('')}</div>
+      ${isDel?`<div class="conf">
+        <span>¿Eliminar <strong>${t.name}</strong> y todos sus resultados?</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-red btn-sm" onclick="delTraining('${t.id}')">Confirmar</button>
+          <button class="btn btn-sm" onclick="cancelDel('t_${t.id}')">Cancelar</button>
+        </div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+  return form+list;
+}
+
+function addRoundFromList(tid){
+  // Activate training if not active, then open the add-round form in the Ronda tab
+  const t=getTraining(tid);if(!t)return;
+  if(t.status==='planned') t.status='active';
+  activeTrainingId=tid;
+  addingRoundToTraining=tid;
+  newRoundData={label:'',azulPairId:'',rojaPairId:''};
+  roundMode='training-start';
+  tab='ronda';
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='ronda'));
+  render();
+}
+function addTrainRound(){nTrainRounds++;render();}
+function removeTrainRound(i){if(nTrainRounds<=1)return;nTrainPairs.splice(i,1);nTrainRounds--;render();}
+function createTraining(){
+  if(!nTrainName.trim()){showToast('Escribe el nombre del entrenamiento');return;}
+  const rounds=[];
+  for(let i=0;i<nTrainRounds;i++){
+    const p=nTrainPairs[i]||{};
+    rounds.push({id:uid(),order:i,label:p.label||'',azulPairId:p.azulPairId||'',rojaPairId:p.rojaPairId||'',completed:false});
+  }
+  trainings.push({id:uid(),name:nTrainName.trim(),ts:Date.now(),status:'planned',rounds});
+  nTrainName='';nTrainRounds=3;nTrainPairs=[];
+  save();showToast('Entrenamiento creado');render();
+}
+function activateTraining(id){
+  trainings.forEach(t=>{if(t.status==='active'&&t.id!==id)t.status='paused';});
+  const t=getTraining(id);if(t)t.status='active';
+  activeTrainingId=id;save();
+  roundMode='training-start';tab='ronda';
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='ronda'));
+  render();
+}
+function delTraining(id){
+  trainings=trainings.filter(t=>t.id!==id);
+  runs=runs.filter(r=>r.trainingId!==id);
+  confDel={...confDel,['t_'+id]:''};save();showToast('Entrenamiento eliminado');render();
+}
+function delTRResult(tid,rid){
+  runs=runs.filter(r=>r.trainingRoundId!==rid);
+  const t=getTraining(tid);
+  if(t){const r=t.rounds.find(x=>x.id===rid);if(r)r.completed=false;}
+  confDel={...confDel,['rr_'+rid]:''};save();showToast('Resultado eliminado');render();
+}
+
+/* ═══════════════════════════════════════════
+   TAB: PARRILLA
+═══════════════════════════════════════════ */
+function renderParrilla(){
+  const form=`<div class="form-card">
+    <div class="sec-lbl">Agregar jugador</div>
+    <div class="row">
+      <input type="text" placeholder="Nombre del jugador" value="${nPlayerName}" oninput="nPlayerName=this.value" style="flex:1" onkeydown="if(event.key==='Enter')addPlayer()">
+      <button class="btn btn-green" onclick="addPlayer()">Agregar</button>
+    </div>
+  </div>`;
+  if(!players.length)return form+`<div class="empty">No hay jugadores aún.</div>`;
+  const list=players.map((p,i)=>{
+    const isEd=editingId.players===p.id;const isDel=confDel['p_'+p.id];
+    const inPair=pairs.some(pr=>pr.p1===p.id||pr.p2===p.id);
+    return`<div class="card" style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap">
+      ${isEd?`<input type="text" value="${editData.name||''}" oninput="editData.name=this.value" style="flex:1;min-width:120px" onkeydown="if(event.key==='Enter')savePlayerEdit('${p.id}')">`:
+      `<div style="display:flex;align-items:center;gap:10px">
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:var(--text3);min-width:24px">${i+1}</span>
+        <span style="font-size:15px;font-weight:500">${p.name}</span>
+        ${inPair?`<span class="tag tag-green">En pareja</span>`:''}
+      </div>`}
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${isEd?`<button class="btn btn-green btn-sm" onclick="savePlayerEdit('${p.id}')">Guardar</button>
+          <button class="btn btn-sm" onclick="cancelEdit('players')">Cancelar</button>`:
+        `<button class="btn btn-amber btn-sm" onclick="startEdit('players','${p.id}','${p.name}')">Editar</button>
+          ${!isDel?`<button class="btn btn-red btn-sm" onclick="askDel('p_${p.id}','p')">Eliminar</button>`:''}`}
+      </div>
+      ${isDel?`<div class="conf" style="width:100%">
+        <span>¿Eliminar a <strong>${p.name}</strong>?${inPair?' Está en una pareja.':''}</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-red btn-sm" onclick="delPlayer('${p.id}')">Confirmar</button>
+          <button class="btn btn-sm" onclick="cancelDel('p_${p.id}')">Cancelar</button>
+        </div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+  return form+`<div style="font-size:13px;color:var(--text3);margin-bottom:8px">${players.length} jugador${players.length!==1?'es':''}</div>`+list;
+}
+
+/* ═══════════════════════════════════════════
+   TAB: PAREJAS
+═══════════════════════════════════════════ */
+function renderParejas(){
+  if(!players.length)return`<div class="empty">Primero agrega jugadores en <strong>Parrilla</strong>.</div>`;
+  const pOpts2=players.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  const form=`<div class="form-card">
+    <div class="sec-lbl">Crear pareja</div>
+    <input type="text" placeholder="Nombre de la pareja" value="${nPairName}" oninput="nPairName=this.value" style="margin-bottom:8px">
+    <div class="pair-sel-grid">
+      <div><div class="field-lbl">Jugador 1</div>
+        <select onchange="nPairP1=this.value"><option value="">—</option>${pOpts2}</select></div>
+      <div><div class="field-lbl">Jugador 2</div>
+        <select onchange="nPairP2=this.value"><option value="">—</option>${pOpts2}</select></div>
+    </div>
+    <button class="btn btn-green" onclick="addPair()">Crear pareja</button>
+  </div>`;
+  if(!pairs.length)return form+`<div class="empty">No hay parejas aún.</div>`;
+  const list=pairs.map(pr=>{
+    const p1=getPlayer(pr.p1);const p2=getPlayer(pr.p2);
+    const isDel=confDel['pr_'+pr.id];const isEd=editingId.pairs===pr.id;
+    const inRun=runs.some(r=>r.azulPairId===pr.id||r.rojaPairId===pr.id);
+    return`<div class="card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700">${pr.name}</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:2px">${p1?p1.name:'?'} &amp; ${p2?p2.name:'?'}</div>
+          ${inRun?`<span class="tag tag-blue" style="margin-top:4px;display:inline-block">En rondas</span>`:''}
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          ${!isEd?`<button class="btn btn-amber btn-sm" onclick="startPairEdit('${pr.id}')">Editar</button>`:''}
+          ${!isDel?`<button class="btn btn-red btn-sm" onclick="askDel('pr_${pr.id}','pr')">Eliminar</button>`:''}
+        </div>
+      </div>
+      ${isEd?`<div style="margin-top:8px">
+        <input type="text" value="${editData.name||''}" oninput="editData.name=this.value" style="margin-bottom:6px">
+        <div class="pair-sel-grid">
+          <div><div class="field-lbl">Jugador 1</div>
+            <select onchange="editData.p1=this.value"><option value="">—</option>
+              ${players.map(p=>`<option value="${p.id}"${editData.p1===p.id?' selected':''}>${p.name}</option>`).join('')}
+            </select></div>
+          <div><div class="field-lbl">Jugador 2</div>
+            <select onchange="editData.p2=this.value"><option value="">—</option>
+              ${players.map(p=>`<option value="${p.id}"${editData.p2===p.id?' selected':''}>${p.name}</option>`).join('')}
+            </select></div>
+        </div>
+        <div class="row">
+          <button class="btn btn-green btn-sm" onclick="savePairEdit('${pr.id}')">Guardar</button>
+          <button class="btn btn-sm" onclick="cancelEdit('pairs')">Cancelar</button>
+        </div>
+      </div>`:''}
+      ${isDel?`<div class="conf">
+        <span>¿Eliminar pareja <strong>${pr.name}</strong>?</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-red btn-sm" onclick="delPair('${pr.id}')">Confirmar</button>
+          <button class="btn btn-sm" onclick="cancelDel('pr_${pr.id}')">Cancelar</button>
+        </div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+  return form+list;
+}
+
+/* ═══════════════════════════════════════════
+   TAB: ESTADÍSTICAS
+   Outer: Global | Rondas sueltas | Entrenamientos
+   Inner: Ranking | Por jugador | Por pareja | Por cuadrilla
+   Entities: collapsible (collapsed by default)
+═══════════════════════════════════════════ */
+function renderEstadisticas(){
+  if(!runs.length)return`<div class="empty">Guarda rondas desde <strong>Ronda</strong> para ver estadísticas.</div>`;
+  const nav=`<div class="sub-tabs">
+    <button class="sub-tbtn ${statsSubTab==='global'?'active':''}"         onclick="switchStatsSub('global')">Global</button>
+    <button class="sub-tbtn ${statsSubTab==='rondas-sueltas'?'active':''}" onclick="switchStatsSub('rondas-sueltas')">Rondas sueltas</button>
+    <button class="sub-tbtn ${statsSubTab==='entrenamientos'?'active':''}" onclick="switchStatsSub('entrenamientos')">Entrenamientos</button>
+  </div>`;
+  let body='';
+  if(statsSubTab==='global'){
+    body=statsPanel(runs,'global');
+  } else if(statsSubTab==='rondas-sueltas'){
+    const loose=runs.filter(r=>!r.trainingId);
+    body=loose.length?statsPanel(loose,'rondas-sueltas'):`<div class="empty">No hay rondas sueltas guardadas.</div>`;
+  } else {
+    body=statsTrainings();
+  }
+  return nav+body;
+}
+
+/* ── switchers ── */
+function switchStatsInner(outerKey,t){statsInner[outerKey]=t;render();}
+function switchTrainInner(tid,t){statsTrainInner[tid]=t;render();}
+function toggleOpen(key){statsOpen[key]=!statsOpen[key];render();}
+
+/* Arrow SVG (rotates when open) */
+function _arrow(key){
+  const open=!!statsOpen[key];
+  return`<svg class="coll-arrow${open?' open':''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+}
+
+/* Inner tab nav bar */
+function _innerNav(outerKey,cur){
+  return`<div class="inner-tabs">
+    ${[['ranking','Ranking'],['jugadores','Por jugador'],['parejas','Por pareja'],['cuadrillas','Por cuadrilla']].map(([k,l])=>
+      `<button class="inner-tbtn${cur===k?' active':''}" onclick="switchStatsInner('${outerKey}','${k}')">${l}</button>`).join('')}
+  </div>`;
+}
+function _innerNavTrain(tid,cur){
+  return`<div class="inner-tabs">
+    ${[['ranking','Ranking'],['jugadores','Por jugador'],['parejas','Por pareja'],['cuadrillas','Por cuadrilla']].map(([k,l])=>
+      `<button class="inner-tbtn${cur===k?' active':''}" onclick="switchTrainInner('${tid}','${k}')">${l}</button>`).join('')}
+  </div>`;
+}
+
+/* Full stats panel for a run-subset (shows inner tabs) */
+function statsPanel(subset,outerKey){
+  const cur=statsInner[outerKey]||'ranking';
+  const nav=_innerNav(outerKey,cur);
+  let body='';
+  if(cur==='ranking')      body=_rankingSection(subset,outerKey);
+  else if(cur==='jugadores')body=_playersSection(subset,outerKey);
+  else if(cur==='parejas')  body=_pairsSection(subset,outerKey);
+  else                       body=_cuadrillasSection(subset,outerKey);
+  return nav+body;
+}
+
+/* ── run detail mini-card used inside open collapsibles ── */
+function _rcard(r,idx,meta){
+  const res=getMissionResults(r.missions);
+  const done=res?res.filter(x=>x.done):[];
+  const fail=res?res.filter(x=>!x.done):[];
+  const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
+  return`<div class="rcard">
+    <div class="rcard-top">
+      <div>
+        <div class="rcard-lbl">${runLabel(r,idx)}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
+          ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
+          ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+          ${meta?`<span style="font-size:11px;color:var(--text3)">${meta}</span>`:''}
+        </div>
+      </div>
+      <div class="rcard-score">${r.score} pts</div>
+    </div>
+    ${res?`
+      <div><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px">COMPLETADAS (${done.length})</div>
+        <div class="mpills">${done.map(m=>`<span class="mpill done" title="${m.name}: ${m.pts}pts">${m.code} +${m.pts}</span>`).join('')||`<span style="font-size:11px;color:var(--text3)">Ninguna</span>`}</div>
+      </div>
+      <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px">FALLIDAS (${fail.length})</div>
+        <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div>
+      </div>`:`<div style="font-size:12px;color:var(--text3);margin-top:4px">Sin detalle de misiones</div>`}
+  </div>`;
+}
+
+/* ── RANKING ── collapsible per run */
+function _rankingSection(subset,prefix){
+  const sorted=[...subset].map((r,i)=>({r,i})).sort((a,b)=>Number(b.r.score)-Number(a.r.score));
+  if(!sorted.length)return`<div class="empty">Sin lanzadas.</div>`;
+  return`<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${subset.length} lanzada${subset.length!==1?'s':''} — mayor a menor</div>`+
+  sorted.map(({r,i},pos)=>{
+    const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
+    const key=`${prefix}_run_${r.id}`;const isOpen=!!statsOpen[key];
+    const isDel=confDel['run_'+r.id];
+    const res=getMissionResults(r.missions);
+    const done=res?res.filter(x=>x.done):[];const fail=res?res.filter(x=>!x.done):[];
+    return`<div class="coll-card">
+      <div class="coll-hdr" onclick="toggleOpen('${key}')">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <span class="rk ${medalClass(pos)}" style="font-size:20px;flex-shrink:0">${pos+1}</span>
+          <div style="min-width:0">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700">${runLabel(r,i)}${r.note&&r.roundName?` — ${r.note}`:''}</div>
+            ${r.trainingId?`<div style="font-size:11px;color:var(--text3)">${getTraining(r.trainingId)?.name||''}</div>`:''}
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">
+              ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
+              ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="text-align:right">
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:700;color:var(--green);line-height:1">${r.score}</div>
+            <div style="font-size:10px;color:var(--text3)">pts</div>
+          </div>
+          ${_arrow(key)}
+        </div>
+      </div>
+      ${isOpen?`<div class="coll-body">
+        ${res?`
+          <div><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px">COMPLETADAS (${done.length})</div>
+            <div class="mpills">${done.map(m=>`<span class="mpill done">${m.code} +${m.pts}</span>`).join('')||`<span style="font-size:11px;color:var(--text3)">Ninguna</span>`}</div>
+          </div>
+          <div style="margin-top:8px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px">FALLIDAS (${fail.length})</div>
+            <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div>
+          </div>`:`<div style="font-size:12px;color:var(--text3)">Sin detalle de misiones</div>`}
+        ${!isDel?`<button class="btn btn-red btn-sm" style="margin-top:10px;font-size:11px" onclick="askDel('run_${r.id}','run')">Borrar lanzada</button>`:''}
+        ${isDel?`<div class="conf" style="margin-top:8px">
+          <span>¿Borrar esta lanzada (${r.score} pts)?</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-red btn-sm" onclick="delRun('${r.id}')">Confirmar</button>
+            <button class="btn btn-sm" onclick="cancelDel('run_${r.id}')">Cancelar</button>
+          </div>
+        </div>`:''}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ── POR JUGADOR ── collapsible per player */
+function _playersSection(subset,prefix){
+  const pMap={};
+  players.forEach(p=>{pMap[p.id]={p,refs:[],scores:[]};});
+  subset.forEach((r,idx)=>{
+    const add=(pid,base)=>{
+      const pr=getPair(pid);if(!pr)return;
+      [pr.p1,pr.p2].filter(Boolean).forEach(id=>{
+        if(!pMap[id])return;
+        pMap[id].refs.push({r,idx,base,pairName:pr.name});
+        pMap[id].scores.push(Number(r.score));
+      });
+    };
+    if(r.azulPairId)add(r.azulPairId,'azul');
+    if(r.rojaPairId)add(r.rojaPairId,'roja');
+  });
+  const sorted=Object.values(pMap).filter(x=>x.scores.length>0)
+    .sort((a,b)=>(best(b.scores)||0)-(best(a.scores)||0));
+  if(!sorted.length)return`<div class="empty">Sin datos de jugadores para este conjunto.</div>`;
+  return sorted.map(({p,refs,scores})=>{
+    const bv=best(scores);const av=avg(scores);const tot=scores.reduce((a,b)=>a+b,0);
+    const key=`${prefix}_jug_${p.id}`;const isOpen=!!statsOpen[key];
+    return`<div class="coll-card">
+      <div class="coll-hdr" onclick="toggleOpen('${key}')">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">${p.name}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${refs.length} ronda${refs.length!==1?'s':''} · Mejor: <strong style="color:var(--green)">${bv}</strong> · Prom: <strong>${av}</strong></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="text-align:right">
+            <div style="font-size:10px;color:var(--text3)">Total acum.</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--green)">${tot}</div>
+          </div>
+          ${_arrow(key)}
+        </div>
+      </div>
+      ${isOpen?`<div class="coll-body">
+        <div class="metric-grid" style="margin-bottom:10px">
+          <div class="metric-box"><div class="lbl">Rondas</div><div class="val">${refs.length}</div></div>
+          <div class="metric-box"><div class="lbl">Mejor</div><div class="val good">${bv}</div></div>
+          <div class="metric-box"><div class="lbl">Promedio</div><div class="val">${av}</div></div>
+        </div>
+        ${refs.map(({r,idx,base,pairName})=>_rcard(r,idx,`Pareja: ${pairName} · ${base==='azul'?'Base Azul':'Base Roja'}`)).join('')}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ── POR PAREJA ── collapsible per pair */
+function _pairsSection(subset,prefix){
+  const pMap={};
+  pairs.forEach(pr=>{pMap[pr.id]={pr,refs:[],scores:[]};});
+  subset.forEach((r,idx)=>{
+    const add=(pid,base)=>{if(pMap[pid]){pMap[pid].refs.push({r,idx,base});pMap[pid].scores.push(Number(r.score));}};
+    if(r.azulPairId)add(r.azulPairId,'azul');
+    if(r.rojaPairId)add(r.rojaPairId,'roja');
+  });
+  const sorted=Object.values(pMap).filter(x=>x.scores.length>0)
+    .sort((a,b)=>(best(b.scores)||0)-(best(a.scores)||0));
+  if(!sorted.length)return`<div class="empty">Sin datos de parejas para este conjunto.</div>`;
+  return sorted.map(({pr,refs,scores})=>{
+    const bv=best(scores);const av=avg(scores);
+    const p1=getPlayer(pr.p1);const p2=getPlayer(pr.p2);
+    const key=`${prefix}_par_${pr.id}`;const isOpen=!!statsOpen[key];
+    return`<div class="coll-card">
+      <div class="coll-hdr" onclick="toggleOpen('${key}')">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">${pr.name}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${p1?p1.name:'?'} &amp; ${p2?p2.name:'?'} · ${refs.length} ronda${refs.length!==1?'s':''} · Mejor: <strong style="color:var(--amber)">${bv}</strong> · Prom: <strong>${av}</strong></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="text-align:right">
+            <div style="font-size:10px;color:var(--text3)">Mejor</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--amber)">${bv}</div>
+          </div>
+          ${_arrow(key)}
+        </div>
+      </div>
+      ${isOpen?`<div class="coll-body">
+        <div class="metric-grid" style="margin-bottom:10px">
+          <div class="metric-box"><div class="lbl">Rondas</div><div class="val">${refs.length}</div></div>
+          <div class="metric-box"><div class="lbl">Mejor</div><div class="val good">${bv}</div></div>
+          <div class="metric-box"><div class="lbl">Promedio</div><div class="val">${av}</div></div>
+        </div>
+        ${refs.map(({r,idx,base})=>_rcard(r,idx,base==='azul'?'Base Azul':'Base Roja')).join('')}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ── POR CUADRILLA (agrupación azul+roja que compitieron juntas) ── */
+function _cuadrillasSection(subset,prefix){
+  const groups={};
+  subset.forEach((r,idx)=>{
+    const az=r.azulPairId||'';const ro=r.rojaPairId||'';
+    if(!az&&!ro)return;
+    const gkey=`${az}||${ro}`;
+    if(!groups[gkey])groups[gkey]={az,ro,refs:[],scores:[]};
+    groups[gkey].refs.push({r,idx});
+    groups[gkey].scores.push(Number(r.score));
+  });
+  const sorted=Object.values(groups).sort((a,b)=>(best(b.scores)||0)-(best(a.scores)||0));
+  if(!sorted.length)return`<div class="empty">Sin cuadrillas registradas. Se necesitan rondas con al menos una pareja asignada.</div>`;
+  return sorted.map(({az,ro,refs,scores},ci)=>{
+    const ap=getPair(az);const rp=getPair(ro);
+    const bv=best(scores);const av=avg(scores);
+    const key=`${prefix}_cua_${ci}`;const isOpen=!!statsOpen[key];
+    return`<div class="coll-card">
+      <div class="coll-hdr" onclick="toggleOpen('${key}')">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700">Cuadrilla ${ci+1}</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">
+            ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
+            ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+          </div>
+          <div style="font-size:12px;color:var(--text3);margin-top:3px">${refs.length} ronda${refs.length!==1?'s':''} · Mejor: <strong style="color:var(--green)">${bv}</strong> · Prom: <strong>${av}</strong></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div style="text-align:right">
+            <div style="font-size:10px;color:var(--text3)">Mejor</div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;color:var(--green)">${bv}</div>
+          </div>
+          ${_arrow(key)}
+        </div>
+      </div>
+      ${isOpen?`<div class="coll-body">
+        <div class="metric-grid" style="margin-bottom:10px">
+          <div class="metric-box"><div class="lbl">Rondas</div><div class="val">${refs.length}</div></div>
+          <div class="metric-box"><div class="lbl">Mejor</div><div class="val good">${bv}</div></div>
+          <div class="metric-box"><div class="lbl">Promedio</div><div class="val">${av}</div></div>
+        </div>
+        ${refs.map(({r,idx})=>_rcard(r,idx,'')).join('')}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ── ENTRENAMIENTOS — solo runs de entrenamientos, sin sueltas ── */
+function statsTrainings(){
+  const groups=trainings.map(t=>({t,sub:runs.filter(r=>r.trainingId===t.id)})).filter(x=>x.sub.length>0);
+  if(!groups.length)return`<div class="empty">No hay rondas de entrenamiento guardadas.<br><span style="font-size:12px">Las rondas sueltas se ven en la pestaña "Rondas sueltas".</span></div>`;
+  return groups.map(({t,sub})=>{
+    const sc=sub.map(r=>Number(r.score));
+    const cur=statsTrainInner[t.id]||'ranking';
+    const tKey=`tcoll_${t.id}`;const isOpen=!!statsOpen[tKey];
+    let innerBody='';
+    if(cur==='ranking')      innerBody=_rankingSection(sub,`ti_${t.id}`);
+    else if(cur==='jugadores')innerBody=_playersSection(sub,`ti_${t.id}`);
+    else if(cur==='parejas')  innerBody=_pairsSection(sub,`ti_${t.id}`);
+    else                       innerBody=_cuadrillasSection(sub,`ti_${t.id}`);
+    return`<div class="card" style="margin-bottom:12px;padding:0;overflow:hidden">
+      <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface2);border-bottom:1px solid var(--border)" onclick="toggleOpen('${tKey}')">
+        <div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700">${t.name}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${sub.length} lanzada${sub.length!==1?'s':''} · Mejor: ${best(sc)||'—'} · Prom: ${avg(sc)||'—'}</div>
+        </div>
+        ${_arrow(tKey)}
+      </div>
+      ${isOpen?`<div style="padding:14px 16px">
+        ${_innerNavTrain(t.id,cur)}
+        ${innerBody}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════
+   TAB: EFECTIVIDAD
+═══════════════════════════════════════════ */
+function renderEfectividad(){
+  const wd=runs.filter(r=>r.missions);
+  if(!wd.length)return`<div class="empty">Guarda rondas con datos de misiones para ver efectividad.</div>`;
+  const nav=`<div class="sub-tabs">
+    <button class="sub-tbtn ${effSubTab==='global'?'active':''}"           onclick="switchEffSub('global')">Global</button>
+    <button class="sub-tbtn ${effSubTab==='por-entrenamiento'?'active':''}" onclick="switchEffSub('por-entrenamiento')">Por entrenamiento</button>
+  </div>`;
+  return nav+(effSubTab==='global'?effTable(wd,'Resumen global'):effByTraining());
+}
+
+function effTable(subset,label){
+  if(!subset.length)return`<div style="color:var(--text3);font-size:13px">Sin datos</div>`;
+  const total=subset.length;
+  const mStats=MISSIONS.map(m=>{
+    let succ=0;const fails=[];
+    subset.forEach((r,i)=>{if(mScoreFor(m,r.missions)>0)succ++;else fails.push(runLabel(r,i));});
+    const pct=Math.round((succ/total)*100);
+    return{code:m.code,name:m.name,amber:m.amber||false,succ,fail:total-succ,pct,fails};
+  }).sort((a,b)=>a.pct-b.pct);
+  const best2=mStats.reduce((a,x)=>a.pct>x.pct?a:x);
+  const worst=mStats.reduce((a,x)=>a.pct<x.pct?a:x);
+  const summary=`<div class="metric-grid" style="margin-bottom:14px">
+    <div class="metric-box"><div class="lbl">Rondas analizadas</div><div class="val">${total}</div></div>
+    <div class="metric-box"><div class="lbl">Más exitosa</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--green)">${best2.code}</div>
+      <div style="font-size:11px;color:var(--text3)">${best2.pct}%</div></div>
+    <div class="metric-box"><div class="lbl">Más fallida</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--red)">${worst.code}</div>
+      <div style="font-size:11px;color:var(--text3)">${worst.pct}%</div></div>
+  </div>`;
+  const cards=mStats.map(ms=>{
+    const col=ms.pct>=80?'#3B6D11':ms.pct>=50?'#854F0B':'#A32D2D';
+    const pCol=ms.pct>=80?'var(--green)':ms.pct>=50?'var(--amber)':'var(--red)';
+    return`<div class="eff-card">
+      <div class="eff-hdr">
+        <span class="mcode${ms.amber?' am':''}" style="font-size:12px">${ms.code}</span>
+        <span class="eff-title">${ms.name}</span>
+        <span class="eff-pct" style="color:${pCol}">${ms.pct}%</span>
+      </div>
+      <div class="eff-bar-bg"><div class="eff-bar" style="width:${ms.pct}%;background:${col}"></div></div>
+      <div class="eff-stats">
+        <div><span style="color:var(--green);font-weight:700">${ms.succ}</span> completada${ms.succ!==1?'s':''}</div>
+        <div><span style="color:var(--red);font-weight:700">${ms.fail}</span> fallida${ms.fail!==1?'s':''}</div>
+        <div>de <span style="font-weight:700">${total}</span> ronda${total!==1?'s':''}</div>
+      </div>
+      ${ms.fail>0?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px">FALLÓ EN:</div>
+        <div>${ms.fails.map(rl=>`<span class="fail-chip">${rl}</span>`).join('')}</div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+  return`<div class="card" style="margin-bottom:14px"><div class="sec-lbl">${label}</div>${summary}</div>
+  <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Ordenadas de menor a mayor efectividad</div>${cards}`;
+}
+
+function effByTraining(){
+  const groups=[];
+  trainings.forEach(t=>{
+    const sub=runs.filter(r=>r.trainingId===t.id&&r.missions);
+    if(sub.length)groups.push({label:t.name,sub});
+  });
+  const loose=runs.filter(r=>!r.trainingId&&r.missions);
+  if(loose.length)groups.push({label:'Lanzadas sueltas',sub:loose});
+  if(!groups.length)return`<div class="empty">Sin datos suficientes.</div>`;
+  return groups.map(({label,sub})=>`
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;margin-bottom:8px;margin-top:20px;display:flex;align-items:center;gap:10px">
+      ${label}<span style="flex:1;height:1px;background:var(--border);display:inline-block"></span>
+    </div>${effTable(sub,label)}`
+  ).join('');
+}
+
+/* ═══════════════════════════════════════════
+   ACTIONS
+═══════════════════════════════════════════ */
+// Players
+function addPlayer(){
+  if(!nPlayerName.trim()){showToast('Escribe el nombre');return;}
+  players.push({id:uid(),name:nPlayerName.trim()});
+  nPlayerName='';save();showToast('Jugador agregado');render();
+}
+function startEdit(sec,id,name){editingId={...editingId,[sec]:id};editData={name};confDel={};render();}
+function cancelEdit(sec){editingId={...editingId,[sec]:''};editData={};render();}
+function savePlayerEdit(id){
+  const p=players.find(x=>x.id===id);if(!p)return;
+  if(!editData.name?.trim()){showToast('Nombre vacío');return;}
+  p.name=editData.name.trim();editingId={...editingId,players:''};editData={};save();showToast('Actualizado');render();
+}
+function askDel(key,_type){confDel={...confDel,[key]:true};editingId={};render();}
+function cancelDel(key){confDel={...confDel,[key]:false};render();}
+function delPlayer(id){
+  players=players.filter(p=>p.id!==id);
+  pairs=pairs.map(pr=>({...pr,p1:pr.p1===id?'':pr.p1,p2:pr.p2===id?'':pr.p2}));
+  confDel={};save();showToast('Jugador eliminado');render();
+}
+// Pairs
+function addPair(){
+  if(!nPairName.trim()){showToast('Escribe el nombre de la pareja');return;}
+  if(!nPairP1||!nPairP2){showToast('Selecciona ambos jugadores');return;}
+  if(nPairP1===nPairP2){showToast('Los jugadores deben ser diferentes');return;}
+  pairs.push({id:uid(),name:nPairName.trim(),p1:nPairP1,p2:nPairP2});
+  nPairName='';nPairP1='';nPairP2='';save();showToast('Pareja creada');render();
+}
+function startPairEdit(id){
+  const pr=pairs.find(x=>x.id===id);if(!pr)return;
+  editingId={...editingId,pairs:id};editData={name:pr.name,p1:pr.p1,p2:pr.p2};confDel={};render();
+}
+function savePairEdit(id){
+  const pr=pairs.find(x=>x.id===id);if(!pr)return;
+  if(!editData.name?.trim()){showToast('Nombre vacío');return;}
+  if(!editData.p1||!editData.p2){showToast('Selecciona ambos jugadores');return;}
+  if(editData.p1===editData.p2){showToast('Deben ser diferentes');return;}
+  pr.name=editData.name.trim();pr.p1=editData.p1;pr.p2=editData.p2;
+  editingId={...editingId,pairs:''};editData={};save();showToast('Pareja actualizada');render();
+}
+function delPair(id){
+  pairs=pairs.filter(p=>p.id!==id);
+  runs=runs.map(r=>({...r,azulPairId:r.azulPairId===id?'':r.azulPairId,rojaPairId:r.rojaPairId===id?'':r.rojaPairId}));
+  trainings.forEach(t=>t.rounds.forEach(r=>{if(r.azulPairId===id)r.azulPairId='';if(r.rojaPairId===id)r.rojaPairId='';}));
+  confDel={};save();showToast('Pareja eliminada');render();
+}
+// Runs
+function delRun(id){
+  const r=runs.find(x=>x.id===id);
+  if(r?.trainingRoundId){
+    const t=getTraining(r.trainingId);
+    if(t){const rd=t.rounds.find(x=>x.id===r.trainingRoundId);if(rd)rd.completed=false;}
+  }
+  runs=runs.filter(x=>x.id!==id);
+  confDel={};save();showToast('Lanzada eliminada');render();
+}
+
+/* ═══════════════════════════════════════════
+   INIT — check for cached team, otherwise show login
+═══════════════════════════════════════════ */
+async function init(){
+  const loading = document.getElementById('loading-wrap');
+  const loginWrap = document.getElementById('login-wrap');
+  try{
+    // Try auto-login from cached team
+    const cached = localStorage.getItem('fll_last_team');
+    if(cached){
+      const {slug, name} = JSON.parse(cached);
+      const snap = await db.ref('teams/'+slug+'/pin').get();
+      if(snap.exists()){
+        loading.style.display='none';
+        // Still need PIN — show pre-filled login
+        loginTeamName = name;
+        document.getElementById('inp-team').value = name;
+        document.getElementById('login-team-display').textContent = name;
+        document.getElementById('login-step-name').style.display='none';
+        document.getElementById('login-step-pin').style.display='block';
+        document.getElementById('pin-label').textContent = 'PIN del equipo';
+        document.getElementById('pin-hint').textContent = 'Ingresa tu PIN para continuar';
+        document.getElementById('login-btn-enter').textContent = 'Entrar al equipo';
+        loginIsNew = false;
+        loginWrap.style.display='flex';
+        document.getElementById('pin0').focus();
+        return;
+      }
+    }
+  } catch(e){}
+  loading.style.display='none';
+  loginWrap.style.display='flex';
+}
+init();
+</script>
+</body>
+</html>
