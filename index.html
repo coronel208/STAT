@@ -173,7 +173,18 @@ input[type=checkbox]{width:20px;height:20px;cursor:pointer;accent-color:var(--gr
 .eff-stats{display:flex;gap:14px;font-size:12px;color:var(--text3)}
 .fail-chip{font-size:11px;background:var(--red-l);color:var(--red);border:1px solid var(--red-b);border-radius:4px;padding:2px 7px;font-family:'Barlow Condensed',sans-serif;font-weight:700;display:inline-block;margin:2px}
 
-/* ── MISC ── */
+/* ── DRAG & DROP PAIR BUILDER ── */
+.player-pool{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rs)}
+.player-chip{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;padding:6px 12px;border-radius:20px;background:var(--surface2);border:1.5px solid var(--border2);color:var(--text);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;transition:background .15s,border-color .15s;display:inline-flex;align-items:center;gap:5px}
+.player-chip:active{cursor:grabbing}
+.player-chip.dragging{opacity:.4}
+.player-chip.in-pair{background:var(--green-l);border-color:var(--green-b);color:var(--green)}
+.drop-zone{min-height:52px;border:2px dashed var(--border2);border-radius:var(--rs);padding:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;transition:border-color .15s,background .15s}
+.drop-zone.over{border-color:var(--green);background:var(--green-l)}
+.drop-zone.filled{border-style:solid;border-color:var(--green-b);background:var(--green-l)}
+.drop-zone-label{font-size:11px;color:var(--text3);font-weight:500;pointer-events:none}
+.chip-remove{background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;line-height:1;padding:0 0 0 2px;display:flex;align-items:center}
+.chip-remove:hover{color:var(--red)} */
 /* collapsible stats cards */
 .coll-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px;overflow:hidden}
 .coll-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;cursor:pointer;gap:10px;flex-wrap:wrap;user-select:none;-webkit-tap-highlight-color:transparent}
@@ -1705,46 +1716,116 @@ function renderParrilla(){
 ═══════════════════════════════════════════ */
 function renderParejas(){
   if(!players.length)return`<div class="empty">Primero agrega jugadores en <strong>Parrilla</strong>.</div>`;
-  const pOpts2=players.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+
+  // Which players are already in a pair
+  const inPairIds=new Set(pairs.flatMap(pr=>[pr.p1,pr.p2].filter(Boolean)));
+
+  // Player pool chips
+  const poolChips=players.map(p=>`
+    <div class="player-chip${inPairIds.has(p.id)?' in-pair':''}"
+      draggable="true"
+      id="chip_${p.id}"
+      ondragstart="dragStart(event,'${p.id}')"
+      ondragend="dragEnd(event)"
+      ontouchstart="touchStart(event,'${p.id}')"
+      ontouchmove="touchMove(event)"
+      ontouchend="touchEnd(event)">
+      ${p.name}
+    </div>`).join('');
+
+  // Current pair being built
+  const slot1Html=nPairP1?(()=>{const p=getPlayer(nPairP1);return`<div class="player-chip in-pair">${p?p.name:'?'}<button class="chip-remove" onclick="removeSlot(1)" type="button">×</button></div>`;})()
+    :`<span class="drop-zone-label">Arrastra el jugador 1 aquí</span>`;
+  const slot2Html=nPairP2?(()=>{const p=getPlayer(nPairP2);return`<div class="player-chip in-pair">${p?p.name:'?'}<button class="chip-remove" onclick="removeSlot(2)" type="button">×</button></div>`;})()
+    :`<span class="drop-zone-label">Arrastra el jugador 2 aquí</span>`;
+
   const form=`<div class="form-card">
     <div class="sec-lbl">Crear pareja</div>
-    <input type="text" placeholder="Nombre de la pareja" value="${nPairName}" oninput="nPairName=this.value" style="margin-bottom:8px">
-    <div class="pair-sel-grid">
-      <div><div class="field-lbl">Jugador 1</div>
-        <select onchange="nPairP1=this.value"><option value="">—</option>${pOpts2}</select></div>
-      <div><div class="field-lbl">Jugador 2</div>
-        <select onchange="nPairP2=this.value"><option value="">—</option>${pOpts2}</select></div>
+    <div style="margin-bottom:10px">
+      <div class="field-lbl">Jugadores disponibles — arrastra a los slots</div>
+      <div class="player-pool" id="player-pool"
+        ondragover="event.preventDefault()"
+        ondrop="dropToPool(event)">
+        ${poolChips}
+      </div>
     </div>
-    <button class="btn btn-green" onclick="addPair()">Crear pareja</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div class="field-lbl">Jugador 1</div>
+        <div class="drop-zone${nPairP1?' filled':''}" id="slot1"
+          ondragover="dragOver(event,'slot1')"
+          ondragleave="dragLeave('slot1')"
+          ondrop="dropToSlot(event,1)">
+          ${slot1Html}
+        </div>
+      </div>
+      <div>
+        <div class="field-lbl">Jugador 2</div>
+        <div class="drop-zone${nPairP2?' filled':''}" id="slot2"
+          ondragover="dragOver(event,'slot2')"
+          ondragleave="dragLeave('slot2')"
+          ondrop="dropToSlot(event,2)">
+          ${slot2Html}
+        </div>
+      </div>
+    </div>
+    <div class="fg">
+      <div class="field-lbl">Nombre de la pareja <span style="color:var(--red)">*</span></div>
+      <input type="text" placeholder="ej. Los Veloces, Pareja Alpha..." value="${nPairName}" oninput="nPairName=this.value" onkeydown="if(event.key==='Enter')addPair()">
+    </div>
+    <button class="btn btn-green" onclick="addPair()" style="width:100%">Crear pareja</button>
   </div>`;
+
   if(!pairs.length)return form+`<div class="empty">No hay parejas aún.</div>`;
+
   const list=pairs.map(pr=>{
     const p1=getPlayer(pr.p1);const p2=getPlayer(pr.p2);
     const isDel=confDel['pr_'+pr.id];const isEd=editingId.pairs===pr.id;
     const inRun=runs.some(r=>r.azulPairId===pr.id||r.rojaPairId===pr.id);
+
+    // Edit mode also uses drag-and-drop
+    const editP1=editData.p1;const editP2=editData.p2;
+    const editSlot1=editP1?(()=>{const p=getPlayer(editP1);return`<div class="player-chip in-pair">${p?p.name:'?'}<button class="chip-remove" onclick="removeEditSlot(1,'${pr.id}')" type="button">×</button></div>`;})()
+      :`<span class="drop-zone-label">Arrastra jugador aquí</span>`;
+    const editSlot2=editP2?(()=>{const p=getPlayer(editP2);return`<div class="player-chip in-pair">${p?p.name:'?'}<button class="chip-remove" onclick="removeEditSlot(2,'${pr.id}')" type="button">×</button></div>`;})()
+      :`<span class="drop-zone-label">Arrastra jugador aquí</span>`;
+
     return`<div class="card">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
         <div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700">${pr.name}</div>
-          <div style="font-size:13px;color:var(--text3);margin-top:2px">${p1?p1.name:'?'} &amp; ${p2?p2.name:'?'}</div>
-          ${inRun?`<span class="tag tag-blue" style="margin-top:4px;display:inline-block">En rondas</span>`:''}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+            <span class="player-chip in-pair" style="cursor:default">${p1?p1.name:'?'}</span>
+            <span class="player-chip in-pair" style="cursor:default">${p2?p2.name:'?'}</span>
+          </div>
+          ${inRun?`<span class="tag tag-blue" style="margin-top:6px;display:inline-block">En rondas</span>`:''}
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
           ${!isEd?`<button class="btn btn-amber btn-sm" onclick="startPairEdit('${pr.id}')">Editar</button>`:''}
           ${!isDel?`<button class="btn btn-red btn-sm" onclick="askDel('pr_${pr.id}','pr')">Eliminar</button>`:''}
         </div>
       </div>
-      ${isEd?`<div style="margin-top:8px">
-        <input type="text" value="${editData.name||''}" oninput="editData.name=this.value" style="margin-bottom:6px">
-        <div class="pair-sel-grid">
+      ${isEd?`<div style="margin-top:10px">
+        <div class="fg"><div class="field-lbl">Nombre</div>
+          <input type="text" value="${editData.name||''}" oninput="editData.name=this.value" style="margin-bottom:0">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0">
           <div><div class="field-lbl">Jugador 1</div>
-            <select onchange="editData.p1=this.value"><option value="">—</option>
-              ${players.map(p=>`<option value="${p.id}"${editData.p1===p.id?' selected':''}>${p.name}</option>`).join('')}
-            </select></div>
+            <div class="drop-zone${editP1?' filled':''}" id="eslot1_${pr.id}"
+              ondragover="dragOver(event,'eslot1_${pr.id}')"
+              ondragleave="dragLeave('eslot1_${pr.id}')"
+              ondrop="dropToEditSlot(event,1,'${pr.id}')">
+              ${editSlot1}
+            </div>
+          </div>
           <div><div class="field-lbl">Jugador 2</div>
-            <select onchange="editData.p2=this.value"><option value="">—</option>
-              ${players.map(p=>`<option value="${p.id}"${editData.p2===p.id?' selected':''}>${p.name}</option>`).join('')}
-            </select></div>
+            <div class="drop-zone${editP2?' filled':''}" id="eslot2_${pr.id}"
+              ondragover="dragOver(event,'eslot2_${pr.id}')"
+              ondragleave="dragLeave('eslot2_${pr.id}')"
+              ondrop="dropToEditSlot(event,2,'${pr.id}')">
+              ${editSlot2}
+            </div>
+          </div>
         </div>
         <div class="row">
           <button class="btn btn-green btn-sm" onclick="savePairEdit('${pr.id}')">Guardar</button>
@@ -2572,6 +2653,122 @@ function delPlayer(id){
   confDel={};save();showToast('Jugador eliminado');render();
 }
 // Pairs
+/* ═══════════════════════════════════════════
+   DRAG & DROP — PAIR BUILDER
+═══════════════════════════════════════════ */
+let _dragId=null; // player id being dragged
+
+function dragStart(e,pid){
+  _dragId=pid;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',pid);
+  setTimeout(()=>{const el=document.getElementById('chip_'+pid);if(el)el.classList.add('dragging');},0);
+}
+function dragEnd(e){
+  if(_dragId){const el=document.getElementById('chip_'+_dragId);if(el)el.classList.remove('dragging');}
+  _dragId=null;
+}
+function dragOver(e,zoneId){
+  e.preventDefault();
+  const el=document.getElementById(zoneId);if(el)el.classList.add('over');
+}
+function dragLeave(zoneId){
+  const el=document.getElementById(zoneId);if(el)el.classList.remove('over');
+}
+function dropToSlot(e,slot){
+  e.preventDefault();
+  const pid=e.dataTransfer.getData('text/plain')||_dragId;
+  if(!pid)return;
+  dragLeave('slot'+slot);
+  const other=slot===1?nPairP2:nPairP1;
+  if(pid===other){showToast('Los jugadores deben ser diferentes');return;}
+  if(slot===1)nPairP1=pid;else nPairP2=pid;
+  _dragId=null;render();
+}
+function dropToPool(e){
+  e.preventDefault();
+  // chips dragged back to pool are handled by removeSlot
+}
+function removeSlot(slot){
+  if(slot===1)nPairP1='';else nPairP2='';render();
+}
+function dropToEditSlot(e,slot,prid){
+  e.preventDefault();
+  const pid=e.dataTransfer.getData('text/plain')||_dragId;
+  if(!pid)return;
+  dragLeave('eslot'+slot+'_'+prid);
+  const other=slot===1?editData.p2:editData.p1;
+  if(pid===other){showToast('Los jugadores deben ser diferentes');return;}
+  if(slot===1)editData.p1=pid;else editData.p2=pid;
+  _dragId=null;render();
+}
+function removeEditSlot(slot,prid){
+  if(slot===1)editData.p1='';else editData.p2='';render();
+}
+
+/* ── Touch drag support ── */
+let _touchDragEl=null,_touchPid=null,_touchClone=null;
+function touchStart(e,pid){
+  _touchPid=pid;
+  _dragId=pid;
+  const el=e.currentTarget;
+  _touchDragEl=el;
+  // Create floating clone
+  _touchClone=el.cloneNode(true);
+  _touchClone.style.cssText='position:fixed;opacity:.85;pointer-events:none;z-index:9999;transition:none;';
+  document.body.appendChild(_touchClone);
+  el.classList.add('dragging');
+  const t=e.touches[0];
+  _touchClone.style.left=(t.clientX-_touchClone.offsetWidth/2)+'px';
+  _touchClone.style.top=(t.clientY-_touchClone.offsetHeight/2)+'px';
+}
+function touchMove(e){
+  if(!_touchClone)return;
+  e.preventDefault();
+  const t=e.touches[0];
+  _touchClone.style.left=(t.clientX-_touchClone.offsetWidth/2)+'px';
+  _touchClone.style.top=(t.clientY-_touchClone.offsetHeight/2)+'px';
+  // Highlight drop zones under finger
+  document.querySelectorAll('.drop-zone').forEach(z=>{
+    const r=z.getBoundingClientRect();
+    const over=t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom;
+    z.classList.toggle('over',over);
+  });
+}
+function touchEnd(e){
+  if(!_touchClone||!_touchPid)return;
+  const t=e.changedTouches[0];
+  // Find drop zone under finger
+  _touchClone.style.display='none';
+  const el=document.elementFromPoint(t.clientX,t.clientY);
+  _touchClone.style.display='';
+  if(el){
+    const zone=el.closest('.drop-zone');
+    if(zone){
+      const id=zone.id;
+      if(id==='slot1'){removeSlot_direct(1,_touchPid);}
+      else if(id==='slot2'){removeSlot_direct(2,_touchPid);}
+      else if(id.startsWith('eslot1_')){const prid=id.replace('eslot1_','');editSlotDirect(1,prid,_touchPid);}
+      else if(id.startsWith('eslot2_')){const prid=id.replace('eslot2_','');editSlotDirect(2,prid,_touchPid);}
+    }
+  }
+  _touchClone.remove();_touchClone=null;
+  if(_touchDragEl)_touchDragEl.classList.remove('dragging');
+  _touchDragEl=null;_touchPid=null;_dragId=null;
+  document.querySelectorAll('.drop-zone.over').forEach(z=>z.classList.remove('over'));
+  render();
+}
+function removeSlot_direct(slot,pid){
+  const other=slot===1?nPairP2:nPairP1;
+  if(pid===other){showToast('Los jugadores deben ser diferentes');return;}
+  if(slot===1)nPairP1=pid;else nPairP2=pid;
+}
+function editSlotDirect(slot,prid,pid){
+  const other=slot===1?editData.p2:editData.p1;
+  if(pid===other){showToast('Los jugadores deben ser diferentes');return;}
+  if(slot===1)editData.p1=pid;else editData.p2=pid;
+}
+
 function addPair(){
   if(!nPairName.trim()){showToast('Escribe el nombre de la pareja');return;}
   if(!nPairP1||!nPairP2){showToast('Selecciona ambos jugadores');return;}
