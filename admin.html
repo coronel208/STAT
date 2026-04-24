@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — STAT · Mecha Titans</title>
+<link rel="icon" type="image/png" href="images/icon_stat.png">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --navy:#0E1F35;--teal:#0D6E8A;--cyan:#00C2D4;--gold:#F5A623;
+  --bg:#0B1929;--surface:#132235;--surface2:#1A2E45;--surface3:#1F364F;
+  --border:rgba(255,255,255,0.08);--border-c:rgba(0,194,212,0.22);
+  --text:#F0F4F8;--text2:rgba(255,255,255,0.65);--text3:rgba(255,255,255,0.35);
+  --green:#0DB67A;--green-l:rgba(13,182,122,0.12);
+  --red:#E05252;--red-l:rgba(224,82,82,0.12);
+  --amber:#F5A623;--amber-l:rgba(245,166,35,0.12);
+  --r:6px;--rs:4px;
+  --sh:0 4px 24px rgba(0,0,0,0.4);
+}
+html{scroll-behavior:smooth;}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(0,194,212,0.035) 1px,transparent 1px),linear-gradient(90deg,rgba(0,194,212,0.035) 1px,transparent 1px);background-size:40px 40px;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:rgba(0,194,212,0.25);border-radius:4px;}
+
+/* ── GATE ── */
+#gate{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);padding:20px;}
+.gate-box{background:var(--surface);border:1.5px solid var(--border-c);border-radius:10px;padding:40px 34px;max-width:360px;width:100%;box-shadow:0 0 60px rgba(0,194,212,0.08),var(--sh);text-align:center;position:relative;z-index:1;}
+.gate-logo{width:140px;display:block;}
+.gate-sub{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1.8px;text-transform:uppercase;margin-bottom:20px;}
+.gate-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(224,82,82,0.1);border:1px solid rgba(224,82,82,0.3);border-radius:20px;padding:4px 12px;font-size:10px;font-weight:700;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:18px;}
+.gate-label{font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;text-align:left;}
+.pin-row{display:flex;gap:10px;justify-content:center;margin-bottom:10px;}
+.pin-input{width:56px;height:60px;background:var(--surface2);border:2px solid var(--border-c);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:var(--cyan);text-align:center;transition:all 0.15s;-webkit-appearance:none;appearance:none;}
+.pin-input:focus{outline:none;border-color:var(--cyan);background:rgba(0,194,212,0.07);box-shadow:0 0 0 3px rgba(0,194,212,0.1);}
+.gate-err{font-size:12px;color:var(--red);min-height:18px;margin-bottom:6px;}
+.gate-btn{width:100%;padding:13px;background:var(--cyan);color:var(--navy);border:none;border-radius:var(--rs);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;font-weight:800;cursor:pointer;letter-spacing:0.3px;transition:all 0.12s;box-shadow:3px 3px 0 rgba(0,194,212,0.3);}
+.gate-btn:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 rgba(0,194,212,0.35);}
+.gate-back{font-size:12px;color:var(--text3);text-decoration:none;margin-top:14px;display:block;transition:color 0.15s;}
+.gate-back:hover{color:var(--cyan);}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-7px);}}
+
+/* ── APP ── */
+#app{display:none;position:relative;z-index:1;min-height:100vh;}
+
+/* ── HEADER ── */
+.hdr{background:rgba(11,25,41,0.96);backdrop-filter:blur(14px);border-bottom:2.5px solid var(--teal);box-shadow:0 3px 0 rgba(0,194,212,0.14);padding:0 24px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.hdr-left{display:flex;align-items:center;gap:14px;}
+.hdr-logo{height:32px;}
+.hdr-sep{width:1px;height:22px;background:rgba(255,255,255,0.12);}
+.hdr-tag{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;color:var(--red);letter-spacing:2px;text-transform:uppercase;background:rgba(224,82,82,0.1);border:1px solid rgba(224,82,82,0.25);padding:3px 9px;border-radius:20px;}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.hdr-status{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;border:1px solid rgba(0,194,212,0.2);color:var(--cyan);background:rgba(0,194,212,0.08);}
+.hdr-link{font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:var(--rs);padding:5px 12px;text-decoration:none;transition:all 0.12s;}
+.hdr-link:hover{background:rgba(255,255,255,0.09);color:#fff;}
+.hdr-link.red{color:rgba(224,82,82,0.75);border-color:rgba(224,82,82,0.18);}
+.hdr-link.red:hover{background:var(--red-l);color:var(--red);}
+
+/* ── MAIN ── */
+.main{max-width:920px;margin:0 auto;padding:32px 20px 64px;}
+
+/* ── PAGE HEADER ── */
+.ph{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:28px;}
+.ph-title{font-size:26px;font-weight:900;color:var(--text);line-height:1.2;}
+.ph-title span{color:var(--cyan);}
+.ph-sub{font-size:13px;color:var(--text3);margin-top:3px;}
+.refresh-info{text-align:right;}
+.refresh-time{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);margin-top:4px;}
+
+/* ── STATS ── */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;overflow:hidden;position:relative;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;}
+.stat-card.c1::before{background:var(--cyan);}
+.stat-card.c2::before{background:var(--gold);}
+.stat-card.c3::before{background:var(--green);}
+.stat-n{font-family:'JetBrains Mono',monospace;font-size:30px;font-weight:800;line-height:1;margin-bottom:3px;}
+.stat-l{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:0.5px;text-transform:uppercase;}
+
+/* ── SECTIONS ── */
+.sec{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:18px;}
+.sec-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface2);}
+.sec-title{font-size:13px;font-weight:800;color:var(--text);letter-spacing:0.2px;}
+.sec-count{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--cyan);background:rgba(0,194,212,0.09);border:1px solid rgba(0,194,212,0.18);padding:2px 9px;border-radius:20px;}
+.sec-body{padding:20px;}
+
+/* ── FORM ── */
+.fgrid{display:grid;grid-template-columns:1fr 130px;gap:10px;margin-bottom:12px;}
+.flabel{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px;letter-spacing:0.3px;}
+input[type=text],input[type=tel]{width:100%;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;transition:border-color 0.15s;}
+input[type=text]:focus,input[type=tel]:focus{outline:none;border-color:var(--cyan);}
+input.pin-field{font-family:'JetBrains Mono',monospace;letter-spacing:4px;font-size:16px;font-weight:700;text-align:center;color:var(--gold);}
+.fhint{font-size:11px;color:var(--text3);margin-top:4px;}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:var(--rs);font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:800;cursor:pointer;border:1.5px solid transparent;transition:all 0.12s;letter-spacing:0.2px;white-space:nowrap;}
+.btn-cyan{background:var(--cyan);color:var(--navy);border-color:var(--cyan);box-shadow:3px 3px 0 rgba(0,194,212,0.25);}
+.btn-cyan:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 rgba(0,194,212,0.3);}
+.btn-ghost{background:transparent;color:var(--text2);border-color:var(--border);}
+.btn-ghost:hover{background:var(--surface2);border-color:rgba(255,255,255,0.15);}
+.btn-gold{background:var(--amber-l);color:var(--amber);border-color:rgba(245,166,35,0.3);}
+.btn-gold:hover{background:rgba(245,166,35,0.2);}
+.btn-red{background:var(--red-l);color:var(--red);border-color:rgba(224,82,82,0.3);}
+.btn-red:hover{background:rgba(224,82,82,0.2);}
+.btn-sm{padding:5px 11px;font-size:11px;}
+.btn-full{width:100%;justify-content:center;}
+.btn:disabled{opacity:0.5;cursor:not-allowed;transform:none!important;box-shadow:none!important;}
+
+/* ── TEAM CARDS ── */
+.team-list{display:flex;flex-direction:column;gap:8px;}
+.tcard{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:14px 16px;transition:border-color 0.15s;}
+.tcard:hover{border-color:rgba(0,194,212,0.18);}
+.tcard-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.tcard-info .tname{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.tcard-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.tslug{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);}
+.tpin{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--cyan);background:rgba(0,194,212,0.08);border:1px solid rgba(0,194,212,0.2);padding:3px 10px;border-radius:var(--rs);letter-spacing:3px;}
+.tbadge{font-size:10px;font-weight:600;color:var(--text3);background:var(--surface3);border:1px solid var(--border);padding:2px 7px;border-radius:20px;}
+.tcard-actions{display:flex;gap:6px;flex-shrink:0;}
+
+/* ── EDIT INLINE ── */
+.tedit{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.tedit.open{display:block;}
+.edit-grid{display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:10px;}
+.edit-actions{display:flex;gap:6px;}
+
+/* ── CONFIRM INLINE ── */
+.tconfirm{display:none;margin-top:8px;background:rgba(224,82,82,0.06);border:1px solid rgba(224,82,82,0.2);border-radius:var(--rs);padding:10px 14px;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.tconfirm.open{display:flex;}
+.tconfirm-msg{font-size:12px;font-weight:600;color:var(--red);}
+
+/* ── DANGER ── */
+.danger-sec{border-color:rgba(224,82,82,0.2);}
+.danger-sec .sec-head{background:rgba(224,82,82,0.05);}
+.danger-sec .sec-title{color:var(--red);}
+
+/* ── EMPTY / LOADING ── */
+.empty{text-align:center;padding:36px 20px;color:var(--text3);font-size:13px;}
+.loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:28px;color:var(--text3);font-size:13px;}
+.spin{width:18px;height:18px;border:2px solid rgba(0,194,212,0.2);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── FIREBASE RULES NOTICE ── */
+.rules-box{background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.25);border-radius:var(--r);padding:16px 20px;margin-bottom:20px;display:none;}
+.rules-box.show{display:block;}
+.rules-box-title{font-size:13px;font-weight:800;color:var(--amber);margin-bottom:6px;}
+.rules-box p{font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:8px;}
+.rules-code{font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 14px;color:var(--cyan);white-space:pre;}
+
+/* ── SEARCH ── */
+.search-wrap{margin-bottom:14px;}
+.search-input{width:100%;padding:9px 13px 9px 36px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;}
+.search-input:focus{outline:none;border-color:var(--cyan);}
+.search-wrap{position:relative;}
+.search-wrap::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border-c);border-radius:var(--r);padding:10px 20px;font-size:13px;font-weight:600;color:var(--text);box-shadow:var(--sh);opacity:0;transition:all 0.25s;pointer-events:none;white-space:nowrap;z-index:999;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.ok{border-color:rgba(13,182,122,0.4);color:var(--green);}
+.toast.err{border-color:rgba(224,82,82,0.35);color:var(--red);}
+
+@media(max-width:600px){
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .fgrid,.edit-grid{grid-template-columns:1fr;}
+  .hdr{padding:0 14px;}
+  .tcard-top{flex-direction:column;align-items:flex-start;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ GATE ══ -->
+<div id="gate">
+  <div class="gate-box">
+    <div style="background:#fff;border-radius:12px;padding:12px 20px;display:inline-block;margin-bottom:6px;box-shadow:0 0 30px rgba(0,194,212,0.2);animation:float 3s ease-in-out infinite;"><img src="images/logo_stat.png" alt="STAT" class="gate-logo"></div>
+    <div class="gate-sub">Scoring &amp; Team Analytics Tool</div>
+    <div class="gate-badge">⚙ Panel de Administrador</div>
+    <div class="gate-label">Contraseña de administrador</div>
+    <div style="position:relative;margin-bottom:6px;">
+      <input type="password" id="g-pass" autocomplete="current-password"
+        placeholder="Contraseña"
+        oninput="document.getElementById('gate-err').textContent=''"
+        onkeydown="if(event.key==='Enter')checkPin()"
+        style="width:100%;padding:12px 44px 12px 14px;background:var(--surface2);border:2px solid var(--border-c);border-radius:var(--r);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;letter-spacing:1px;transition:border-color 0.15s;">
+      <button onclick="togglePassVis()" id="pass-eye"
+        style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:4px;">👁</button>
+    </div>
+    <div class="gate-err" id="gate-err"></div>
+    <button class="gate-btn" onclick="checkPin()">Entrar al panel →</button>
+    <a href="app.html" class="gate-back">← Volver a la app</a>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+  <header class="hdr">
+    <div class="hdr-left">
+      <img src="images/icon_stat.png" alt="STAT" class="hdr-logo" style="border-radius:4px;">
+      <div class="hdr-sep"></div>
+      <span class="hdr-tag">ADMIN</span>
+    </div>
+    <div class="hdr-right">
+      <span class="hdr-status" id="hdr-status">● En línea</span>
+      <a href="app.html" class="hdr-link">← App</a>
+      <a href="index.html" class="hdr-link">Inicio</a>
+      <button class="hdr-link red" onclick="doLogout()">Salir</button>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- Title row -->
+    <div class="ph">
+      <div>
+        <div class="ph-title">Panel de <span>Administrador</span></div>
+        <div class="ph-sub">Gestiona equipos, PINs y datos · STAT 2025–2026</div>
+      </div>
+      <div class="refresh-info">
+        <button class="btn btn-ghost btn-sm" onclick="loadAll()">↺ Actualizar</button>
+        <div class="refresh-time" id="refresh-time">—</div>
+      </div>
+    </div>
+
+    <!-- Firebase rules notice (shown on permission error) -->
+    <div class="rules-box" id="rules-box">
+      <div class="rules-box-title">⚠ Error de permisos Firebase — Solución rápida</div>
+      <p>Las reglas de tu base de datos bloquean la lectura del listado de equipos. Para arreglarlo:</p>
+      <p><strong>1.</strong> Ve a <strong>console.firebase.google.com</strong> → tu proyecto → Realtime Database → pestaña <strong>Rules</strong></p>
+      <p><strong>2.</strong> Reemplaza todo el contenido por esto y haz clic en <strong>Publicar</strong>:</p>
+      <div class="rules-code">{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}</div>
+      <p style="margin-top:8px;color:var(--text3);font-size:11px;">Nota: esto permite acceso público de lectura/escritura. Para mayor seguridad en producción puedes usar reglas más específicas.</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card c1"><div class="stat-n" id="st-teams" style="color:var(--cyan)">—</div><div class="stat-l">Equipos</div></div>
+      <div class="stat-card c2"><div class="stat-n" id="st-runs" style="color:var(--gold)">—</div><div class="stat-l">Lanzadas totales</div></div>
+      <div class="stat-card c3"><div class="stat-n" id="st-players" style="color:var(--green)">—</div><div class="stat-l">Jugadores totales</div></div>
+    </div>
+
+    <!-- Create team -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-title">+ Crear nuevo equipo</span>
+      </div>
+      <div class="sec-body">
+        <div class="fgrid">
+          <div>
+            <div class="flabel">Nombre del equipo *</div>
+            <input type="text" id="new-name" placeholder="ej. Mecha Titans, Los Constructores…" onkeydown="if(event.key==='Enter')createTeam()">
+            <div class="fhint">El ID se genera automáticamente a partir del nombre.</div>
+          </div>
+          <div>
+            <div class="flabel">PIN (4 dígitos) *</div>
+            <input type="tel" id="new-pin" maxlength="4" class="pin-field" placeholder="0000" onkeydown="if(event.key==='Enter')createTeam()">
+          </div>
+        </div>
+        <button class="btn btn-cyan" onclick="createTeam()" id="create-btn">+ Crear equipo</button>
+      </div>
+    </div>
+
+    <!-- Teams list -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-title">Equipos registrados</span>
+        <span class="sec-count" id="teams-count">…</span>
+      </div>
+      <div class="sec-body">
+        <div class="search-wrap">
+          <input type="text" class="search-input" id="search-input" placeholder="Buscar equipo por nombre o ID…" oninput="filterTeams(this.value)">
+        </div>
+        <div id="teams-body"><div class="loading"><span class="spin"></span>Conectando con Firebase…</div></div>
+      </div>
+    </div>
+
+    <!-- Change Admin PIN -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-title">🔐 Cambiar contraseña del administrador</span>
+      </div>
+      <div class="sec-body">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">
+          La contraseña se guarda en Firebase. Aplica en todos los dispositivos inmediatamente. Puede ser alfanumérica.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:12px;max-width:380px;">
+          <div>
+            <div class="flabel">Contraseña actual *</div>
+            <input type="password" id="pin-current" placeholder="Contraseña actual" autocomplete="current-password"
+              style="width:100%;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;">
+          </div>
+          <div>
+            <div class="flabel">Nueva contraseña * <span style="color:var(--text3);font-weight:400">(mín. 4 caracteres, alfanumérica)</span></div>
+            <input type="password" id="pin-new" placeholder="Nueva contraseña" autocomplete="new-password"
+              style="width:100%;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;">
+          </div>
+          <div>
+            <div class="flabel">Confirmar nueva contraseña *</div>
+            <input type="password" id="pin-confirm" placeholder="Repetir contraseña" autocomplete="new-password"
+              style="width:100%;padding:9px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;"
+              onkeydown="if(event.key==='Enter')changeAdminPin()">
+          </div>
+        </div>
+        <button class="btn btn-cyan" style="margin-top:14px;" onclick="changeAdminPin()">Guardar nueva contraseña</button>
+        <div id="pin-msg" style="font-size:12px;min-height:18px;margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="sec danger-sec">
+      <div class="sec-head"><span class="sec-title">⚠ Zona de peligro</span></div>
+      <div class="sec-body">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Las siguientes acciones son <strong>irreversibles</strong>.</p>
+        <button class="btn btn-red" onclick="openNuke()">🗑 Eliminar TODOS los equipos</button>
+        <div class="tconfirm" id="nuke-confirm" style="margin-top:10px;">
+          <span class="tconfirm-msg">¿Eliminar absolutamente todos los equipos y sus datos? No se puede deshacer.</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-red btn-sm" onclick="nukeAll()">Sí, borrar todo</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('nuke-confirm').classList.remove('open')">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+/* ── CONFIG ── */
+// Default PIN used only if Firebase has no admin config yet
+const DEFAULT_ADMIN_PIN = 'stat2026';
+let _adminPin = DEFAULT_ADMIN_PIN; // overwritten once Firebase loads
+
+const firebaseConfig = {
+  apiKey:           "AIzaSyAP3r7hdCaiTJNr7MaSycOpk5V8HO87t3U",
+  authDomain:       "fll-unearthed-2026-6ff40.firebaseapp.com",
+  databaseURL:      "https://fll-unearthed-2026-6ff40-default-rtdb.firebaseio.com",
+  projectId:        "fll-unearthed-2026-6ff40",
+  storageBucket:    "fll-unearthed-2026-6ff40.firebasestorage.app",
+  messagingSenderId:"1076126436793",
+  appId:            "1:1076126436793:web:f9fb2460e53a6aa1713a68"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* ── STATE ── */
+let allTeams = [];
+let currentFilter = '';
+
+/* ── LOAD ADMIN PIN FROM FIREBASE ON PAGE LOAD ── */
+async function loadAdminPin(){
+  try{
+    const snap = await db.ref('_admin/pin').get();
+    if(snap.exists() && snap.val()){
+      _adminPin = snap.val();
+    } else {
+      // First time: write default PIN to Firebase
+      await db.ref('_admin/pin').set(DEFAULT_ADMIN_PIN);
+    }
+  } catch(e){
+    // If read fails (rules not yet set), keep default
+    console.warn('Could not load admin PIN from Firebase, using default');
+  }
+}
+
+/* ── GATE ── */
+function togglePassVis(){
+  const inp=document.getElementById('g-pass');
+  const btn=document.getElementById('pass-eye');
+  if(inp.type==='password'){ inp.type='text'; btn.textContent='🙈'; }
+  else { inp.type='password'; btn.textContent='👁'; }
+}
+
+async function checkPin(){
+  const pass = document.getElementById('g-pass').value;
+  if(!pass){ document.getElementById('gate-err').textContent='Introduce la contraseña'; return; }
+  // Refresh from Firebase before checking
+  await loadAdminPin();
+  if(pass === _adminPin){
+    document.getElementById('gate').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('g-pass').value='';
+    loadAll();
+    return;
+  }
+  document.getElementById('gate-err').textContent='Contraseña incorrecta. Inténtalo de nuevo.';
+  document.getElementById('g-pass').value='';
+  document.getElementById('g-pass').focus();
+}
+
+document.addEventListener('DOMContentLoaded',async ()=>{
+  await loadAdminPin();
+  setTimeout(()=>{ const p=document.getElementById('g-pass'); if(p)p.focus(); },200);
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeAllForms(); });
+
+function doLogout(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('gate').style.display='flex';
+  const p=document.getElementById('g-pass'); if(p)p.value='';
+  document.getElementById('gate-err').textContent='';
+  setTimeout(()=>{ const p=document.getElementById('g-pass'); if(p)p.focus(); },200);
+}
+
+/* ── HELPERS ── */
+function teamSlug(n){ return n.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'equipo'; }
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(type?' '+type:'');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),3000);
+}
+function fmtDate(ts){ if(!ts)return''; return new Date(ts).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}); }
+function arrLen(v){ if(!v)return 0; return Array.isArray(v)?v.length:Object.keys(v).length; }
+
+/* ── LOAD ALL ── */
+async function loadAll(){
+  const body=document.getElementById('teams-body');
+  const cnt=document.getElementById('teams-count');
+  body.innerHTML='<div class="loading"><span class="spin"></span>Cargando equipos…</div>';
+  cnt.textContent='…';
+  document.getElementById('hdr-status').textContent='↑ Cargando…';
+  document.getElementById('rules-box').classList.remove('show');
+
+  try{
+    const snap = await db.ref('teams').get();
+    allTeams=[];
+    let totalRuns=0,totalPlayers=0;
+
+    if(snap.exists()){
+      snap.forEach(ts=>{
+        const d=ts.child('data').val()||{};
+        const r=arrLen(d.runs), p=arrLen(d.players), pr=arrLen(d.pairs);
+        totalRuns+=r; totalPlayers+=p;
+        allTeams.push({
+          key:ts.key,
+          name:ts.child('name').val()||ts.key,
+          pin:ts.child('pin').val()||'????',
+          created:ts.child('created').val()||null,
+          runs:r, players:p, pairs:pr
+        });
+      });
+    }
+
+    allTeams.sort((a,b)=>(a.created||0)-(b.created||0));
+    document.getElementById('st-teams').textContent=allTeams.length;
+    document.getElementById('st-runs').textContent=totalRuns;
+    document.getElementById('st-players').textContent=totalPlayers;
+    cnt.textContent=allTeams.length+' equipo'+(allTeams.length!==1?'s':'');
+    document.getElementById('refresh-time').textContent='Actualizado: '+new Date().toLocaleTimeString('es-CO');
+    document.getElementById('hdr-status').textContent='● En línea';
+    currentFilter=document.getElementById('search-input').value;
+    renderTeams(currentFilter);
+  } catch(e){
+    console.error(e);
+    const isPerm = e.message&&(e.message.includes('Permission')||e.message.includes('permission'));
+    body.innerHTML=`<div class="empty" style="color:var(--red)">⚠ Error: ${e.message}</div>`;
+    cnt.textContent='Error';
+    document.getElementById('hdr-status').textContent='⚠ Error';
+    if(isPerm) document.getElementById('rules-box').classList.add('show');
+  }
+}
+
+/* ── RENDER ── */
+function filterTeams(q){
+  currentFilter=q;
+  renderTeams(q);
+}
+function renderTeams(q=''){
+  const body=document.getElementById('teams-body');
+  const ql=q.toLowerCase();
+  const list=q ? allTeams.filter(t=>t.name.toLowerCase().includes(ql)||t.key.includes(ql)) : allTeams;
+  if(!list.length){
+    body.innerHTML=`<div class="empty">${q?'Sin resultados para "'+q+'"':'No hay equipos registrados. Crea el primero arriba.'}</div>`;
+    return;
+  }
+  body.innerHTML='<div class="team-list">'+list.map(t=>teamCard(t)).join('')+'</div>';
+}
+function teamCard(t){
+  return`<div class="tcard" id="tc-${t.key}">
+    <div class="tcard-top">
+      <div class="tcard-info">
+        <div class="tname">${t.name}</div>
+        <div class="tcard-meta">
+          <span class="tslug">/${t.key}</span>
+          <span class="tpin">${t.pin}</span>
+          ${t.players?`<span class="tbadge">👥 ${t.players}</span>`:''}
+          ${t.runs?`<span class="tbadge">🏁 ${t.runs}</span>`:''}
+          ${t.pairs?`<span class="tbadge">🤝 ${t.pairs}</span>`:''}
+          ${t.created?`<span class="tbadge">📅 ${fmtDate(t.created)}</span>`:''}
+        </div>
+      </div>
+      <div class="tcard-actions">
+        <button class="btn btn-gold btn-sm" onclick="openEdit('${t.key}')">✏ Editar</button>
+        <button class="btn btn-red btn-sm" onclick="openDel('${t.key}')">🗑 Eliminar</button>
+      </div>
+    </div>
+    <div class="tedit" id="edit-${t.key}">
+      <div class="edit-grid">
+        <div>
+          <div class="flabel">Nombre del equipo</div>
+          <input type="text" id="en-${t.key}" value="${t.name.replace(/"/g,'&quot;')}">
+        </div>
+        <div>
+          <div class="flabel">Nuevo PIN</div>
+          <input type="tel" id="ep-${t.key}" value="${t.pin}" maxlength="4" class="pin-field">
+        </div>
+      </div>
+      <div class="edit-actions">
+        <button class="btn btn-cyan btn-sm" onclick="saveEdit('${t.key}')">✓ Guardar</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeEdit('${t.key}')">Cancelar</button>
+      </div>
+    </div>
+    <div class="tconfirm" id="del-${t.key}">
+      <span class="tconfirm-msg">¿Eliminar "${t.name}" y sus ${t.runs} lanzadas?</span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-red btn-sm" onclick="deleteTeam('${t.key}','${t.name}')">Sí, eliminar</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeDel('${t.key}')">Cancelar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ── EDIT ── */
+function openEdit(k){ closeAllForms(); document.getElementById('edit-'+k).classList.add('open'); document.getElementById('en-'+k).focus(); }
+function closeEdit(k){ document.getElementById('edit-'+k).classList.remove('open'); }
+async function saveEdit(k){
+  const name=document.getElementById('en-'+k).value.trim();
+  const pin=document.getElementById('ep-'+k).value.trim();
+  if(!name){ toast('El nombre no puede estar vacío','err'); return; }
+  if(!pin||pin.length!==4||!/^\d{4}$/.test(pin)){ toast('El PIN debe ser 4 dígitos','err'); return; }
+  try{
+    await db.ref('teams/'+k+'/name').set(name);
+    await db.ref('teams/'+k+'/pin').set(pin);
+    toast('✓ Equipo actualizado','ok');
+    await loadAll();
+  } catch(e){ toast('Error: '+e.message,'err'); }
+}
+
+/* ── DELETE ── */
+function openDel(k){ closeAllForms(); document.getElementById('del-'+k).classList.add('open'); }
+function closeDel(k){ document.getElementById('del-'+k).classList.remove('open'); }
+async function deleteTeam(k,name){
+  try{
+    await db.ref('teams/'+k).remove();
+    toast('✓ "'+name+'" eliminado','ok');
+    await loadAll();
+  } catch(e){ toast('Error: '+e.message,'err'); }
+}
+
+/* ── CREATE ── */
+async function createTeam(){
+  const name=document.getElementById('new-name').value.trim();
+  const pin=document.getElementById('new-pin').value.trim();
+  if(!name){ toast('Escribe el nombre del equipo','err'); document.getElementById('new-name').focus(); return; }
+  if(!pin||pin.length!==4||!/^\d{4}$/.test(pin)){ toast('El PIN debe ser 4 dígitos','err'); document.getElementById('new-pin').focus(); return; }
+  const slug=teamSlug(name);
+  const btn=document.getElementById('create-btn');
+  btn.disabled=true; btn.textContent='Creando…';
+  try{
+    const snap=await db.ref('teams/'+slug).get();
+    if(snap.exists()){ toast('Ya existe un equipo con ese nombre/ID','err'); btn.disabled=false; btn.textContent='+ Crear equipo'; return; }
+    await db.ref('teams/'+slug).set({name,pin,created:Date.now()});
+    document.getElementById('new-name').value='';
+    document.getElementById('new-pin').value='';
+    toast('✓ Equipo "'+name+'" creado','ok');
+    await loadAll();
+  } catch(e){ toast('Error: '+e.message,'err'); }
+  btn.disabled=false; btn.textContent='+ Crear equipo';
+}
+
+/* ── NUKE ── */
+function openNuke(){ closeAllForms(); document.getElementById('nuke-confirm').classList.add('open'); }
+async function nukeAll(){
+  try{
+    await db.ref('teams').remove();
+    document.getElementById('nuke-confirm').classList.remove('open');
+    toast('✓ Todos los equipos eliminados','ok');
+    await loadAll();
+  } catch(e){ toast('Error: '+e.message,'err'); }
+}
+
+/* ── CHANGE ADMIN PIN ── */
+async function changeAdminPin(){
+  const current = document.getElementById('pin-current').value;
+  const newPass  = document.getElementById('pin-new').value;
+  const confirm = document.getElementById('pin-confirm').value;
+  const msg     = document.getElementById('pin-msg');
+
+  if(!current){
+    msg.style.color='var(--red)'; msg.textContent='Introduce la contraseña actual'; return;
+  }
+  if(current !== _adminPin){
+    msg.style.color='var(--red)'; msg.textContent='La contraseña actual es incorrecta'; return;
+  }
+  if(!newPass||newPass.length<4){
+    msg.style.color='var(--red)'; msg.textContent='La nueva contraseña debe tener al menos 4 caracteres'; return;
+  }
+  if(newPass !== confirm){
+    msg.style.color='var(--red)'; msg.textContent='Las contraseñas nuevas no coinciden'; return;
+  }
+  try{
+    await db.ref('_admin/pin').set(newPass);
+    _adminPin = newPass;
+    document.getElementById('pin-current').value='';
+    document.getElementById('pin-new').value='';
+    document.getElementById('pin-confirm').value='';
+    msg.style.color='var(--green)';
+    msg.textContent='✓ Contraseña actualizada en Firebase';
+    toast('✓ Contraseña de administrador actualizada','ok');
+  } catch(e){
+    msg.style.color='var(--red)';
+    msg.textContent='Error al guardar: '+e.message;
+  }
+}
+
+function closeAllForms(){
+  document.querySelectorAll('.tedit.open,.tconfirm.open').forEach(e=>e.classList.remove('open'));
+  document.getElementById('nuke-confirm').classList.remove('open');
+}
+</script>
+</body>
+</html>
