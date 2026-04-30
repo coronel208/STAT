@@ -598,7 +598,7 @@ input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--te
   <button class="tbtn active" data-tab="ronda"          onclick="switchTab('ronda')">🏁 Ronda</button>
   <button class="tbtn"        data-tab="entrenamientos" onclick="switchTab('entrenamientos')">📋 Entrenam.</button>
   <button class="tbtn"        data-tab="parrilla"       onclick="switchTab('parrilla')">👥 Parrilla</button>
-  <button class="tbtn"        data-tab="parejas"        onclick="switchTab('parejas')">🤝 Parejas</button>
+  
   <button class="tbtn"        data-tab="estadisticas"   onclick="switchTab('estadisticas')">📊 Estadísticas</button>
   <button class="tbtn"        data-tab="graficas"       onclick="switchTab('graficas')">📈 Gráficas</button>
   <button class="tbtn"        data-tab="efectividad"    onclick="switchTab('efectividad')">🎯 Efectividad</button>
@@ -677,7 +677,7 @@ let graficasSubTab='evolucion';
 
 // roundMode: 'hub'|'loose-config'|'training-start'|'ready'|'countdown'|'timer'|'missions'
 let roundMode='hub';
-let pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',trainingId:null,trainingRoundId:null};
+let pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',trainingId:null,trainingRoundId:null,azulP1:'',azulP2:'',rojaP1:'',rojaP2:''};
 let mState={}; // mission state for current run
 let activeTrainingId=null;
 let editingTR=null; // {trainingId, roundId}
@@ -708,6 +708,62 @@ let editData={};
 let nPlayerName='';
 let nPairName='',nPairP1='',nPairP2='';
 let nTrainName='',nTrainRounds=3,nTrainPairs=[];
+// Training creation wizard state
+// trainWizStep: 'setup'|'config'|'preview'
+let trainWizStep='setup';
+let trainWizCurrentRound=0; // which round we're configuring (0-based)
+let trainWizEditingRound=null; // index of round being edited in preview
+// Per-round player slots during wizard config (separate from nTrainPairs)
+let trainWizSlots=[]; // [{azulP1,azulP2,rojaP1,rojaP2,cuadrillaName}]
+let _twDragPid=null;
+
+// Sort state per section key → {by, dir}
+let _statSort={};
+function _getSort(key,defBy){return _statSort[key]||{by:defBy||'score',dir:'desc'};}
+function _setSort(key,by,defBy){
+  const cur=_getSort(key,defBy);
+  // Sequential sorts toggle dir; value sorts default desc then toggle
+  const dir=(cur.by===by&&cur.dir==='desc')?'asc':'desc';
+  _statSort[key]={by,dir};render();
+}
+function _sortArrow(key,by,defBy){
+  const cur=_getSort(key,defBy);
+  if(cur.by!==by)return'';
+  // For A-Z and morder: asc=↓, desc=↑; for value sorts: desc=↓, asc=↑
+  if(by==='az'||by==='morder')return cur.dir==='asc'?' ↓':' ↑';
+  return cur.dir==='desc'?' ↓':' ↑';
+}
+function _sortBar(key,opts,defBy){
+  const cur=_getSort(key,defBy);
+  return'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;align-items:center">'+
+    '<span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Ordenar:</span>'+
+    opts.map(([by,label])=>{
+      const active=cur.by===by;
+      return`<button onclick="_setSort('${key}','${by}','${defBy||'score'}')" `+
+        `style="padding:3px 10px;font-size:11px;font-weight:700;`+
+        `border:1.5px solid ${active?'var(--teal)':'var(--border2)'};`+
+        `border-radius:12px;background:${active?'var(--teal)':'var(--surface2)'};`+
+        `color:${active?'#fff':'var(--text2)'};cursor:pointer;white-space:nowrap">`+
+        label+_sortArrow(key,by,defBy)+'</button>';
+    }).join('')+
+  '</div>';
+}
+function _applySort(arr,key,defBy){
+  const cur=_getSort(key,defBy||'score');
+  const s=[...arr];
+  if(cur.by==='score')s.sort((a,b)=>cur.dir==='desc'?(best(b.scores)||0)-(best(a.scores)||0):(best(a.scores)||0)-(best(b.scores)||0));
+  else if(cur.by==='avg')s.sort((a,b)=>cur.dir==='desc'?(avg(b.scores)||0)-(avg(a.scores)||0):(avg(a.scores)||0)-(avg(b.scores)||0));
+  else if(cur.by==='rounds')s.sort((a,b)=>cur.dir==='desc'?(b.refs||[]).length-(a.refs||[]).length:(a.refs||[]).length-(b.refs||[]).length);
+  else if(cur.by==='az')s.sort((a,b)=>cur.dir==='asc'?(a.name||'').localeCompare(b.name||''):(b.name||'').localeCompare(a.name||''));
+  return s;
+}
+function _sortRunObjs(arr,key){
+  const cur=_getSort(key,'score');
+  const s=[...arr];
+  if(cur.by==='score')s.sort((a,b)=>cur.dir==='desc'?Number(b.r.score)-Number(a.r.score):Number(a.r.score)-Number(b.r.score));
+  else if(cur.by==='date')s.sort((a,b)=>cur.dir==='desc'?(b.r.ts||0)-(a.r.ts||0):(a.r.ts||0)-(b.r.ts||0));
+  return s;
+}
 
 /* ═══════════════════════════════════════════
    FIREBASE CONFIG & INIT
@@ -768,6 +824,7 @@ async function loadTeamData(){
   } else {
     players=[]; pairs=[]; trainings=[]; runs=[];
   }
+  if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
 }
 
 /* ── Real-time listener: update if another device saves ── */
@@ -783,6 +840,7 @@ function startRealtimeSync(){
       pairs    = d.pairs     || [];
       trainings= d.trainings || [];
       runs     = d.runs      || [];
+      if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
       render();
     }
   });
@@ -933,6 +991,10 @@ function pairNames(pid){
 function pairOpts(sel=''){
   return`<option value="">— Sin asignar —</option>`+
     pairs.map(p=>`<option value="${p.id}"${p.id===sel?' selected':''}>${p.name} (${pairNames(p.id)})</option>`).join('');
+}
+function playerOpts(sel='',excludeId=''){
+  return`<option value="">— Sin asignar —</option>`+
+    players.filter(p=>p.id!==excludeId).map(p=>`<option value="${p.id}"${p.id===sel?' selected':''}>${p.name}</option>`).join('');
 }
 function runLabel(r,i){return r.roundName||r.note||`Ronda ${i+1}`;}
 function medalClass(i){return i===0?'gold':i===1?'silver':i===2?'bronze':'';}
@@ -1098,7 +1160,8 @@ function beginCountdown(){
    RENDER DISPATCH
 ═══════════════════════════════════════════ */
 // ── Search filter state ──
-let _buscarFilter = {text:'', jugadorId:'', parejaId:'', cuadrillaText:'', minScore:'', maxScore:''};
+function _emptyBuscarFilter(){return {text:'', jugadorId:'', parejaId:'', cuadrillaText:'', minScore:'', maxScore:'', bqP1:'', bqP2:'', dateFromTs:null, dateToTs:null, rangeLabel:''};}
+let _buscarFilter = _emptyBuscarFilter();
 // Pending state for text inputs (applied on Enter or button click)
 let _buscarPending = {text:'', minScore:'', maxScore:''};
 
@@ -1109,12 +1172,22 @@ function _aplicarBuscar(){
   render();
 }
 
+function _irBuscarPromedio(){
+  const b=_rangeBounds();
+  _buscarFilter={..._emptyBuscarFilter(),dateFromTs:isFinite(b.from)?b.from:null,dateToTs:isFinite(b.to)?b.to:null,rangeLabel:_periodLabel()};
+  _buscarPending={text:'',minScore:'',maxScore:''};
+  tab='buscar';
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));
+  render();
+}
+
 function render(){
   const el=document.getElementById('main');
+  if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
   if(tab==='ronda')            el.innerHTML=renderRonda();
   else if(tab==='entrenamientos')el.innerHTML=renderEntrenamientos();
   else if(tab==='parrilla')    el.innerHTML=renderParrilla();
-  else if(tab==='parejas')     el.innerHTML=renderParejas();
+  
   else if(tab==='estadisticas')el.innerHTML=renderEstadisticas();
   else if(tab==='graficas')    el.innerHTML=renderGraficas();
   else if(tab==='efectividad') el.innerHTML=renderEfectividad();
@@ -1123,14 +1196,14 @@ function render(){
 }
 
 function _irBuscarJugador(pid, pname){
-  _buscarFilter = {text:'', jugadorId:pid, parejaId:'', cuadrillaText:'', minScore:'', maxScore:''};
+  _buscarFilter = {..._emptyBuscarFilter(),jugadorId:pid};
   _buscarPending = {text:'', minScore:'', maxScore:''};
   tab='buscar';
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));
   render();
 }
 function _irBuscarPareja(prid, prname){
-  _buscarFilter = {text:'', jugadorId:'', parejaId:prid, cuadrillaText:'', minScore:'', maxScore:''};
+  _buscarFilter = {..._emptyBuscarFilter(),parejaId:prid};
   _buscarPending = {text:'', minScore:'', maxScore:''};
   tab='buscar';
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));
@@ -1138,9 +1211,10 @@ function _irBuscarPareja(prid, prname){
 }
 function switchTab(t){
   if((timerRunning||roundMode==='countdown')&&t!=='ronda'){showToast('⏱ Hay un contador activo');return;}
-  // Sync pending text fields before leaving buscar
-  if(tab==='buscar' && t!=='buscar'){
-    _aplicarBuscar();
+  if(tab==='buscar'&&t!=='buscar') _aplicarBuscar();
+  // Reset wizard if navigating away mid-creation
+  if(tab==='entrenamientos'&&t!=='entrenamientos'&&trainWizStep!=='setup'){
+    trainWizStep='setup';trainWizCurrentRound=0;trainWizSlots=[];
   }
   tab=t;
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
@@ -1203,8 +1277,9 @@ function renderHub(){
                 ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
               <span style="font-family:inherit;font-size:20px;font-weight:700;color:var(--green)">${r.score} pts</span>
+              <button class="btn btn-sm" style="font-size:11px;padding:4px 9px;" onclick="reutilizarRun('${r.id}')" title="Reutilizar parejas y cuadrilla">↺ Reutilizar</button>
               ${!isDel?`<button class="btn btn-red btn-sm" onclick="askDel('run_${r.id}','run')">Borrar</button>`:''}
             </div>
           </div>
@@ -1236,7 +1311,7 @@ function renderHub(){
 }
 
 function startLoose(){
-  pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',trainingId:null,trainingRoundId:null};
+  pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',trainingId:null,trainingRoundId:null,azulP1:'',azulP2:'',rojaP1:'',rojaP2:''};
   looseModalOpen=false;
   roundMode='loose-config';render();
 }
@@ -1245,12 +1320,13 @@ function startLoose(){
 let looseModalOpen = false;
 
 function _looseWarnings(){
-  const az=pendingRound.azulPairId;const ro=pendingRound.rojaPairId;
+  const az=autoGetOrCreatePair(pendingRound.azulP1,pendingRound.azulP2)||pendingRound.azulPairId;
+  const ro=autoGetOrCreatePair(pendingRound.rojaP1,pendingRound.rojaP2)||pendingRound.rojaPairId;
   const w=[];
   if(pairs.length && !pendingRound.cuadrillaName.trim())
     w.push({title:'Sin nombre de cuadrilla',body:'No pusiste un nombre de cuadrilla. Esta lanzada quedará sin cuadrilla asignada y no aparecerá en las estadísticas por cuadrilla.'});
-  if(pairs.length && !az && !ro)
-    w.push({title:'Sin parejas asignadas',body:'No seleccionaste ninguna pareja. Esta lanzada no aparecerá en estadísticas de parejas ni de jugadores individuales.'});
+  if(!az && !ro)
+    w.push({title:'Sin parejas asignadas',body:'Arrastra dos jugadores a una base para formar una pareja automática. Sin pareja, esta lanzada no aparecerá en estadísticas de parejas.'});
   if(az && ro && az===ro)
     w.push({title:'Misma pareja en las dos bases',body:`La pareja <strong>${getPair(az)?.name||''}</strong> está asignada en Base Azul y Base Roja al mismo tiempo.`});
   return w;
@@ -1286,26 +1362,240 @@ function renderLooseConfig(){
       <div class="field-lbl">Nombre de la ronda <span style="font-size:11px;color:var(--text3)">(opcional)</span></div>
       <input type="text" placeholder="ej. Ronda 1, Práctica A... (si no pones nada se nombra automático)" value="${pendingRound.roundName}" oninput="pendingRound.roundName=this.value">
     </div>
-    ${pairs.length?`
-    <div class="fg">
-      <div class="field-lbl">Nombre de la cuadrilla <span style="font-size:11px;color:var(--text3)">(opcional)</span></div>
-      <input type="text" placeholder="ej. Cuadrilla A, Los Rápidos..." value="${pendingRound.cuadrillaName}" oninput="pendingRound.cuadrillaName=this.value">
-    </div>
-    <div class="field-lbl">Parejas que lanzan <span style="font-size:11px;color:var(--text3)">(opcional)</span></div>
-    <div class="bases-grid">
-      <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
-        <select onchange="pendingRound.azulPairId=this.value">${pairOpts(pendingRound.azulPairId)}</select>
-      </div>
-      <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
-        <select onchange="pendingRound.rojaPairId=this.value">${pairOpts(pendingRound.rojaPairId)}</select>
-      </div>
-    </div>`:
-    `<p style="font-size:12px;color:var(--text3);margin:8px 0">Sin parejas. <a href="#" onclick="switchTab('parejas');return false;" style="color:var(--blue)">Crear parejas</a></p>`}
+    ${players.length?renderHubPairDnD():'<p style="font-size:12px;color:var(--text3);margin:8px 0">Sin jugadores. <a href="#" onclick="switchTab(\'parrilla\');return false;" style="color:var(--blue)">Agregar jugadores</a></p>'}
     <button class="btn btn-green btn-lg" style="width:100%;margin-top:12px" onclick="goToReady()">▶ Iniciar contador</button>
   </div>`;
 }
 
+/* ── HUB DRAG & DROP (lanzada suelta) ── */
+function renderHubPairDnD(){
+  // All players in slots
+  const slotted=new Set([pendingRound.azulP1,pendingRound.azulP2,pendingRound.rojaP1,pendingRound.rojaP2].filter(Boolean));
+  const chips=players.map(p=>{
+    const used=slotted.has(p.id);
+    const pid=p.id;
+    return `<div class="player-chip${used?' in-pair':''}" draggable="true" id="hubchip_${pid}"
+      ondragstart="hubDragStart(event,'${pid}')"
+      ondragend="hubDragEnd(event)"
+      ontouchstart="hubTouchStart(event,'${pid}')"
+      ontouchmove="hubTouchMove(event)"
+      ontouchend="hubTouchEnd(event)">${p.name}</div>`;
+  }).join('');
+
+  // Slot display helper
+  function slotHtml(pid,slot){
+    if(!pid) return '<span style="font-size:12px;color:var(--text3)">Arrastra un jugador</span>';
+    const p=getPlayer(pid);
+    return `<div class="player-chip in-pair" style="cursor:default">${p?p.name:'?'}<button class="chip-remove" onclick="pendingRound['${slot}']='';render()" type="button" style="margin-left:4px">×</button></div>`;
+  }
+
+  return `<div class="fg">
+      <div class="field-lbl">Nombre de la cuadrilla <span style="font-size:11px;color:var(--text3)">(opcional)</span></div>
+      <input type="text" placeholder="ej. Cuadrilla A, Los Rápidos..." value="${pendingRound.cuadrillaName}" oninput="pendingRound.cuadrillaName=this.value">
+    </div>
+    <div class="field-lbl" style="margin-bottom:6px">Jugadores — arrastra a la base</div>
+    <div class="player-pool" id="hub-pool" ondragover="event.preventDefault()" ondrop="hubDropToPool(event)">
+      ${chips}
+    </div>
+    <div class="bases-grid" style="margin-top:10px">
+      <div class="bbox azul">
+        <div class="btit azul"><span class="dot azul"></span>Base Azul</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+          <div class="drop-zone${pendingRound.azulP1?' filled':''}" id="hub-az1"
+            ondragover="hubDragOver(event,'hub-az1')" ondragleave="hubDragLeave('hub-az1')"
+            ondrop="hubDropTo(event,'azulP1')">${slotHtml(pendingRound.azulP1,'azulP1')}
+          </div>
+          <div class="drop-zone${pendingRound.azulP2?' filled':''}" id="hub-az2"
+            ondragover="hubDragOver(event,'hub-az2')" ondragleave="hubDragLeave('hub-az2')"
+            ondrop="hubDropTo(event,'azulP2')">${slotHtml(pendingRound.azulP2,'azulP2')}
+          </div>
+        </div>
+      </div>
+      <div class="bbox roja">
+        <div class="btit roja"><span class="dot roja"></span>Base Roja</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+          <div class="drop-zone${pendingRound.rojaP1?' filled':''}" id="hub-ro1"
+            ondragover="hubDragOver(event,'hub-ro1')" ondragleave="hubDragLeave('hub-ro1')"
+            ondrop="hubDropTo(event,'rojaP1')">${slotHtml(pendingRound.rojaP1,'rojaP1')}
+          </div>
+          <div class="drop-zone${pendingRound.rojaP2?' filled':''}" id="hub-ro2"
+            ondragover="hubDragOver(event,'hub-ro2')" ondragleave="hubDragLeave('hub-ro2')"
+            ondrop="hubDropTo(event,'rojaP2')">${slotHtml(pendingRound.rojaP2,'rojaP2')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+
+/* ── HUB DnD JS ── */
+function pairOfPlayer(pid){return pairs.find(pr=>pr.p1===pid||pr.p2===pid)||null;}
+let _hubDragPid=null;
+function hubDragStart(e,pid){
+  _hubDragPid=pid;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',pid);
+  setTimeout(()=>{const el=document.getElementById('hubchip_'+pid);if(el)el.classList.add('dragging');},0);
+}
+function hubDragEnd(e){
+  if(_hubDragPid){const el=document.getElementById('hubchip_'+_hubDragPid);if(el)el.classList.remove('dragging');}
+  _hubDragPid=null;
+}
+function hubDragOver(e,zoneId){e.preventDefault();const el=document.getElementById(zoneId);if(el)el.classList.add('over');}
+function hubDragLeave(zoneId){const el=document.getElementById(zoneId);if(el)el.classList.remove('over');}
+function hubDropToPool(e){e.preventDefault();}
+function hubDropTo(e,slot){
+  e.preventDefault();
+  const pid=e.dataTransfer.getData('text/plain')||_hubDragPid;
+  if(!pid)return;
+  const zone=e.currentTarget;if(zone)zone.classList.remove('over');
+  // Count how many times this player appears across all slots
+  const all=['azulP1','azulP2','rojaP1','rojaP2'];
+  const curSlotHasPid=pendingRound[slot]===pid;
+  const countElsewhere=all.filter(s=>s!==slot&&pendingRound[s]===pid).length;
+  // Allow up to 2 total uses (both bases) — but clear from current slot if already there
+  if(pendingRound[slot]===pid){_hubDragPid=null;return;} // already in this slot
+  if(countElsewhere>=2){showToast('Este jugador ya está en dos slots');_hubDragPid=null;return;}
+  pendingRound[slot]=pid;
+  // Warn if same player appears in both bases
+  const azSlots=['azulP1','azulP2'];const roSlots=['rojaP1','rojaP2'];
+  const inAzul=azSlots.some(s=>pendingRound[s]===pid);
+  const inRoja=roSlots.some(s=>pendingRound[s]===pid);
+  if(inAzul&&inRoja)showToast('⚠ Este jugador está en las dos bases');
+  _hubDragPid=null;render();
+}
+/* Touch for hub */
+let _hubTouchPid=null,_hubTouchClone=null,_hubTouchEl=null;
+function hubTouchStart(e,pid){
+  _hubTouchPid=pid;_hubDragPid=pid;
+  const el=e.currentTarget;_hubTouchEl=el;
+  _hubTouchClone=el.cloneNode(true);
+  _hubTouchClone.style.cssText='position:fixed;opacity:.8;pointer-events:none;z-index:9999;transition:none;';
+  document.body.appendChild(_hubTouchClone);
+  el.classList.add('dragging');
+  const t=e.touches[0];
+  _hubTouchClone.style.left=(t.clientX-40)+'px';
+  _hubTouchClone.style.top=(t.clientY-20)+'px';
+}
+function hubTouchMove(e){
+  if(!_hubTouchClone)return;
+  e.preventDefault();
+  const t=e.touches[0];
+  _hubTouchClone.style.left=(t.clientX-40)+'px';
+  _hubTouchClone.style.top=(t.clientY-20)+'px';
+  document.querySelectorAll('.drop-zone').forEach(z=>{
+    const r=z.getBoundingClientRect();
+    z.classList.toggle('over',t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom);
+  });
+}
+function hubTouchEnd(e){
+  if(!_hubTouchClone||!_hubTouchPid)return;
+  const t=e.changedTouches[0];
+  _hubTouchClone.style.display='none';
+  const target=document.elementFromPoint(t.clientX,t.clientY);
+  _hubTouchClone.style.display='';
+  if(target){
+    const zone=target.closest('.drop-zone');
+    if(zone){
+      const slotMap={'hub-az1':'azulP1','hub-az2':'azulP2','hub-ro1':'rojaP1','hub-ro2':'rojaP2'};
+      const slot=slotMap[zone.id];
+      if(slot){
+        const all=['azulP1','azulP2','rojaP1','rojaP2'];
+        const countElsewhere=all.filter(s=>s!==slot&&pendingRound[s]===_hubTouchPid).length;
+        if(countElsewhere>=2)showToast('Este jugador ya está en dos slots');
+        else {
+          pendingRound[slot]=_hubTouchPid;
+          const azSlots=['azulP1','azulP2'];const roSlots=['rojaP1','rojaP2'];
+          const inAzul=azSlots.some(s=>pendingRound[s]===_hubTouchPid);
+          const inRoja=roSlots.some(s=>pendingRound[s]===_hubTouchPid);
+          if(inAzul&&inRoja)showToast('⚠ Este jugador está en las dos bases');
+        }
+      }
+    }
+  }
+  _hubTouchClone.remove();_hubTouchClone=null;
+  if(_hubTouchEl)_hubTouchEl.classList.remove('dragging');
+  _hubTouchEl=null;_hubTouchPid=null;_hubDragPid=null;
+  document.querySelectorAll('.drop-zone.over').forEach(z=>z.classList.remove('over'));
+  render();
+}
+
+function _pairKey(a,b){return[a,b].filter(Boolean).sort().join('|');}
+function _playersFromPairId(pairId){const pr=getPair(pairId);return pr?[pr.p1||'',pr.p2||'']:['',''];}
+function _runBasePlayers(r,base){
+  const p1=r[base+'P1']||'';const p2=r[base+'P2']||'';
+  if(p1||p2)return[p1,p2];
+  return _playersFromPairId(r[base+'PairId']);
+}
+
+/* Build automatic pair name "A & B" (alphabetical, full names) */
+function autoPairName(p1id,p2id){
+  const pl1=getPlayer(p1id);const pl2=getPlayer(p2id);
+  const n1=pl1?pl1.name.trim():'?';const n2=pl2?pl2.name.trim():'?';
+  const [a,b]=[n1,n2].sort((x,y)=>x.localeCompare(y,'es',{sensitivity:'base'}));
+  return `${a} & ${b}`;
+}
+
+/* MIGRATION: ensure every run/training round with two players has a pairId. */
+function _ensureRunPairs(){
+  let changed=false;
+  const fixRound=r=>['azul','roja'].forEach(base=>{
+    const pairKey=base+'PairId';const p1Key=base+'P1';const p2Key=base+'P2';
+    let p1=r[p1Key]||'';let p2=r[p2Key]||'';
+    if((!p1||!p2)&&r[pairKey]){
+      const pr=getPair(r[pairKey]);
+      if(pr){
+        if(!p1&&pr.p1){r[p1Key]=pr.p1;p1=pr.p1;changed=true;}
+        if(!p2&&pr.p2){r[p2Key]=pr.p2;p2=pr.p2;changed=true;}
+      }
+    }
+    if(p1&&p2){
+      const id=autoGetOrCreatePair(p1,p2);
+      if(id&&r[pairKey]!==id){r[pairKey]=id;changed=true;}
+    }
+  });
+  runs.forEach(r=>{
+    if((!r.azulP1&&!r.azulP2&&!r.rojaP1&&!r.rojaP2) && r.trainingId && r.trainingRoundId){
+      const t=getTraining(r.trainingId);const tr=t?.rounds?.find(x=>x.id===r.trainingRoundId);
+      if(tr){
+        ['azulP1','azulP2','rojaP1','rojaP2','cuadrillaName'].forEach(k=>{if(!r[k]&&tr[k]){r[k]=tr[k];changed=true;}});
+      }
+    }
+    fixRound(r);
+  });
+  trainings.forEach(t=>(t.rounds||[]).forEach(fixRound));
+  return changed;
+}
+
+/* Auto find or create a pair from two player IDs. */
+function autoGetOrCreatePair(p1id,p2id){
+  if(!p1id||!p2id||p1id===p2id)return null;
+  const wanted=_pairKey(p1id,p2id);
+  let pr=pairs.find(pr=>_pairKey(pr.p1,pr.p2)===wanted);
+  if(!pr){
+    pr={id:uid(),name:autoPairName(p1id,p2id),p1:p1id,p2:p2id};
+    pairs.push(pr);
+  } else if(pr.name !== autoPairName(p1id,p2id) && pr._auto !== false){
+    pr.name = autoPairName(p1id,p2id);
+  }
+  return pr.id;
+}
+
+
+function _syncPendingPairs(){
+  ['azul','roja'].forEach(base=>{
+    const pairKey=base+'PairId';const p1Key=base+'P1';const p2Key=base+'P2';
+    if((!pendingRound[p1Key]||!pendingRound[p2Key])&&pendingRound[pairKey]){
+      const pr=getPair(pendingRound[pairKey]);
+      if(pr){pendingRound[p1Key]=pendingRound[p1Key]||pr.p1||'';pendingRound[p2Key]=pendingRound[p2Key]||pr.p2||'';}
+    }
+    const id=autoGetOrCreatePair(pendingRound[p1Key],pendingRound[p2Key]);
+    pendingRound[pairKey]=id||'';
+  });
+}
+
 function goToReady(){
+  _syncPendingPairs();
   const warnings = _looseWarnings();
   if(warnings.length > 0){
     looseModalOpen = true;
@@ -1316,6 +1606,7 @@ function goToReady(){
 }
 
 function _proceedToReady(){
+  _syncPendingPairs();
   looseModalOpen=false;
   stopTimerCleanup();
   timerRemaining=TIMER_TOTAL;
@@ -1407,10 +1698,39 @@ function renderTimerRunning(){
 }
 
 function goToMissions(){pauseTimer();roundMode='missions';mState=defaultMState();render();}
+function reutilizarRun(runId){
+  const r=runs.find(x=>x.id===runId);
+  if(!r)return;
+
+  // Copy player slots and cuadrilla from the original run — keep editable
+  pendingRound.azulP1=r.azulP1||'';
+  pendingRound.azulP2=r.azulP2||'';
+  pendingRound.rojaP1=r.rojaP1||'';
+  pendingRound.rojaP2=r.rojaP2||'';
+  pendingRound.azulPairId=r.azulPairId||'';
+  pendingRound.rojaPairId=r.rojaPairId||'';
+  pendingRound.cuadrillaName=r.cuadrillaName||'';
+  // Do NOT reuse round name — only configuration
+  pendingRound.roundName='';
+  pendingRound.note='';
+  pendingRound.trainingId=null;
+  pendingRound.trainingRoundId=null;
+
+  // Go to round creation/config screen so user can edit pairs before starting
+  tab='ronda';
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='ronda'));
+  stopTimerCleanup();
+  timerRemaining=TIMER_TOTAL;
+  roundMode='loose-config';
+  looseModalOpen=false;
+  render();
+  showToast('↺ Configuración cargada — ajusta y comienza');
+}
+
 function cancelRound(){
   stopTimerCleanup();
   const wasT=!!pendingRound.trainingId;
-  pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',trainingId:null,trainingRoundId:null};
+  pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',trainingId:null,trainingRoundId:null,azulP1:'',azulP2:'',rojaP1:'',rojaP2:''};
   roundMode=wasT?'training-start':'hub';
   render();
 }
@@ -1569,8 +1889,12 @@ function saveRun(){
   }
   const score=calcScore(mState);
   const snap=JSON.parse(JSON.stringify(mState));
+  // Auto-create pairs from individual player slots
+  _syncPendingPairs();
   const run={id:uid(),roundName:pendingRound.roundName.trim(),note:pendingRound.note.trim(),
     azulPairId:pendingRound.azulPairId,rojaPairId:pendingRound.rojaPairId,
+    azulP1:pendingRound.azulP1||'',azulP2:pendingRound.azulP2||'',
+    rojaP1:pendingRound.rojaP1||'',rojaP2:pendingRound.rojaP2||'',
     cuadrillaName:(pendingRound.cuadrillaName||'').trim(),
     missions:snap,score,ts:Date.now(),
     trainingId:pendingRound.trainingId||null,trainingRoundId:pendingRound.trainingRoundId||null};
@@ -1583,7 +1907,7 @@ function saveRun(){
   stopTimerCleanup();
   showToast(`Guardado: ${score} pts`);
   const wasT=!!pendingRound.trainingId;const tid=pendingRound.trainingId;
-  pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',trainingId:null,trainingRoundId:null};
+  pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',trainingId:null,trainingRoundId:null,azulP1:'',azulP2:'',rojaP1:'',rojaP2:''};
   mState={};
   if(wasT){activeTrainingId=tid;roundMode='training-start';}else roundMode='hub';
   render();
@@ -1602,16 +1926,28 @@ function renderTrainingStart(){
     const isEd=editingTR&&editingTR.trainingId===t.id&&editingTR.roundId===r.id;
     const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
     const runFor=runs.find(x=>x.trainingRoundId===r.id);
+    const _ap=getPair(r.azulPairId);const _rp=getPair(r.rojaPairId);
+    const azP1=r.azulP1||_ap?.p1||'';const azP2=r.azulP2||_ap?.p2||'';
+    const roP1=r.rojaP1||_rp?.p1||'';const roP2=r.rojaP2||_rp?.p2||'';
     const pairView=isEd?
       `<div style="margin-top:8px">
         <div class="field-lbl">Nombre de la cuadrilla <span style="color:var(--red)">*</span></div>
         <input type="text" id="ec_${r.id}" value="${editTRData.cua||r.cuadrillaName||''}" placeholder="ej. Cuadrilla A..." style="margin-bottom:8px">
         <div class="bases-grid">
           <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
-            <select id="ea_${r.id}">${pairOpts(editTRData.azul||r.azulPairId)}</select></div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <select id="ea1_${r.id}">${playerOpts(azP1)}</select>
+              <select id="ea2_${r.id}">${playerOpts(azP2)}</select>
+            </div>
+          </div>
           <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
-            <select id="er_${r.id}">${pairOpts(editTRData.roja||r.rojaPairId)}</select></div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <select id="er1_${r.id}">${playerOpts(roP1)}</select>
+              <select id="er2_${r.id}">${playerOpts(roP2)}</select>
+            </div>
+          </div>
         </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">La pareja se crea automáticamente con el nombre de los dos jugadores.</div>
         <div class="row" style="margin-top:8px">
           <button class="btn btn-green btn-sm" onclick="saveTREdit('${t.id}','${r.id}')">Guardar</button>
           <button class="btn btn-sm" onclick="editingTR=null;editTRData={};render()">Cancelar</button>
@@ -1649,14 +1985,21 @@ function renderTrainingStart(){
         <input type="text" placeholder="ej. Cuadrilla A, Los Rápidos..." value="${newRoundData.cuadrillaName||''}" oninput="newRoundData.cuadrillaName=this.value">
       </div>
       <div class="field-lbl">Parejas</div>
-      <div class="bases-grid" style="margin-bottom:10px">
+      <div class="bases-grid" style="margin-bottom:6px">
         <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
-          <select onchange="newRoundData.azulPairId=this.value">${pairOpts(newRoundData.azulPairId)}</select>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <select onchange="newRoundData.azulP1=this.value">${playerOpts(newRoundData.azulP1||'')}</select>
+            <select onchange="newRoundData.azulP2=this.value">${playerOpts(newRoundData.azulP2||'')}</select>
+          </div>
         </div>
         <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
-          <select onchange="newRoundData.rojaPairId=this.value">${pairOpts(newRoundData.rojaPairId)}</select>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <select onchange="newRoundData.rojaP1=this.value">${playerOpts(newRoundData.rojaP1||'')}</select>
+            <select onchange="newRoundData.rojaP2=this.value">${playerOpts(newRoundData.rojaP2||'')}</select>
+          </div>
         </div>
       </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">La pareja se crea automáticamente con el nombre de los dos jugadores.</div>
       <div class="row">
         <button class="btn btn-green" onclick="confirmAddRound('${t.id}')">+ Agregar lanzada</button>
         <button class="btn btn-sm" onclick="addingRoundToTraining=null;newRoundData={label:'',azulPairId:'',rojaPairId:'',cuadrillaName:''};render()">Cancelar</button>
@@ -1714,12 +2057,18 @@ function saveTREdit(tid,rid){
   const r=t.rounds.find(x=>x.id===rid);if(!r)return;
   const cua=(document.getElementById('ec_'+rid)?.value||'').trim();
   if(!cua){showToast('Ponle un nombre a la cuadrilla');return;}
-  const az=document.getElementById('ea_'+rid)?.value||'';
-  const ro=document.getElementById('er_'+rid)?.value||'';
-  if(az&&az===ro){showToast('La misma pareja no puede estar en las dos bases');return;}
+  const aP1=document.getElementById('ea1_'+rid)?.value||'';
+  const aP2=document.getElementById('ea2_'+rid)?.value||'';
+  const rP1=document.getElementById('er1_'+rid)?.value||'';
+  const rP2=document.getElementById('er2_'+rid)?.value||'';
+  if(aP1&&aP2&&aP1===aP2){showToast('Base Azul: el mismo jugador no puede ir dos veces');return;}
+  if(rP1&&rP2&&rP1===rP2){showToast('Base Roja: el mismo jugador no puede ir dos veces');return;}
+  const azPair=autoGetOrCreatePair(aP1,aP2)||'';
+  const roPair=autoGetOrCreatePair(rP1,rP2)||'';
+  if(azPair&&azPair===roPair){showToast('La misma pareja no puede estar en las dos bases');return;}
   r.cuadrillaName=cua;
-  r.azulPairId=az;
-  r.rojaPairId=ro;
+  r.azulP1=aP1;r.azulP2=aP2;r.azulPairId=azPair;
+  r.rojaP1=rP1;r.rojaP2=rP2;r.rojaPairId=roPair;
   editingTR=null;editTRData={};save();showToast('Ronda actualizada');render();
 }
 function startTR(tid,rid){
@@ -1729,6 +2078,8 @@ function startTR(tid,rid){
   const roundName=r.label.trim()||`Ronda ${rIdx}`;
   pendingRound={roundName:`${t.name} — ${roundName}`,note:'',
     azulPairId:r.azulPairId||'',rojaPairId:r.rojaPairId||'',
+    azulP1:r.azulP1||'',azulP2:r.azulP2||'',
+    rojaP1:r.rojaP1||'',rojaP2:r.rojaP2||'',
     cuadrillaName:r.cuadrillaName||'',
     trainingId:tid,trainingRoundId:rid};
   stopTimerCleanup();timerRemaining=TIMER_TOTAL;roundMode='ready';render();
@@ -1769,6 +2120,10 @@ function doReuseTraining(id){
     order:r.order,
     label:r.label||'',
     cuadrillaName:r.cuadrillaName||'',
+    azulP1:r.azulP1||'',
+    azulP2:r.azulP2||'',
+    rojaP1:r.rojaP1||'',
+    rojaP2:r.rojaP2||'',
     azulPairId:r.azulPairId||'',
     rojaPairId:r.rojaPairId||'',
     completed:false
@@ -1797,7 +2152,13 @@ function doReuseTraining(id){
 function confirmAddRound(tid){
   const t=getTraining(tid);if(!t)return;
   if(!(newRoundData.cuadrillaName||'').trim()){showToast('Ponle un nombre a la cuadrilla');return;}
-  if(newRoundData.azulPairId && newRoundData.azulPairId===newRoundData.rojaPairId){
+  const aP1=newRoundData.azulP1||'';const aP2=newRoundData.azulP2||'';
+  const rP1=newRoundData.rojaP1||'';const rP2=newRoundData.rojaP2||'';
+  if(aP1&&aP2&&aP1===aP2){showToast('Base Azul: el mismo jugador no puede ir dos veces');return;}
+  if(rP1&&rP2&&rP1===rP2){showToast('Base Roja: el mismo jugador no puede ir dos veces');return;}
+  const azPair=autoGetOrCreatePair(aP1,aP2)||'';
+  const roPair=autoGetOrCreatePair(rP1,rP2)||'';
+  if(azPair && azPair===roPair){
     showToast('La misma pareja no puede estar en las dos bases');return;
   }
   const newRound={
@@ -1805,14 +2166,16 @@ function confirmAddRound(tid){
     order:t.rounds.length,
     label:newRoundData.label.trim(),
     cuadrillaName:(newRoundData.cuadrillaName||'').trim(),
-    azulPairId:newRoundData.azulPairId||'',
-    rojaPairId:newRoundData.rojaPairId||'',
+    azulP1:aP1,azulP2:aP2,
+    rojaP1:rP1,rojaP2:rP2,
+    azulPairId:azPair,
+    rojaPairId:roPair,
     completed:false
   };
   t.rounds.push(newRound);
   if(t.status==='completed') t.status='active';
   addingRoundToTraining=null;
-  newRoundData={label:'',azulPairId:'',rojaPairId:'',cuadrillaName:''};
+  newRoundData={label:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',azulP1:'',azulP2:'',rojaP1:'',rojaP2:''};
   save();showToast('Lanzada agregada');render();
 }
 
@@ -1820,44 +2183,167 @@ function confirmAddRound(tid){
    TAB: ENTRENAMIENTOS
 ═══════════════════════════════════════════ */
 function renderEntrenamientos(){
-  const rows=[];
-  for(let i=0;i<nTrainRounds;i++){
-    if(!nTrainPairs[i])nTrainPairs[i]={azulPairId:'',rojaPairId:'',label:'',cuadrillaName:''};
-    rows.push(`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-family:inherit;font-size:13px;font-weight:700">Ronda ${i+1}</div>
-        ${nTrainRounds>1?`<button class="btn btn-red btn-sm" style="padding:2px 8px;font-size:11px" onclick="removeTrainRound(${i})">× Quitar</button>`:''}
-      </div>
-      <div style="margin-bottom:8px">
-        <div class="field-lbl">Nombre de la cuadrilla <span style="color:var(--red)">*</span></div>
-        <input type="text" placeholder="ej. Cuadrilla A, Los Rápidos..." value="${nTrainPairs[i].cuadrillaName||''}" oninput="nTrainPairs[${i}].cuadrillaName=this.value">
-      </div>
-      <div class="bases-grid">
-        <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
-          <select onchange="nTrainPairs[${i}].azulPairId=this.value">${pairOpts(nTrainPairs[i].azulPairId)}</select>
+  // ── Step rendering ──
+  function renderWizardForm(){
+    if(trainWizStep==='setup'){
+      return`<div class="form-card">
+        <div class="sec-lbl">Nuevo entrenamiento</div>
+        <div class="fg">
+          <div class="field-lbl">Nombre del entrenamiento *</div>
+          <input type="text" placeholder="ej. Sesión martes, Entrenamiento 1..." value="${nTrainName}"
+            oninput="nTrainName=this.value" onkeydown="if(event.key==='Enter')document.getElementById('tw-rounds-inp').focus()">
         </div>
-        <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
-          <select onchange="nTrainPairs[${i}].rojaPairId=this.value">${pairOpts(nTrainPairs[i].rojaPairId)}</select>
+        <div class="fg">
+          <div class="field-lbl">Número de lanzadas</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn btn-sm" onclick="if(nTrainRounds>1)nTrainRounds--;render()" style="width:36px;font-size:18px;font-weight:700;padding:4px">−</button>
+            <span id="tw-rounds-inp" style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:800;min-width:40px;text-align:center">${nTrainRounds}</span>
+            <button class="btn btn-sm" onclick="nTrainRounds++;render()" style="width:36px;font-size:18px;font-weight:700;padding:4px">+</button>
+            <span style="font-size:12px;color:var(--text3)">lanzada${nTrainRounds!==1?'s':''} (puedes cambiar después)</span>
+          </div>
         </div>
-      </div>
-    </div>`);
-  }
-  const form=pairs.length?`<div class="form-card">
-    <div class="sec-lbl">Nuevo entrenamiento</div>
-    <div class="fg">
-      <div class="field-lbl">Nombre del entrenamiento</div>
-      <input type="text" placeholder="ej. Sesión martes, Entrenamiento 1..." value="${nTrainName}" oninput="nTrainName=this.value">
-    </div>
-    <div style="margin-bottom:10px">${rows.join('')}</div>
-    <div class="row" style="margin-bottom:10px">
-      <button class="btn btn-sm" onclick="addTrainRound()">+ Agregar ronda</button>
-      <span style="font-size:12px;color:var(--text3)">${nTrainRounds} lanzada${nTrainRounds!==1?'s':''}</span>
-    </div>
-    <button class="btn btn-green" style="width:100%" onclick="createTraining()">Crear entrenamiento</button>
-  </div>`:
-  `<div class="form-card"><p style="font-size:13px;color:var(--text3)">Primero crea <a href="#" onclick="switchTab('parejas');return false;" style="color:var(--blue)">parejas</a>.</p></div>`;
+        <button class="btn btn-green" style="width:100%;margin-top:8px" onclick="startTrainWizConfig()">
+          Configurar entrenamiento →
+        </button>
+      </div>`;
+    }
 
+    if(trainWizStep==='config'||trainWizStep==='editround'){
+      const idx=trainWizCurrentRound;
+      const totalR=trainWizSlots.length;
+      const slot=trainWizSlots[idx]||{azulP1:'',azulP2:'',rojaP1:'',rojaP2:'',cuadrillaName:''};
+      const isEdit=trainWizStep==='editround';
+      const title=isEdit?`Editar lanzada ${idx+1} de ${totalR}`:`Configurar lanzada ${idx+1} de ${totalR}`;
+      const progress=Math.round((idx/totalR)*100);
+
+      // Pool
+      const slotted=new Set([slot.azulP1,slot.azulP2,slot.rojaP1,slot.rojaP2].filter(Boolean));
+      const chips=players.map(p=>{
+        const used=slotted.has(p.id);
+        return`<div class="player-chip${used?' in-pair':''}" draggable="true" id="twchip_${p.id}"
+          ondragstart="twDragStart(event,'${p.id}')" ondragend="twDragEnd(event)"
+          ontouchstart="twTouchStart(event,'${p.id}')" ontouchmove="twTouchMove(event)" ontouchend="twTouchEnd(event)">${p.name}</div>`;
+      }).join('');
+      function twSlot(pid,slotKey){
+        if(!pid)return`<span style="font-size:12px;color:var(--text3)">Arrastra un jugador</span>`;
+        const p=getPlayer(pid);
+        return`<div class="player-chip in-pair" style="cursor:default">${p?p.name:'?'}<button class="chip-remove" onclick="trainWizSlots[${idx}]['${slotKey}']='';render()" type="button" style="margin-left:4px">×</button></div>`;
+      }
+      const filled=[slot.azulP1,slot.azulP2,slot.rojaP1,slot.rojaP2].filter(Boolean).length;
+
+      return`<div class="form-card">
+        <!-- Progress -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <div style="font-family:inherit;font-size:15px;font-weight:800">${nTrainName||'Entrenamiento'}</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">${title}</div>
+          </div>
+          <button class="btn btn-sm" onclick="trainWizStep='setup';render()">✕ Cancelar</button>
+        </div>
+        <div style="height:4px;background:var(--border);border-radius:4px;margin-bottom:14px">
+          <div style="height:4px;background:var(--green-d);border-radius:4px;width:${Math.max(4,Math.round(((idx+1)/totalR)*100))}%;transition:width .3s"></div>
+        </div>
+
+        <!-- Cuadrilla name -->
+        <div class="fg" style="margin-bottom:10px">
+          <div class="field-lbl">Nombre de la cuadrilla <span style="font-size:11px;color:var(--text3)">(opcional)</span></div>
+          <input type="text" placeholder="ej. Cuadrilla A, Los Rápidos..." value="${slot.cuadrillaName||''}"
+            oninput="trainWizSlots[${idx}].cuadrillaName=this.value">
+        </div>
+
+        <!-- Player pool -->
+        <div class="field-lbl" style="margin-bottom:6px">Jugadores — arrastra a cada base</div>
+        <div class="player-pool" id="tw-pool" ondragover="event.preventDefault()" ondrop="twDropToPool(event)">
+          ${chips}
+        </div>
+
+        <!-- Bases -->
+        <div class="bases-grid" style="margin-top:10px">
+          <div class="bbox azul">
+            <div class="btit azul"><span class="dot azul"></span>Base Azul</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+              <div style="font-size:10px;font-weight:700;color:var(--text3)">Jugador 1</div>
+              <div class="drop-zone${slot.azulP1?' filled':''}" id="tw-az1"
+                ondragover="twDragOver(event,'tw-az1')" ondragleave="twDragLeave('tw-az1')"
+                ondrop="twDrop(event,'azulP1')">${twSlot(slot.azulP1,'azulP1')}</div>
+              <div style="font-size:10px;font-weight:700;color:var(--text3)">Jugador 2</div>
+              <div class="drop-zone${slot.azulP2?' filled':''}" id="tw-az2"
+                ondragover="twDragOver(event,'tw-az2')" ondragleave="twDragLeave('tw-az2')"
+                ondrop="twDrop(event,'azulP2')">${twSlot(slot.azulP2,'azulP2')}</div>
+            </div>
+          </div>
+          <div class="bbox roja">
+            <div class="btit roja"><span class="dot roja"></span>Base Roja</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+              <div style="font-size:10px;font-weight:700;color:var(--text3)">Jugador 1</div>
+              <div class="drop-zone${slot.rojaP1?' filled':''}" id="tw-ro1"
+                ondragover="twDragOver(event,'tw-ro1')" ondragleave="twDragLeave('tw-ro1')"
+                ondrop="twDrop(event,'rojaP1')">${twSlot(slot.rojaP1,'rojaP1')}</div>
+              <div style="font-size:10px;font-weight:700;color:var(--text3)">Jugador 2</div>
+              <div class="drop-zone${slot.rojaP2?' filled':''}" id="tw-ro2"
+                ondragover="twDragOver(event,'tw-ro2')" ondragleave="twDragLeave('tw-ro2')"
+                ondrop="twDrop(event,'rojaP2')">${twSlot(slot.rojaP2,'rojaP2')}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation -->
+        <div style="display:flex;gap:8px;margin-top:14px">
+          ${idx>0&&!isEdit?`<button class="btn btn-sm" onclick="trainWizCurrentRound--;render()">← Anterior</button>`:''}
+          <div style="flex:1"></div>
+          ${isEdit?
+            `<button class="btn btn-green" onclick="trainWizStep='preview';render()">Guardar cambios ✓</button>`:
+            idx<totalR-1?
+            `<button class="btn btn-green" style="flex:1" onclick="trainWizCurrentRound++;render()">Siguiente lanzada →</button>`:
+            `<button class="btn btn-green" style="flex:1" onclick="trainWizStep='preview';render()">Ver resumen del entrenamiento →</button>`
+          }
+        </div>
+      </div>`;
+    }
+
+    if(trainWizStep==='preview'){
+      const previewRows=trainWizSlots.map((slot,i)=>{
+        const p1a=getPlayer(slot.azulP1);const p2a=getPlayer(slot.azulP2);
+        const p1r=getPlayer(slot.rojaP1);const p2r=getPlayer(slot.rojaP2);
+        const hasPlayers=slot.azulP1||slot.azulP2||slot.rojaP1||slot.rojaP2;
+        return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;margin-bottom:8px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:700;font-size:14px">Lanzada ${i+1}${slot.cuadrillaName?' · '+slot.cuadrillaName:''}</div>
+              ${hasPlayers?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">
+                ${(slot.azulP1||slot.azulP2)?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${[p1a?.name,p2a?.name].filter(Boolean).join(' & ')||'Sin asignar'}</span>`:''}
+                ${(slot.rojaP1||slot.rojaP2)?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${[p1r?.name,p2r?.name].filter(Boolean).join(' & ')||'Sin asignar'}</span>`:''}
+              </div>`:`<div style="font-size:12px;color:var(--text3);margin-top:3px">Sin jugadores asignados</div>`}
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              <button class="btn btn-gold btn-sm" onclick="trainWizCurrentRound=${i};trainWizStep='editround';render()">✏ Editar</button>
+              <button class="btn btn-red btn-sm" onclick="trainWizDeleteRound(${i})">× Eliminar</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      return`<div class="form-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div style="font-family:inherit;font-size:16px;font-weight:800">${nTrainName}</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">${trainWizSlots.length} lanzada${trainWizSlots.length!==1?'s':''} configuradas</div>
+          </div>
+          <button class="btn btn-sm" onclick="trainWizStep='setup';render()">← Volver</button>
+        </div>
+        ${previewRows}
+        <button class="btn btn-sm" style="width:100%;margin-bottom:10px" onclick="trainWizAddRound()">+ Agregar lanzada</button>
+        <button class="btn btn-green" style="width:100%;font-size:15px;font-weight:800;padding:12px" onclick="finishTrainWiz()">
+          ✓ Crear entrenamiento
+        </button>
+      </div>`;
+    }
+    return'';
+  }
+
+  const form=renderWizardForm();
   if(!trainings.length)return form+`<div class="empty">No hay entrenamientos aún.</div>`;
+
 
   const list=trainings.map(t=>{
     const done=t.rounds.filter(r=>r.completed).length;
@@ -1922,10 +2408,19 @@ function renderEntrenamientos(){
             </div>
             <div class="bases-grid" style="margin-bottom:8px">
               <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
-                <select id="ea_${r.id}">${pairOpts(editTRData.azul||r.azulPairId)}</select></div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <select id="ea1_${r.id}">${playerOpts(r.azulP1||getPair(r.azulPairId)?.p1||'')}</select>
+                  <select id="ea2_${r.id}">${playerOpts(r.azulP2||getPair(r.azulPairId)?.p2||'')}</select>
+                </div>
+              </div>
               <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
-                <select id="er_${r.id}">${pairOpts(editTRData.roja||r.rojaPairId)}</select></div>
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <select id="er1_${r.id}">${playerOpts(r.rojaP1||getPair(r.rojaPairId)?.p1||'')}</select>
+                  <select id="er2_${r.id}">${playerOpts(r.rojaP2||getPair(r.rojaPairId)?.p2||'')}</select>
+                </div>
+              </div>
             </div>
+            <div style="font-size:11px;color:var(--text3);margin:-4px 0 8px">La pareja se crea automáticamente con el nombre de los dos jugadores.</div>
             <div class="row">
               <button class="btn btn-green btn-sm" onclick="saveTREdit('${t.id}','${r.id}')">Guardar</button>
               <button class="btn btn-sm" onclick="editingTR=null;editTRData={};render()">Cancelar</button>
@@ -1982,6 +2477,126 @@ function addRoundFromList(tid){
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='ronda'));
   render();
 }
+function startTrainWizConfig(){
+  if(!nTrainName.trim()){showToast('Escribe el nombre del entrenamiento');return;}
+  if(nTrainRounds<1||nTrainRounds>20){showToast('Número de lanzadas debe ser entre 1 y 20');return;}
+  // Initialize slots if not already
+  while(trainWizSlots.length<nTrainRounds)trainWizSlots.push({azulP1:'',azulP2:'',rojaP1:'',rojaP2:'',cuadrillaName:''});
+  trainWizSlots.length=nTrainRounds;
+  trainWizCurrentRound=0;
+  trainWizStep='config';
+  render();
+}
+function trainWizDeleteRound(i){
+  if(trainWizSlots.length<=1){showToast('Debe haber al menos una lanzada');return;}
+  trainWizSlots.splice(i,1);
+  nTrainRounds=trainWizSlots.length;
+  render();
+}
+function trainWizAddRound(){
+  trainWizSlots.push({azulP1:'',azulP2:'',rojaP1:'',rojaP2:'',cuadrillaName:''});
+  nTrainRounds=trainWizSlots.length;
+  trainWizCurrentRound=trainWizSlots.length-1;
+  trainWizStep='config';
+  render();
+}
+function finishTrainWiz(){
+  if(!nTrainName.trim()){showToast('Escribe el nombre del entrenamiento');return;}
+  const rounds=trainWizSlots.map((slot,i)=>({
+    id:uid(),order:i,
+    label:'',
+    cuadrillaName:(slot.cuadrillaName||'').trim(),
+    azulP1:slot.azulP1||'',azulP2:slot.azulP2||'',
+    rojaP1:slot.rojaP1||'',rojaP2:slot.rojaP2||'',
+    azulPairId:autoGetOrCreatePair(slot.azulP1,slot.azulP2),
+    rojaPairId:autoGetOrCreatePair(slot.rojaP1,slot.rojaP2),
+    completed:false
+  }));
+  trainings.push({id:uid(),name:nTrainName.trim(),ts:Date.now(),status:'planned',rounds});
+  // Reset wizard
+  nTrainName='';nTrainRounds=3;nTrainPairs=[];
+  trainWizSlots=[];trainWizStep='setup';trainWizCurrentRound=0;
+  save();showToast('Entrenamiento creado');render();
+}
+
+/* ── TRAINING WIZARD drag-and-drop ── */
+function twDragStart(e,pid){_twDragPid=pid;e.dataTransfer.setData('text/plain',pid);setTimeout(()=>{const el=document.getElementById('twchip_'+pid);if(el)el.classList.add('dragging');},0);}
+function twDragEnd(){if(_twDragPid){const el=document.getElementById('twchip_'+_twDragPid);if(el)el.classList.remove('dragging');}  _twDragPid=null;}
+function twDragOver(e,z){e.preventDefault();const el=document.getElementById(z);if(el)el.classList.add('over');}
+function twDragLeave(z){const el=document.getElementById(z);if(el)el.classList.remove('over');}
+function twDropToPool(e){e.preventDefault();}
+function twDrop(e,slotKey){
+  e.preventDefault();
+  const pid=e.dataTransfer.getData('text/plain')||_twDragPid;
+  if(!pid)return;
+  const zone=e.currentTarget;if(zone)zone.classList.remove('over');
+  const idx=trainWizCurrentRound;
+  const slot=trainWizSlots[idx];
+  if(!slot)return;
+  const all=['azulP1','azulP2','rojaP1','rojaP2'];
+  const countElsewhere=all.filter(s=>s!==slotKey&&slot[s]===pid).length;
+  if(countElsewhere>=2){showToast('Este jugador ya está en dos slots');_twDragPid=null;return;}
+  slot[slotKey]=pid;
+  // Warn cross-base
+  const inAz=['azulP1','azulP2'].some(s=>slot[s]===pid);
+  const inRo=['rojaP1','rojaP2'].some(s=>slot[s]===pid);
+  if(inAz&&inRo)showToast('⚠ Este jugador está en las dos bases');
+  _twDragPid=null;render();
+}
+let _twTouchPid=null,_twTouchClone=null,_twTouchEl=null;
+function twTouchStart(e,pid){
+  _twTouchPid=pid;_twDragPid=pid;
+  _twTouchEl=e.currentTarget;
+  _twTouchClone=_twTouchEl.cloneNode(true);
+  _twTouchClone.style.cssText='position:fixed;opacity:.8;pointer-events:none;z-index:9999;';
+  document.body.appendChild(_twTouchClone);
+  _twTouchEl.classList.add('dragging');
+  const t=e.touches[0];
+  _twTouchClone.style.left=(t.clientX-40)+'px';
+  _twTouchClone.style.top=(t.clientY-20)+'px';
+}
+function twTouchMove(e){
+  if(!_twTouchClone)return;e.preventDefault();
+  const t=e.touches[0];
+  _twTouchClone.style.left=(t.clientX-40)+'px';
+  _twTouchClone.style.top=(t.clientY-20)+'px';
+  document.querySelectorAll('#tw-az1,#tw-az2,#tw-ro1,#tw-ro2').forEach(z=>{
+    const r=z.getBoundingClientRect();
+    z.classList.toggle('over',t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom);
+  });
+}
+function twTouchEnd(e){
+  if(!_twTouchClone||!_twTouchPid)return;
+  const t=e.changedTouches[0];
+  _twTouchClone.style.display='none';
+  const el=document.elementFromPoint(t.clientX,t.clientY);
+  _twTouchClone.style.display='';
+  if(el){
+    const zone=el.closest('#tw-az1,#tw-az2,#tw-ro1,#tw-ro2');
+    if(zone){
+      const map={'tw-az1':'azulP1','tw-az2':'azulP2','tw-ro1':'rojaP1','tw-ro2':'rojaP2'};
+      const sk=map[zone.id];
+      if(sk){
+        const idx=trainWizCurrentRound;const slot=trainWizSlots[idx];
+        const all=['azulP1','azulP2','rojaP1','rojaP2'];
+        const n=all.filter(s=>s!==sk&&slot[s]===_twTouchPid).length;
+        if(n>=2)showToast('Este jugador ya está en dos slots');
+        else {
+          slot[sk]=_twTouchPid;
+          const inAz=['azulP1','azulP2'].some(s=>slot[s]===_twTouchPid);
+          const inRo=['rojaP1','rojaP2'].some(s=>slot[s]===_twTouchPid);
+          if(inAz&&inRo)showToast('⚠ Este jugador está en las dos bases');
+        }
+      }
+    }
+  }
+  _twTouchClone.remove();_twTouchClone=null;
+  if(_twTouchEl)_twTouchEl.classList.remove('dragging');
+  _twTouchEl=null;_twTouchPid=null;_twDragPid=null;
+  document.querySelectorAll('#tw-az1,#tw-az2,#tw-ro1,#tw-ro2').forEach(z=>z.classList.remove('over'));
+  render();
+}
+
 function addTrainRound(){nTrainRounds++;render();}
 function removeTrainRound(i){if(nTrainRounds<=1)return;nTrainPairs.splice(i,1);nTrainRounds--;render();}
 function createTraining(){
@@ -2081,162 +2696,169 @@ function renderParrilla(){
 function renderParejas(){
   if(!players.length)return`<div class="empty">Primero agrega jugadores en <strong>Parrilla</strong>.</div>`;
 
-  // Which players are already in a pair
-  const inPairIds=new Set(pairs.flatMap(pr=>[pr.p1,pr.p2].filter(Boolean)));
+  // Auto-detect pairs from run history using individual player slots
+  const pairMap={}; // key: sorted p1_p2 ids → {p1,p2,runs[],base[]}
+  runs.forEach(r=>{
+    [['azulP1','azulP2','azul'],['rojaP1','rojaP2','roja']].forEach(([k1,k2,base])=>{
+      const a=r[k1]||''; const b=r[k2]||'';
+      if(!a&&!b)return;
+      const key=[a,b].filter(Boolean).sort().join('|');
+      if(!pairMap[key])pairMap[key]={p1:a||null,p2:b||null,runRefs:[],key};
+      pairMap[key].runRefs.push(r);
+    });
+    // Also detect from legacy azulPairId/rojaPairId
+    ['azulPairId','rojaPairId'].forEach(k=>{
+      const prid=r[k]; if(!prid)return;
+      const pr=getPair(prid); if(!pr)return;
+      const key=[pr.p1,pr.p2].filter(Boolean).sort().join('|');
+      if(!pairMap[key])pairMap[key]={p1:pr.p1||null,p2:pr.p2||null,runRefs:[],key};
+      if(!pairMap[key].runRefs.find(x=>x.id===r.id))pairMap[key].runRefs.push(r);
+    });
+  });
 
-  // Player pool chips
-  const poolChips=players.map(p=>`
-    <div class="player-chip${inPairIds.has(p.id)?' in-pair':''}"
-      draggable="true"
-      id="chip_${p.id}"
-      ondragstart="dragStart(event,'${p.id}')"
-      ondragend="dragEnd(event)"
-      ontouchstart="touchStart(event,'${p.id}')"
-      ontouchmove="touchMove(event)"
-      ontouchend="touchEnd(event)">
-      ${p.name}
-    </div>`).join('');
+  const detectedPairs=Object.values(pairMap).sort((a,b)=>b.runRefs.length-a.runRefs.length);
 
-  // Current pair being built
-  const slot1Html=nPairP1?(()=>{const p=getPlayer(nPairP1);return`<div class="player-chip in-pair">${p?p.name:'?'}<button class="chip-remove" onclick="removeSlot(1)" type="button">×</button></div>`;})()
-    :`<span class="drop-zone-label">Arrastra el jugador 1 aquí</span>`;
-  const slot2Html=nPairP2?(()=>{const p=getPlayer(nPairP2);return`<div class="player-chip in-pair">${p?p.name:'?'}<button class="chip-remove" onclick="removeSlot(2)" type="button">×</button></div>`;})()
-    :`<span class="drop-zone-label">Arrastra el jugador 2 aquí</span>`;
-
-  const form=`<div class="form-card">
-    <div class="sec-lbl">Crear pareja</div>
-    <div style="margin-bottom:10px">
-      <div class="field-lbl">Jugadores disponibles — arrastra a los slots</div>
-      <div class="player-pool" id="player-pool"
-        ondragover="event.preventDefault()"
-        ondrop="dropToPool(event)">
-        ${poolChips}
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-      <div>
-        <div class="field-lbl">Jugador 1</div>
-        <div class="drop-zone${nPairP1?' filled':''}" id="slot1"
-          ondragover="dragOver(event,'slot1')"
-          ondragleave="dragLeave('slot1')"
-          ondrop="dropToSlot(event,1)">
-          ${slot1Html}
-        </div>
-      </div>
-      <div>
-        <div class="field-lbl">Jugador 2</div>
-        <div class="drop-zone${nPairP2?' filled':''}" id="slot2"
-          ondragover="dragOver(event,'slot2')"
-          ondragleave="dragLeave('slot2')"
-          ondrop="dropToSlot(event,2)">
-          ${slot2Html}
-        </div>
-      </div>
-    </div>
-    <div class="fg">
-      <div class="field-lbl">Nombre de la pareja <span style="color:var(--red)">*</span></div>
-      <input type="text" placeholder="ej. Los Veloces, Pareja Alpha..." value="${nPairName}" oninput="nPairName=this.value" onkeydown="if(event.key==='Enter')addPair()">
-    </div>
-    <button class="btn btn-green" onclick="addPair()" style="width:100%">Crear pareja</button>
+  const header=`<div class="card" style="margin-bottom:14px;background:var(--green-l);border-color:var(--teal)">
+    <div style="font-family:inherit;font-size:14px;font-weight:700;color:var(--green-d);margin-bottom:4px;">🤝 Parejas detectadas automáticamente</div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.5;">Las parejas se forman al registrar rondas. Arrastra jugadores a cada base en <strong>Ronda → Lanzada suelta</strong> y el sistema reconoce las combinaciones automáticamente.</div>
   </div>`;
 
-  if(!pairs.length)return form+`<div class="empty">No hay parejas aún.</div>`;
+  if(!detectedPairs.length){
+    return header+`<div class="card" style="text-align:center;padding:28px 20px;">
+      <div style="font-size:32px;margin-bottom:10px;">🏁</div>
+      <div style="font-family:inherit;font-size:16px;font-weight:700;margin-bottom:6px;">Sin parejas todavía</div>
+      <div style="font-size:13px;color:var(--text3);line-height:1.6;">Registra rondas con jugadores asignados a cada base y las parejas aparecerán aquí con sus estadísticas.</div>
+    </div>`;
+  }
 
-  const list=pairs.map(pr=>{
-    const p1=getPlayer(pr.p1);const p2=getPlayer(pr.p2);
-    const isDel=confDel['pr_'+pr.id];const isEd=editingId.pairs===pr.id;
-    const inRun=runs.some(r=>r.azulPairId===pr.id||r.rojaPairId===pr.id);
-
-    // Edit mode also uses drag-and-drop
-    const editP1=editData.p1;const editP2=editData.p2;
-    const editSlot1=editP1?(()=>{const p=getPlayer(editP1);return`<div class="player-chip in-pair">${p?p.name:'?'}<button class="chip-remove" onclick="removeEditSlot(1,'${pr.id}')" type="button">×</button></div>`;})()
-      :`<span class="drop-zone-label">Arrastra jugador aquí</span>`;
-    const editSlot2=editP2?(()=>{const p=getPlayer(editP2);return`<div class="player-chip in-pair">${p?p.name:'?'}<button class="chip-remove" onclick="removeEditSlot(2,'${pr.id}')" type="button">×</button></div>`;})()
-      :`<span class="drop-zone-label">Arrastra jugador aquí</span>`;
-
-    return`<div class="card">
+  return header+detectedPairs.map(({p1,p2,runRefs})=>{
+    const pl1=p1?getPlayer(p1):null; const pl2=p2?getPlayer(p2):null;
+    const name=[pl1?.name,pl2?.name].filter(Boolean).join(' & ')||'Pareja desconocida';
+    const scores=runRefs.map(r=>Number(r.score));
+    const bestScore=scores.length?Math.max(...scores):null;
+    const avgScore=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
+    return`<div class="card" style="margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap">
-        <div style="flex:1;min-width:180px">
-          <div style="font-size:19px;font-weight:800;margin-bottom:9px">${pr.name}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:7px">
-            <div style="display:inline-flex;align-items:center;gap:7px;background:var(--green-l);border:1.5px solid var(--green-b);border-radius:30px;padding:6px 15px">
-              <span style="width:8px;height:8px;border-radius:50%;background:var(--green-d);flex-shrink:0;display:inline-block"></span>
-              <span style="font-size:14px;font-weight:700">${p1?p1.name:'?'}</span>
-            </div>
-            <div style="display:inline-flex;align-items:center;gap:7px;background:var(--green-l);border:1.5px solid var(--green-b);border-radius:30px;padding:6px 15px">
-              <span style="width:8px;height:8px;border-radius:50%;background:var(--green-d);flex-shrink:0;display:inline-block"></span>
-              <span style="font-size:14px;font-weight:700">${p2?p2.name:'?'}</span>
-            </div>
+        <div>
+          <div style="font-family:inherit;font-size:16px;font-weight:700">${name}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+            ${pl1?`<span class="player-chip in-pair" style="cursor:default">${pl1.name}</span>`:''}
+            ${pl2?`<span class="player-chip in-pair" style="cursor:default">${pl2.name}</span>`:''}
           </div>
-          ${inRun?`<span class="tag tag-blue">En rondas</span>`:`<span style="font-size:12px;color:var(--text3)">Sin rondas registradas</span>`}
-        </div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
-          ${!isEd?`<button class="btn btn-amber btn-sm" onclick="startPairEdit('${pr.id}')">Editar</button>`:''}
-          ${!isDel?`<button class="btn btn-red btn-sm" onclick="askDel('pr_${pr.id}','pr')">Eliminar</button>`:''}
+          <div style="font-size:12px;color:var(--text3);margin-top:6px">
+            ${runRefs.length} lanzada${runRefs.length!==1?'s':''}
+            ${bestScore!==null?` · Mejor: <strong style="color:var(--green)">${bestScore} pts</strong>`:''}
+            ${avgScore!==null?` · Prom: <strong>${avgScore}</strong>`:''}
+          </div>
         </div>
       </div>
-      ${isEd?`<div style="margin-top:10px">
-        <div class="fg"><div class="field-lbl">Nombre</div>
-          <input type="text" value="${editData.name||''}" oninput="editData.name=this.value" style="margin-bottom:0">
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0">
-          <div><div class="field-lbl">Jugador 1</div>
-            <div class="drop-zone${editP1?' filled':''}" id="eslot1_${pr.id}"
-              ondragover="dragOver(event,'eslot1_${pr.id}')"
-              ondragleave="dragLeave('eslot1_${pr.id}')"
-              ondrop="dropToEditSlot(event,1,'${pr.id}')">
-              ${editSlot1}
-            </div>
-          </div>
-          <div><div class="field-lbl">Jugador 2</div>
-            <div class="drop-zone${editP2?' filled':''}" id="eslot2_${pr.id}"
-              ondragover="dragOver(event,'eslot2_${pr.id}')"
-              ondragleave="dragLeave('eslot2_${pr.id}')"
-              ondrop="dropToEditSlot(event,2,'${pr.id}')">
-              ${editSlot2}
-            </div>
-          </div>
-        </div>
-        <div class="row">
-          <button class="btn btn-green btn-sm" onclick="savePairEdit('${pr.id}')">Guardar</button>
-          <button class="btn btn-sm" onclick="cancelEdit('pairs')">Cancelar</button>
-        </div>
-      </div>`:''}
-      ${isDel?`<div class="conf">
-        <span>¿Eliminar pareja <strong>${pr.name}</strong>?</span>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-red btn-sm" onclick="delPair('${pr.id}')">Confirmar</button>
-          <button class="btn btn-sm" onclick="cancelDel('pr_${pr.id}')">Cancelar</button>
-        </div>
-      </div>`:''}
     </div>`;
   }).join('');
-  return form+list;
 }
 
-/* ═══════════════════════════════════════════
-   TAB: ESTADÍSTICAS
-   Outer: Global | Rondas sueltas | Entrenamientos
-   Inner: Ranking | Por jugador | Por pareja | Por cuadrilla
-   Entities: collapsible (collapsed by default)
-═══════════════════════════════════════════ */
+
+
+/* ─── Period filter state (persisted) ─── */
+let _statsRange = (function(){
+  try{const r=JSON.parse(localStorage.getItem('stat_range')||'null');
+    return r||{preset:'all',from:'',to:''};
+  }catch(e){return{preset:'all',from:'',to:''};}
+})();
+function _saveStatsRange(){try{localStorage.setItem('stat_range',JSON.stringify(_statsRange));}catch(e){}}
+function setStatsPreset(p){_statsRange={preset:p,from:'',to:''};_saveStatsRange();render();}
+function setStatsFrom(v){_statsRange.from=v;_statsRange.preset='custom';_saveStatsRange();render();}
+function setStatsTo(v){_statsRange.to=v;_statsRange.preset='custom';_saveStatsRange();render();}
+function _rangeBounds(){
+  const now=Date.now();
+  const day=86400000;
+  if(_statsRange.preset==='7d')   return {from:now-7*day, to:now+day};
+  if(_statsRange.preset==='30d')  return {from:now-30*day,to:now+day};
+  if(_statsRange.preset==='90d')  return {from:now-90*day,to:now+day};
+  if(_statsRange.preset==='season')return {from:new Date(new Date().getFullYear()-(new Date().getMonth()<7?1:0),7,1).getTime(),to:now+day};
+  if(_statsRange.preset==='custom'){
+    const f=_statsRange.from?new Date(_statsRange.from+'T00:00:00').getTime():-Infinity;
+    const t=_statsRange.to  ?new Date(_statsRange.to  +'T23:59:59').getTime(): Infinity;
+    return {from:f,to:t};
+  }
+  return {from:-Infinity,to:Infinity};
+}
+function _filterByRange(arr){
+  const {from,to}=_rangeBounds();
+  return arr.filter(r=>r.ts>=from && r.ts<=to);
+}
+function _periodLabel(){
+  const m={'all':'Todo el histórico','7d':'Últimos 7 días','30d':'Últimos 30 días','90d':'Últimos 90 días','season':'Esta temporada','custom':'Rango personalizado'};
+  return m[_statsRange.preset]||'Todo';
+}
+function _periodSelector(){
+  const presets=[['all','Todo'],['7d','7d'],['30d','30d'],['90d','90d'],['season','Temporada']];
+  const btns=presets.map(([k,l])=>`<button class="sub-tbtn${_statsRange.preset===k?' active':''}" style="padding:6px 12px;font-size:12px" onclick="setStatsPreset('${k}')">${l}</button>`).join('');
+  return `<div class="card" style="margin-bottom:12px;padding:12px 14px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <span style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase">Período</span>
+      ${btns}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--text3)">Personalizado:</span>
+      <input type="date" value="${_statsRange.from||''}" onchange="setStatsFrom(this.value)" style="font-size:12px;padding:5px 8px;width:auto">
+      <span style="font-size:11px;color:var(--text3)">→</span>
+      <input type="date" value="${_statsRange.to||''}" onchange="setStatsTo(this.value)" style="font-size:12px;padding:5px 8px;width:auto">
+      <span class="tag tag-green" style="font-size:10px;margin-left:auto">${_periodLabel()}</span>
+    </div>
+  </div>`;
+}
+function _summaryPanel(allRuns,periodRuns){
+  const perScores=periodRuns.map(r=>Number(r.score));
+  const avgPer=perScores.length?Math.round(perScores.reduce((a,b)=>a+b,0)/perScores.length):'—';
+  const bestPer=perScores.length?Math.max(...perScores):'—';
+  return `<div class="metric-grid" style="margin-bottom:14px">
+    <div class="metric-box"><div class="lbl">Promedio período</div><div class="val good">${avgPer}</div></div>
+    <div class="metric-box"><div class="lbl">Mejor del período</div><div class="val good">${bestPer}</div></div>
+    <div class="metric-box"><div class="lbl">Rondas período</div><div class="val">${periodRuns.length}</div></div>
+  </div>`;
+}
+
 function renderEstadisticas(){
   if(!runs.length)return`<div class="empty">Guarda rondas desde <strong>Ronda</strong> para ver estadísticas.</div>`;
   const nav=`<div class="sub-tabs">
     <button class="sub-tbtn ${statsSubTab==='global'?'active':''}"         onclick="switchStatsSub('global')">Global</button>
+    <button class="sub-tbtn ${statsSubTab==='promedios'?'active':''}"      onclick="switchStatsSub('promedios')">Promedio</button>
     <button class="sub-tbtn ${statsSubTab==='rondas-sueltas'?'active':''}" onclick="switchStatsSub('rondas-sueltas')">Rondas sueltas</button>
     <button class="sub-tbtn ${statsSubTab==='entrenamientos'?'active':''}" onclick="switchStatsSub('entrenamientos')">Entrenamientos</button>
   </div>`;
   let body='';
-  if(statsSubTab==='global'){
+  if(statsSubTab==='promedios'){
+    body=_promediosPanel();
+  } else if(statsSubTab==='global'){
     body=statsPanel(runs,'global');
   } else if(statsSubTab==='rondas-sueltas'){
     const loose=runs.filter(r=>!r.trainingId);
-    body=loose.length?statsPanel(loose,'rondas-sueltas'):`<div class="empty">No hay rondas sueltas guardadas.</div>`;
+    const filtered=_filterByRange(loose);
+    body=loose.length?(_periodSelector()+_summaryPanel(loose,filtered)+statsPanel(filtered,'rondas-sueltas')):`<div class="empty">No hay rondas sueltas guardadas.</div>`;
   } else {
     body=statsTrainings();
   }
   return nav+body;
+}
+
+/* ── PROMEDIO sub-tab: por período ── */
+function _promediosPanel(){
+  const filtered=_filterByRange(runs);
+  const perScores=filtered.map(r=>Number(r.score));
+  const avgPer=perScores.length?Math.round(perScores.reduce((a,b)=>a+b,0)/perScores.length):'—';
+  const bestPer=perScores.length?Math.max(...perScores):'—';
+  return `
+    <div class="card" style="padding:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px">Promedio por período</div>
+      ${_periodSelector()}
+      <div class="metric-grid" style="margin-top:10px">
+        <div class="metric-box"><div class="lbl">Promedio período</div><div class="val good">${avgPer}</div></div>
+        <div class="metric-box"><div class="lbl">Mejor del período</div><div class="val">${bestPer}</div></div>
+        <div class="metric-box"><div class="lbl">Rondas período</div><div class="val">${filtered.length}</div></div>
+      </div>
+      <button class="btn btn-green" style="width:100%;justify-content:center;margin-top:12px;font-weight:800" onclick="_irBuscarPromedio()">🔍 Buscar lanzadas de este promedio →</button>
+    </div>
+  `;
 }
 
 /* ── switchers ── */
@@ -2311,9 +2933,12 @@ function _rcard(r,idx,meta){
 
 /* ── RANKING ── collapsible per run */
 function _rankingSection(subset,prefix){
-  const sorted=[...subset].map((r,i)=>({r,i})).sort((a,b)=>Number(b.r.score)-Number(a.r.score));
+  const sk=prefix+'_rank';
+  const mapped=[...subset].map((r,i)=>({r,i}));
+  const sorted=_sortRunObjs(mapped,sk);
   if(!sorted.length)return`<div class="empty">Sin lanzadas.</div>`;
-  return`<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${subset.length} lanzada${subset.length!==1?'s':''} — mayor a menor</div>`+
+  const bar=_sortBar(sk,[['score','Puntaje'],['date','Fecha']],'score');
+  return bar+`<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${subset.length} lanzada${subset.length!==1?'s':''}</div>`+
   sorted.map(({r,i},pos)=>{
     const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
     const key=`${prefix}_run_${r.id}`;const isOpen=!!statsOpen[key];
@@ -2377,21 +3002,24 @@ function _playersSection(subset,prefix){
   const pMap={};
   players.forEach(p=>{pMap[p.id]={p,refs:[],scores:[]};});
   subset.forEach((r,idx)=>{
-    const add=(pid,base)=>{
-      const pr=getPair(pid);if(!pr)return;
+    const add=(pid,base,p1,p2)=>{
+      let pairId=pid;
+      if((!pairId||!getPair(pairId))&&p1&&p2){pairId=autoGetOrCreatePair(p1,p2);if(pairId)r[base+'PairId']=pairId;}
+      const pr=getPair(pairId);if(!pr)return;
       [pr.p1,pr.p2].filter(Boolean).forEach(id=>{
         if(!pMap[id])return;
         pMap[id].refs.push({r,idx,base,pairName:pr.name});
         pMap[id].scores.push(Number(r.score));
       });
     };
-    if(r.azulPairId)add(r.azulPairId,'azul');
-    if(r.rojaPairId)add(r.rojaPairId,'roja');
+    add(r.azulPairId,'azul',..._runBasePlayers(r,'azul'));
+    add(r.rojaPairId,'roja',..._runBasePlayers(r,'roja'));
   });
-  const sorted=Object.values(pMap).filter(x=>x.scores.length>0)
-    .sort((a,b)=>(best(b.scores)||0)-(best(a.scores)||0));
-  if(!sorted.length)return`<div class="empty">Sin datos de jugadores para este conjunto.</div>`;
-  return sorted.map(({p,refs,scores})=>{
+  const sk=prefix+'_play';
+  const allPlay=_applySort(Object.values(pMap).filter(x=>x.scores.length>0),sk,'score');
+  if(!allPlay.length)return`<div class="empty">Sin datos de jugadores para este conjunto.</div>`;
+  const bar=_sortBar(sk,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas']],'score');
+  return bar+allPlay.map(({p,refs,scores})=>{
     const bv=best(scores);const av=avg(scores);const tot=scores.reduce((a,b)=>a+b,0);
     const key=`${prefix}_jug_${p.id}`;const isOpen=!!statsOpen[key];
     return`<div class="coll-card">
@@ -2433,16 +3061,36 @@ function _playersSection(subset,prefix){
 /* ── POR PAREJA ── collapsible per pair */
 function _pairsSection(subset,prefix){
   const pMap={};
+  // Seed with all known pairs (so empty pairs still show 0 if needed — but filtered later)
   pairs.forEach(pr=>{pMap[pr.id]={pr,refs:[],scores:[]};});
   subset.forEach((r,idx)=>{
-    const add=(pid,base)=>{if(pMap[pid]){pMap[pid].refs.push({r,idx,base});pMap[pid].scores.push(Number(r.score));}};
-    if(r.azulPairId)add(r.azulPairId,'azul');
-    if(r.rojaPairId)add(r.rojaPairId,'roja');
+    const add=(pid,p1,p2,base)=>{
+      let key=pid;
+      // If no pairId but we have both players, auto-create pair on the fly
+      if((!key || !pairs.find(p=>p.id===key)) && p1 && p2){
+        key=autoGetOrCreatePair(p1,p2);
+        if(key){
+          // Persist the fix back onto the run
+          if(base==='azul') r.azulPairId=key; else r.rojaPairId=key;
+        }
+      }
+      if(!key) return;
+      if(!pMap[key]){
+        const pr=pairs.find(p=>p.id===key);
+        if(!pr) return;
+        pMap[key]={pr,refs:[],scores:[]};
+      }
+      pMap[key].refs.push({r,idx,base});
+      pMap[key].scores.push(Number(r.score));
+    };
+    add(r.azulPairId, ..._runBasePlayers(r,'azul'), 'azul');
+    add(r.rojaPairId, ..._runBasePlayers(r,'roja'), 'roja');
   });
-  const sorted=Object.values(pMap).filter(x=>x.scores.length>0)
-    .sort((a,b)=>(best(b.scores)||0)-(best(a.scores)||0));
-  if(!sorted.length)return`<div class="empty">Sin datos de parejas para este conjunto.</div>`;
-  return sorted.map(({pr,refs,scores})=>{
+  const sk2=prefix+'_pair';
+  const allPair=_applySort(Object.values(pMap).filter(x=>x.scores.length>0),sk2,'score');
+  if(!allPair.length)return`<div class="empty">Sin datos de parejas para este conjunto.</div>`;
+  const bar=_sortBar(sk2,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas']],'score');
+  return bar+allPair.map(({pr,refs,scores})=>{
     const bv=best(scores);const av=avg(scores);
     const p1=getPlayer(pr.p1);const p2=getPlayer(pr.p2);
     const key=`${prefix}_par_${pr.id}`;const isOpen=!!statsOpen[key];
@@ -2495,7 +3143,11 @@ function _bestName(names){
 function _cuadrillasSection(subset,prefix){
   const groups={};
   subset.forEach((r,idx)=>{
-    const az=r.azulPairId||'';const ro=r.rojaPairId||'';
+    let az=r.azulPairId||'';let ro=r.rojaPairId||'';
+    const [az1,az2]=_runBasePlayers(r,'azul');
+    const [ro1,ro2]=_runBasePlayers(r,'roja');
+    if((!az||!getPair(az))&&az1&&az2){az=autoGetOrCreatePair(az1,az2)||'';if(az)r.azulPairId=az;}
+    if((!ro||!getPair(ro))&&ro1&&ro2){ro=autoGetOrCreatePair(ro1,ro2)||'';if(ro)r.rojaPairId=ro;}
     if(!az&&!ro)return;
     const cuaRaw=(r.cuadrillaName||'').trim();
     const normCua=_normStr(cuaRaw);
@@ -2507,9 +3159,12 @@ function _cuadrillasSection(subset,prefix){
     groups[gkey].refs.push({r,idx});
     groups[gkey].scores.push(Number(r.score));
   });
-  const sorted=Object.values(groups).sort((a,b)=>(best(b.scores)||0)-(best(a.scores)||0));
-  if(!sorted.length)return`<div class="empty">Sin cuadrillas registradas. Se necesitan rondas con al menos una pareja asignada.</div>`;
-  return sorted.map(({az,ro,names,refs,scores},ci)=>{
+  const sk3=prefix+'_cua';
+  const rawCua=Object.values(groups).map(g=>({...g,name:_bestName(g.names||[])||''}));
+  const allCua=_applySort(rawCua,sk3,'score');
+  if(!allCua.length)return`<div class="empty">Sin cuadrillas registradas. Se necesitan rondas con al menos una pareja asignada.</div>`;
+  const bar3=_sortBar(sk3,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas'],['az','A–Z']],'score');
+  return bar3+allCua.map(({az,ro,names,refs,scores},ci)=>{
     const ap=getPair(az);const rp=getPair(ro);
     const bv=best(scores);const av=avg(scores);
     const displayName=_bestName(names)||[ap?.name,rp?.name].filter(Boolean).join(' + ')||`Cuadrilla ${ci+1}`;
@@ -2544,7 +3199,7 @@ function _cuadrillasSection(subset,prefix){
             ${rp?`<span class="bpill roja" style="font-size:11px"><span class="dot roja"></span>${rp.name}</span>`:''}
           </div>
         </div>
-        <button class="btn btn-green" style="width:100%;font-weight:700" onclick="(function(){_buscarFilter={text:'',jugadorId:'',parejaId:'',cuadrillaText:'${displayName.replace(/'/g,String.fromCharCode(92,39)).replace(/"/g,'&quot;')}',minScore:'',maxScore:''};tab='buscar';document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));render();})()">
+        <button class="btn btn-green" style="width:100%;font-weight:700" onclick="(function(){_buscarFilter={..._emptyBuscarFilter(),cuadrillaText:'${displayName.replace(/'/g,String.fromCharCode(92,39)).replace(/"/g,'&quot;')}'};tab='buscar';document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));render();})()">
           🔍 Ver rondas de ${displayName} →
         </button>
       </div>`:''}
@@ -2668,7 +3323,7 @@ function renderGraficas(){
     html=`
       <div class="card" style="margin-bottom:16px">
         <div style="font-size:17px;font-weight:800;margin-bottom:3px">📈 Evolución de puntajes</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Cronológico · punteado = promedio móvil (5 rondas)</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Cronológico · punteado = promedio móvil (10 rondas)</div>
         <div style="position:relative;height:250px"><canvas id="gc_evol"></canvas></div>
       </div>`;
   } else if(graficasSubTab==='tendencia'){
@@ -2847,10 +3502,10 @@ function drawGraficas(){
     const sorted=[...runs].sort((a,b)=>a.ts-b.ts);
     const labels=sorted.map(r=>fmtTs(r.ts));
     const scores=sorted.map(r=>r.score);
-    const avgs=scores.map((_,i)=>{const w=scores.slice(Math.max(0,i-4),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
+    const avgs=scores.map((_,i)=>{const w=scores.slice(Math.max(0,i-9),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
     _mkChart('gc_evol',{type:'line',data:{labels,datasets:[
       {label:'Puntaje',data:scores,borderColor:'#0D6E8A',backgroundColor:'rgba(13,110,138,0.08)',tension:.4,pointRadius:5,pointBackgroundColor:'#fff',pointBorderColor:'#0D6E8A',pointBorderWidth:2.5,fill:true,borderWidth:2.5},
-      {label:'Promedio móvil (5)',data:avgs,borderColor:'#B85C00',borderDash:[6,4],tension:.4,pointRadius:0,fill:false,borderWidth:2}
+      {label:'Promedio móvil (10)',data:avgs,borderColor:'#B85C00',borderDash:[6,4],tension:.4,pointRadius:0,fill:false,borderWidth:2}
     ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
       scales:{y:{suggestedMin:0,max:545,ticks:{color:_TICK,font:{size:11}},grid:{color:_GRID},border:{display:false}},
               x:{ticks:{color:_TICK,maxRotation:40,font:{size:10}},grid:{display:false},border:{display:false}}}})});
@@ -2976,11 +3631,11 @@ function drawGraficas(){
       if(!eRuns.length)return;
       const lbs=eRuns.map(r=>fmtTs(r.ts));
       const sc=eRuns.map(r=>r.score);
-      const avgL=sc.map((_,i)=>{const w=sc.slice(Math.max(0,i-4),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
+      const avgL=sc.map((_,i)=>{const w=sc.slice(Math.max(0,i-9),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
       const col=_PAL[ei%_PAL.length];
       _mkChart('gc_ent_'+ei,{type:'line',data:{labels:lbs,datasets:[
         {label:'Puntaje',data:sc,borderColor:col,backgroundColor:col+'22',tension:.3,pointRadius:4,fill:true},
-        {label:'Promedio movil (5)',data:avgL,borderColor:'#854F0B',borderDash:[5,3],tension:.4,pointRadius:0,fill:false}
+        {label:'Promedio móvil (10)',data:avgL,borderColor:'#854F0B',borderDash:[5,3],tension:.4,pointRadius:0,fill:false}
       ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
         scales:{y:{beginAtZero:true,max:545,ticks:{color:_TICK},grid:{color:_GRID}},
                 x:{ticks:{color:_TICK,maxRotation:45,font:{size:9}},grid:{display:false}}}})});
@@ -3080,8 +3735,14 @@ function effTable(subset,label){
       full,partial,fail,total,maxPts,hasCounter,
       pctFull,pctPartial,pctAny,
       failRounds,partialRounds};
-  }).sort((a,b)=>a.pctAny-b.pctAny);
+  }).sort((a,b)=>{
+    const ec=_getSort('eff_missions','score_asc');
+    if(ec.by==='morder'){const mo=x=>x.code==='INS'?-1:x.code==='FP'?999:parseInt(x.code.replace('M',''))||0;return ec.dir==='asc'?mo(a)-mo(b):mo(b)-mo(a);}
+    if(ec.by==='score_asc'||(ec.by==='score'&&ec.dir==='asc'))return a.pctAny-b.pctAny;
+    return b.pctAny-a.pctAny; // score_desc / mayor→menor
+  });
 
+  if(!mStats.length)return`<div class="empty">Sin datos.</div>`;
   const best2=mStats.reduce((a,x)=>a.pctFull>x.pctFull?a:x);
   const worst=mStats.reduce((a,x)=>a.pctAny<x.pctAny?a:x);
 
@@ -3131,8 +3792,21 @@ function effTable(subset,label){
       </div>`:''}
     </div>`;
   }).join('');
+  // Unified eff sort: one toggle for efectividad (asc↔desc), one for mission order
+  const _ec=_getSort('eff_missions','score_asc');
+  const _nextEff=_ec.by==='score_asc'?'score_desc':_ec.by==='score_desc'?'score_asc':'score_asc';
+  const _effBtnLabel=_ec.by==='morder'?'Efectividad':(_ec.by==='score_asc'?'Efect. ↑ menor':'Efect. ↓ mayor');
+  const _mBtnLabel=_ec.by==='morder'?'M01→M15 ↓':'M01→M15';
+  const effBar='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;align-items:center">'+
+    '<span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Ordenar:</span>'+
+    '<button onclick="_statSort[\'eff_missions\']={by:\''+(_ec.by==='score_asc'?'score_desc':'score_asc')+'\',dir:\'asc\'};render()" '+
+      'style="padding:3px 10px;font-size:11px;font-weight:700;border:1.5px solid '+(_ec.by!=='morder'?'var(--teal)':'var(--border2)')+';border-radius:12px;background:'+(_ec.by!=='morder'?'var(--teal)':'var(--surface2)')+';color:'+(_ec.by!=='morder'?'#fff':'var(--text2)')+';cursor:pointer">'+_effBtnLabel+'</button>'+
+    '<button onclick="_statSort[\'eff_missions\']={by:\''+(_ec.by==='morder'?'score_asc':'morder')+'\',dir:\'asc\'};render()" '+
+      'style="padding:3px 10px;font-size:11px;font-weight:700;border:1.5px solid '+(_ec.by==='morder'?'var(--teal)':'var(--border2)')+';border-radius:12px;background:'+(_ec.by==='morder'?'var(--teal)':'var(--surface2)')+';color:'+(_ec.by==='morder'?'#fff':'var(--text2)')+';cursor:pointer">'+_mBtnLabel+'</button>'+
+  '</div>';
   return`<div class="card" style="margin-bottom:14px"><div class="sec-lbl">${label}</div>${summary}</div>
-  <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Ordenadas de menor a mayor efectividad · <span style="color:var(--green);font-weight:700">■</span> completa &nbsp;<span style="color:var(--amber);font-weight:700">■</span> parcial &nbsp;<span style="color:var(--red);font-weight:700">■</span> fallida</div>${cards}`;
+  ${effBar}
+  <div style="font-size:12px;color:var(--text3);margin-bottom:10px"><span style="color:var(--green);font-weight:700">■</span> completa &nbsp;<span style="color:var(--amber);font-weight:700">■</span> parcial &nbsp;<span style="color:var(--red);font-weight:700">■</span> fallida</div>${cards}`;
 }
 
 function effByTraining(){
@@ -3330,6 +4004,74 @@ function delRun(id){
 /* ═══════════════════════════════════════════
    TAB: BUSCAR RONDAS
 ═══════════════════════════════════════════ */
+function _limpiarBuscar(){
+  _buscarFilter=_emptyBuscarFilter();
+  _buscarPending={text:'',cuadrillaText:'',minScore:'',maxScore:''};
+  render();
+}
+
+/* ── BUSCAR: pair DnD ── */
+let _bqDragPid=null;
+function bqDragStart(e,pid){_bqDragPid=pid;e.dataTransfer.setData('text/plain',pid);setTimeout(()=>{const el=document.getElementById('bqchip_'+pid);if(el)el.classList.add('dragging');},0);}
+function bqDragEnd(){if(_bqDragPid){const el=document.getElementById('bqchip_'+_bqDragPid);if(el)el.classList.remove('dragging');}  _bqDragPid=null;}
+function bqDragOver(e,z){e.preventDefault();const el=document.getElementById(z);if(el)el.classList.add('over');}
+function bqDragLeave(z){const el=document.getElementById(z);if(el)el.classList.remove('over');}
+function bqDropToPool(e){e.preventDefault();}
+function bqDropTo(e,slot){
+  e.preventDefault();
+  const pid=e.dataTransfer.getData('text/plain')||_bqDragPid;
+  if(!pid)return;
+  const zone=e.currentTarget;if(zone)zone.classList.remove('over');
+  const other=slot==='bqP1'?'bqP2':'bqP1';
+  if(_buscarFilter[other]===pid){showToast('Selecciona jugadores diferentes');return;}
+  _buscarFilter[slot]=pid;
+  _bqDragPid=null;render();
+}
+function _applyBqPair(){}
+let _bqTouchPid=null,_bqTouchClone=null,_bqTouchEl=null;
+function bqTouchStart(e,pid){
+  _bqTouchPid=pid;_bqDragPid=pid;
+  const el=e.currentTarget;_bqTouchEl=el;
+  _bqTouchClone=el.cloneNode(true);
+  _bqTouchClone.style.cssText='position:fixed;opacity:.8;pointer-events:none;z-index:9999;';
+  document.body.appendChild(_bqTouchClone);
+  el.classList.add('dragging');
+  const t=e.touches[0];
+  _bqTouchClone.style.left=(t.clientX-40)+'px';
+  _bqTouchClone.style.top=(t.clientY-20)+'px';
+}
+function bqTouchMove(e){
+  if(!_bqTouchClone)return;e.preventDefault();
+  const t=e.touches[0];
+  _bqTouchClone.style.left=(t.clientX-40)+'px';
+  _bqTouchClone.style.top=(t.clientY-20)+'px';
+  document.querySelectorAll('#bq-slot1,#bq-slot2').forEach(z=>{
+    const r=z.getBoundingClientRect();
+    z.classList.toggle('over',t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom);
+  });
+}
+function bqTouchEnd(e){
+  if(!_bqTouchClone||!_bqTouchPid)return;
+  const t=e.changedTouches[0];
+  _bqTouchClone.style.display='none';
+  const target=document.elementFromPoint(t.clientX,t.clientY);
+  _bqTouchClone.style.display='';
+  if(target){
+    const zone=target.closest('#bq-slot1,#bq-slot2');
+    if(zone){
+      const slot=zone.id==='bq-slot1'?'bqP1':'bqP2';
+      const other=slot==='bqP1'?'bqP2':'bqP1';
+      if(_buscarFilter[other]!==_bqTouchPid)_buscarFilter[slot]=_bqTouchPid;
+      else showToast('Selecciona jugadores diferentes');
+    }
+  }
+  _bqTouchClone.remove();_bqTouchClone=null;
+  if(_bqTouchEl)_bqTouchEl.classList.remove('dragging');
+  _bqTouchEl=null;_bqTouchPid=null;_bqDragPid=null;
+  document.querySelectorAll('#bq-slot1,#bq-slot2').forEach(z=>z.classList.remove('over'));
+  render();
+}
+
 function renderBuscar(){
   let filtered=[...runs];
   const txt=(_buscarFilter.text||'').trim().toLowerCase();
@@ -3338,28 +4080,97 @@ function renderBuscar(){
     const pid=_buscarFilter.jugadorId;
     filtered=filtered.filter(r=>{
       const az=getPair(r.azulPairId);const ro=getPair(r.rojaPairId);
-      return(az&&(az.p1===pid||az.p2===pid))||(ro&&(ro.p1===pid||ro.p2===pid));
+      return(az&&(az.p1===pid||az.p2===pid))||(ro&&(ro.p1===pid||ro.p2===pid))
+        ||(r.azulP1===pid||r.azulP2===pid||r.rojaP1===pid||r.rojaP2===pid);
     });
   }
   if(_buscarFilter.parejaId){
     const prid=_buscarFilter.parejaId;
     filtered=filtered.filter(r=>r.azulPairId===prid||r.rojaPairId===prid);
   }
+  // Filter by pair DnD selection
+  if(_buscarFilter.bqP1||_buscarFilter.bqP2){
+    const selected=new Set([_buscarFilter.bqP1,_buscarFilter.bqP2].filter(Boolean));
+    filtered=filtered.filter(r=>{
+      const allPids=new Set([r.azulP1,r.azulP2,r.rojaP1,r.rojaP2].filter(Boolean));
+      const azpr=getPair(r.azulPairId);const ropr=getPair(r.rojaPairId);
+      if(azpr){allPids.add(azpr.p1);allPids.add(azpr.p2);}
+      if(ropr){allPids.add(ropr.p1);allPids.add(ropr.p2);}
+      for(const s of selected){if(!allPids.has(s))return false;}
+      return true;
+    });
+  }
   const cuaQ=(_buscarFilter.cuadrillaText||'').trim().toLowerCase();
   if(cuaQ) filtered=filtered.filter(r=>_normStr(r.cuadrillaName||'').includes(_normStr(cuaQ)));
+  if(_buscarFilter.dateFromTs!==null) filtered=filtered.filter(r=>(r.ts||0)>=_buscarFilter.dateFromTs);
+  if(_buscarFilter.dateToTs!==null) filtered=filtered.filter(r=>(r.ts||0)<=_buscarFilter.dateToTs);
   const minS=parseFloat(_buscarFilter.minScore);
   const maxS=parseFloat(_buscarFilter.maxScore);
   if(!isNaN(minS)) filtered=filtered.filter(r=>Number(r.score)>=minS);
   if(!isNaN(maxS)) filtered=filtered.filter(r=>Number(r.score)<=maxS);
 
-  const hasFilter=txt||_buscarFilter.jugadorId||_buscarFilter.parejaId||cuaQ||_buscarFilter.minScore||_buscarFilter.maxScore;
+  // Build detected pairs from runs (same logic as renderParejas)
+  const detectedPairsMap={};
+  runs.forEach(r=>{
+    [['azulP1','azulP2'],['rojaP1','rojaP2']].forEach(([k1,k2])=>{
+      const a=r[k1]||'';const b=r[k2]||'';
+      if(!a&&!b)return;
+      const key=[a,b].filter(Boolean).sort().join('|');
+      if(!detectedPairsMap[key])detectedPairsMap[key]={p1:a||null,p2:b||null};
+    });
+    ['azulPairId','rojaPairId'].forEach(k=>{
+      const pr=getPair(r[k]);if(!pr)return;
+      const key=[pr.p1,pr.p2].filter(Boolean).sort().join('|');
+      if(!detectedPairsMap[key])detectedPairsMap[key]={p1:pr.p1,p2:pr.p2};
+    });
+  });
+
+  // Pair search: two player slots using DnD
+  const bSlotted=new Set([_buscarFilter.bqP1||'',_buscarFilter.bqP2||''].filter(Boolean));
+  const bChips=players.map(p=>{
+    const used=bSlotted.has(p.id);
+    return `<div class="player-chip${used?' in-pair':''}" draggable="true" id="bqchip_${p.id}"
+      ondragstart="bqDragStart(event,'${p.id}')"
+      ondragend="bqDragEnd(event)"
+      ontouchstart="bqTouchStart(event,'${p.id}')"
+      ontouchmove="bqTouchMove(event)"
+      ontouchend="bqTouchEnd(event)">${p.name}</div>`;
+  }).join('');
+  function bqSlotHtml(pid,slot){
+    if(!pid) return `<span style="font-size:12px;color:var(--text3)">Arrastra un jugador</span>`;
+    const p=getPlayer(pid);
+    return `<div class="player-chip in-pair" style="cursor:default">${p?p.name:'?'}<button class="chip-remove" onclick="_buscarFilter['${slot}']='';_applyBqPair();render()" type="button" style="margin-left:4px">×</button></div>`;
+  }
+
+  // Matched pair display if both slots are filled
+  let matchedPairInfo='';
+  if(_buscarFilter.bqP1&&_buscarFilter.bqP2){
+    const key=[_buscarFilter.bqP1,_buscarFilter.bqP2].sort().join('|');
+    const cnt=runs.filter(r=>{
+      const azp=r.azulP1&&r.azulP2?[r.azulP1,r.azulP2].sort().join('|'):'';
+      const rop=r.rojaP1&&r.rojaP2?[r.rojaP1,r.rojaP2].sort().join('|'):'';
+      const azpr=getPair(r.azulPairId);const ropr=getPair(r.rojaPairId);
+      const azpk=azpr?[azpr.p1,azpr.p2].sort().join('|'):'';
+      const ropk=ropr?[ropr.p1,ropr.p2].sort().join('|'):'';
+      return azp===key||rop===key||azpk===key||ropk===key;
+    }).length;
+    const p1=getPlayer(_buscarFilter.bqP1);const p2=getPlayer(_buscarFilter.bqP2);
+    matchedPairInfo=`<div style="font-size:12px;color:var(--green-d);font-weight:600;margin-top:6px;">
+      ✓ ${p1?.name||'?'} & ${p2?.name||'?'} — ${cnt} lanzada${cnt!==1?'s':''} juntos
+    </div>`;
+  }
+
   const playerOpts=players.map(p=>`<option value="${p.id}"${_buscarFilter.jugadorId===p.id?' selected':''}>${p.name}</option>`).join('');
+  // Keep pair opts for backward compat chip display
   const pairOpts2=pairs.map(p=>`<option value="${p.id}"${_buscarFilter.parejaId===p.id?' selected':''}>${p.name}</option>`).join('');
+
+  const hasFilter=txt||_buscarFilter.jugadorId||_buscarFilter.parejaId||cuaQ||_buscarFilter.minScore||_buscarFilter.maxScore||_buscarFilter.bqP1||_buscarFilter.bqP2||_buscarFilter.dateFromTs!==null||_buscarFilter.dateToTs!==null;
 
   const chips=[];
   if(_buscarFilter.jugadorId){const pl=getPlayer(_buscarFilter.jugadorId);if(pl)chips.push(`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--blue-l);color:var(--blue);border:1px solid var(--blue-b);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700">👤 ${pl.name}<button onclick="_buscarFilter.jugadorId='';render()" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:14px;line-height:1;padding:0 0 0 4px">×</button></span>`);}
   if(_buscarFilter.parejaId){const pr=getPair(_buscarFilter.parejaId);if(pr)chips.push(`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--green-l);color:var(--green-d);border:1px solid var(--green-b);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700">🤝 ${pr.name}<button onclick="_buscarFilter.parejaId='';render()" style="background:none;border:none;cursor:pointer;color:var(--green-d);font-size:14px;line-height:1;padding:0 0 0 4px">×</button></span>`);}
   if(cuaQ)chips.push(`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--amber-l);color:var(--amber);border:1px solid var(--amber-b);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700">📋 ${_buscarFilter.cuadrillaText}<button onclick="_buscarFilter.cuadrillaText='';render()" style="background:none;border:none;cursor:pointer;color:var(--amber);font-size:14px;line-height:1;padding:0 0 0 4px">×</button></span>`);
+  if(_buscarFilter.dateFromTs!==null||_buscarFilter.dateToTs!==null)chips.push(`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--blue-l);color:var(--blue);border:1px solid var(--blue-b);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700">📅 ${_buscarFilter.rangeLabel||'Período'}<button onclick="_buscarFilter.dateFromTs=null;_buscarFilter.dateToTs=null;_buscarFilter.rangeLabel='';render()" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:14px;line-height:1;padding:0 0 0 4px">×</button></span>`);
 
   const sorted=[...filtered].sort((a,b)=>Number(b.score)-Number(a.score));
   const results=sorted.length?sorted.map((r,pos)=>{
@@ -3414,42 +4225,69 @@ function renderBuscar(){
     </div>`;
   }).join(''):(hasFilter?`<div class="empty">No hay rondas con esos filtros.<br><span style="font-size:12px">Intenta ajustar los criterios</span></div>`:`<div class="empty">Guarda rondas para buscarlas aquí.</div>`);
 
-  return`<div class="form-card" style="margin-bottom:16px">
-    <div class="sec-lbl">🔍 Buscar rondas</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-      <div><div class="field-lbl">Nombre de ronda / cuadrilla</div>
-        <input type="text" id="bq-text" placeholder="Buscar... (Enter para aplicar)" value="${_buscarFilter.text||''}"
+  return`<div style="margin-bottom:16px">
+    <!-- Search bar + action buttons -->
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="position:relative;flex:1">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none">🔍</span>
+        <input type="text" id="bq-text" placeholder="Nombre de ronda, cuadrilla…" value="${_buscarFilter.text||''}"
           oninput="_buscarPending.text=this.value"
           onkeydown="if(event.key==='Enter'){_aplicarBuscar();}"
-        ></div>
-      <div><div class="field-lbl">Jugador</div>
-        <select onchange="_buscarFilter.jugadorId=this.value;render()">
-          <option value="">— Todos —</option>${playerOpts}
-        </select></div>
-      <div><div class="field-lbl">Pareja</div>
-        <select onchange="_buscarFilter.parejaId=this.value;render()">
-          <option value="">— Todas —</option>${pairOpts2}
-        </select></div>
-      <div><div class="field-lbl">Rango de puntaje</div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input type="number" id="bq-min" placeholder="Mín" value="${_buscarFilter.minScore||''}"
-            oninput="_buscarPending.minScore=this.value"
-            onkeydown="if(event.key==='Enter'){_aplicarBuscar();}"
-            style="text-align:center">
-          <span style="color:var(--text3);flex-shrink:0">—</span>
-          <input type="number" id="bq-max" placeholder="Máx" value="${_buscarFilter.maxScore||''}"
-            oninput="_buscarPending.maxScore=this.value"
-            onkeydown="if(event.key==='Enter'){_aplicarBuscar();}"
-            style="text-align:center">
-        </div></div>
+          style="width:100%;padding:14px 16px 14px 42px;background:var(--surface);border:1.5px solid var(--border2);border-radius:20px;font-size:15px;">
+      </div>
+      <button class="btn btn-green" onclick="_aplicarBuscar()" style="border-radius:20px;padding:14px 28px;font-size:15px;font-weight:800;min-width:120px;box-shadow:3px 3px 0 rgba(42,111,56,0.25)">🔍 Buscar</button>
+      ${hasFilter?`<button class="btn btn-sm" onclick="_limpiarBuscar()" style="border-radius:20px;padding:14px 18px;font-size:13px;font-weight:700;color:var(--red);border-color:rgba(224,82,82,0.4)">✕ Limpiar</button>`:''}
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
-      <button class="btn btn-green" style="padding:9px 22px;font-weight:700" onclick="_aplicarBuscar()">🔍 Buscar</button>
-      ${hasFilter?`<button class="btn btn-sm" onclick="_buscarFilter={text:'',jugadorId:'',parejaId:'',cuadrillaText:'',minScore:'',maxScore:''};_buscarPending={text:'',minScore:'',maxScore:''};render()">✕ Limpiar filtros</button>`:''}
-      ${chips.length?`<div style="display:flex;gap:6px;flex-wrap:wrap">${chips.join('')}</div>`:''}
+
+    <!-- Filters row: jugador + score range (single row, no duplication) -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+      <div style="position:relative">
+        <select onchange="_buscarFilter.jugadorId=this.value;render()"
+          style="appearance:none;-webkit-appearance:none;padding:8px 28px 8px 12px;font-size:12px;font-weight:700;border:1.5px solid ${_buscarFilter.jugadorId?'var(--teal)':'var(--border)'};border-radius:20px;background:${_buscarFilter.jugadorId?'rgba(13,110,138,0.1)':'var(--surface2)'};color:${_buscarFilter.jugadorId?'var(--teal)':'var(--text2)'};cursor:pointer;">
+          <option value="">👤 Todos los jugadores</option>${playerOpts}
+        </select>
+        <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--text3)">▾</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;border:1.5px solid ${_buscarFilter.minScore||_buscarFilter.maxScore?'var(--teal)':'var(--border)'};border-radius:20px;padding:6px 14px;background:${_buscarFilter.minScore||_buscarFilter.maxScore?'rgba(13,110,138,0.1)':'var(--surface2)'}">
+        <input type="number" id="bq-min" placeholder="Mín" value="${_buscarFilter.minScore||''}"
+          oninput="_buscarPending.minScore=this.value" onkeydown="if(event.key==='Enter'){_aplicarBuscar();}"
+          style="width:72px;border:none;background:transparent;font-size:14px;font-weight:700;color:var(--teal);text-align:center;outline:none;">
+        <span style="font-size:12px;color:var(--text3)">—</span>
+        <input type="number" id="bq-max" placeholder="Máx" value="${_buscarFilter.maxScore||''}"
+          oninput="_buscarPending.maxScore=this.value" onkeydown="if(event.key==='Enter'){_aplicarBuscar();}"
+          style="width:72px;border:none;background:transparent;font-size:14px;font-weight:700;color:var(--teal);text-align:center;outline:none;">
+        <span style="font-size:11px;color:var(--text3);font-weight:600">pts</span>
+      </div>
+      ${chips.length?`<div style="display:flex;gap:4px;flex-wrap:wrap">${chips.join('')}</div>`:''}
+    </div>
+
+    <!-- Pair DnD finder -->
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--text2)">🤝 Buscar por pareja — arrastra dos jugadores</div>
+      </div>
+      <div class="player-pool" style="min-height:40px;padding:8px;margin-bottom:10px;border-radius:var(--rs);" id="bq-pool"
+        ondragover="event.preventDefault()" ondrop="bqDropToPool(event)">
+        ${bChips}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Jugador 1</div>
+          <div class="drop-zone${_buscarFilter.bqP1?' filled':''}" id="bq-slot1"
+            ondragover="bqDragOver(event,'bq-slot1')" ondragleave="bqDragLeave('bq-slot1')"
+            ondrop="bqDropTo(event,'bqP1')">${bqSlotHtml(_buscarFilter.bqP1,'bqP1')}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Jugador 2</div>
+          <div class="drop-zone${_buscarFilter.bqP2?' filled':''}" id="bq-slot2"
+            ondragover="bqDragOver(event,'bq-slot2')" ondragleave="bqDragLeave('bq-slot2')"
+            ondrop="bqDropTo(event,'bqP2')">${bqSlotHtml(_buscarFilter.bqP2,'bqP2')}</div>
+        </div>
+      </div>
+      ${matchedPairInfo}
     </div>
   </div>
-  <div style="font-size:12px;color:var(--text3);margin-bottom:10px;font-weight:600">${filtered.length} ronda${filtered.length!==1?'s':''} encontrada${filtered.length!==1?'s':''} · por mayor puntaje</div>
+  <div style="font-size:12px;color:var(--text3);font-weight:600;margin-bottom:10px">${filtered.length} ronda${filtered.length!==1?'s':''} encontrada${filtered.length!==1?'s':''}</div>
   ${results}`;
 }
 
