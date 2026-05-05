@@ -630,6 +630,8 @@ input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--te
 
   <div style="display:flex;align-items:center;gap:10px">
     
+    <span id="header-badge-container"></span>
+
     <button id="btn-admin-panel" onclick="switchTab('admin')" style="display:none; background:none; border:1px solid var(--gold); color:var(--gold); padding:4px 8px; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer; text-transform:uppercase; transition: 0.2s;">
       ⚙️ Panel
     </button>
@@ -1350,10 +1352,13 @@ function _irBuscarPromedio(){
 let runsFiltradas = [];
 
 function render() {
+  aplicarTemaGlobal();
+  renderHeaderBadge(); // <-- Añadido: Pinta el código de invitación si eres admin
+
   const el = document.getElementById('main');
   if (typeof _ensureRunPairs === 'function' && _ensureRunPairs()) save();
 
-  // --- Lógica de filtrado por rol (se mantiene igual) ---
+  // --- Lógica de filtrado por rol ---
   if (usuarioActual && usuarioActual.rol === 'jugador') {
     const miJugador = players.find(p => (p.username === usuarioActual.username) || (p.name === usuarioActual.username));
     if (miJugador) {
@@ -1361,13 +1366,14 @@ function render() {
       runsFiltradas = runs.filter(r => {
         const az = pairs.find(pr => pr.id === r.azulPairId);
         const ro = pairs.find(pr => pr.id === r.rojaPairId);
-        return (az && (az.p1 === pid || az.p2 === pid)) || (ro && (ro.p1 === pid || ro.p2 === pid)) || (r.azulP1 === pid || r.azulP2 === pid || r.rojaP1 === pid || r.rojaP2 === pid);
+        return (az && (az.p1 === pid || az.p2 === pid)) || 
+               (ro && (ro.p1 === pid || ro.p2 === pid)) || 
+               (r.azulP1 === pid || r.azulP2 === pid || r.rojaP1 === pid || r.rojaP2 === pid);
       });
     } else { runsFiltradas = []; }
   } else { runsFiltradas = runs; }
 
   // --- ENRUTADOR CORREGIDO ---
-  // Si la pestaña es 'jugadores' o 'parejas', forzamos que use la lógica de Efectividad
   if (tab === 'ronda') el.innerHTML = renderRonda();
   else if (tab === 'entrenamientos') el.innerHTML = renderEntrenamientos();
   else if (tab === 'parrilla') el.innerHTML = renderParrilla();
@@ -1381,22 +1387,100 @@ function render() {
 
   if (roundMode === 'timer') _updateTimerDOM();
 }
+
 /* ═══════════════════════════════════════════
    SISTEMA DE TEMAS Y RENDERIZADO GLOBAL (VIP DEFINITIVO)
 ═══════════════════════════════════════════ */
+
+// Función para pintar el Código de Invitación en el menú superior
+async function renderHeaderBadge() {
+  if (!usuarioActual) return;
+
+  const rol = (usuarioActual.rol || "").toLowerCase().trim();
+  const esSuper = (rol === 'superadmin');
+  const esAdmin = (esSuper || rol === 'entrenador' || rol === 'admin');
+  
+  const badgeContainer = document.getElementById('header-badge-container');
+  const btnHeader = document.getElementById('btn-admin-panel');
+  const tabAdmin = document.getElementById('tb-admin');
+
+  // Mostrar/ocultar botones base de administrador
+  if (btnHeader) btnHeader.style.display = esAdmin ? '' : 'none';
+  if (tabAdmin) tabAdmin.style.display = esAdmin ? '' : 'none';
+
+  // Solo buscamos el código si el usuario tiene permisos
+  if (esAdmin && badgeContainer) {
+    badgeContainer.style.display = 'inline-block';
+    // Ponemos un texto temporal mientras consulta Firebase
+    badgeContainer.innerHTML = `<span style="color:rgba(255,255,255,0.5); font-size:10px;">⏳ Cargando...</span>`;
+    
+    try {
+      const teamId = usuarioActual.teamId;
+      let codigo = "SIN-CÓDIGO";
+      
+      if (teamId) {
+        // 🔥 AQUÍ VAMOS A LA RUTA EXACTA QUE ME INDICASTE 🔥
+        const snapCode = await db.ref(`teams/${teamId}/inviteCode`).once('value');
+        if (snapCode.exists()) {
+          codigo = snapCode.val();
+        }
+      }
+
+      // Estilos: Dorado para SuperAdmin, Cian para Entrenador
+      const badgeColor = esSuper ? '#ffb400' : '#00c2d4';
+      
+      badgeContainer.innerHTML = `
+        <span style="display:inline-flex; align-items:center; background:${badgeColor}; color:#0e1f35; 
+              padding:4px 10px; border-radius:6px; font-size:10px; font-weight:900; letter-spacing:1px; 
+              box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+          🔑 INV: ${codigo}
+        </span>
+      `;
+    } catch (e) {
+      console.error("Error obteniendo el código:", e);
+      badgeContainer.innerHTML = ``; // Limpiamos si hay error
+    }
+  } else if (!esAdmin && badgeContainer) {
+    badgeContainer.style.display = 'none';
+  }
+}
 
 function aplicarTemaGlobal() {
   const miRol = (usuarioActual && usuarioActual.rol) ? usuarioActual.rol.toLowerCase().trim() : "";
   const esSuper = (miRol === 'superadmin');
   
-  // Buscamos si ya existe el estilo VIP
+  // -- ESTILOS NORMALES GLOBALES (Para el Admin Normal) --
+  let styleNormal = document.getElementById('normal-global-styles');
+  if (!styleNormal) {
+    styleNormal = document.createElement('style');
+    styleNormal.id = 'normal-global-styles';
+    styleNormal.innerHTML = `
+      .invite-badge-top {
+        background: rgba(13, 110, 138, 0.1);
+        border: 1px solid var(--teal);
+        color: var(--teal);
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-right: 15px;
+        vertical-align: middle;
+      }
+    `;
+    document.head.appendChild(styleNormal);
+  }
+
+  // -- ESTILOS VIP (Solo para SuperAdmin) --
   let styleEl = document.getElementById('vip-superadmin-styles');
 
   if (esSuper) {
-    // Le ponemos una "etiqueta" al body para saber que estamos en modo VIP
     document.body.classList.add('modo-vip');
 
-    // Inyectamos el CSS mágico solo si no existe
     if (!styleEl) {
       styleEl = document.createElement('style');
       styleEl.id = 'vip-superadmin-styles';
@@ -1453,158 +1537,71 @@ function aplicarTemaGlobal() {
           border: 1px solid rgba(255, 215, 0, 0.15) !important;
           background: rgba(10, 25, 45, 0.4) !important;
           backdrop-filter: blur(10px) !important;
-          
-          /* Solución barrita de scroll: ensanchamos y forzamos visible */
-          max-width: 1200px !important;
+          max-width: 1100px !important;
           overflow: visible !important;
           height: auto !important;
+          max-height: none !important;
+        }
+
+        /* ESTILO VIP PARA EL BADGE DE INVITACIÓN */
+        body.modo-vip .invite-badge-top {
+          background: #FFC107 !important;
+          border: 1px solid #FFD700 !important;
+          color: #071324 !important; 
+          box-shadow: 0 0 10px rgba(255, 193, 7, 0.4) !important;
         }
 
         /* 5. PARCHES SOLICITADOS */
-        
-        /* Pestaña Ronda: Botones de Entrenamiento y Lanzada Suelta (.hub-btn) */
         body.modo-vip .hub-btn {
-          background: rgba(15, 36, 64, 0.8) !important; /* Fondo azul oscuro VIP */
-          border: 1px solid #FFC107 !important;         /* Borde dorado */
-          color: #FFFFFF !important;                    /* Texto blanco forzado */
+          background: rgba(15, 36, 64, 0.8) !important;
+          border: 1px solid #FFC107 !important;        
+          color: #FFFFFF !important;                    
         }
-        body.modo-vip .hub-btn .hub-btn-title {
-          color: #FFD700 !important;                    /* Título dorado */
-        }
-        body.modo-vip .hub-btn .hub-btn-sub {
-          color: rgba(255,255,255,0.7) !important;      /* Subtítulo un poco más gris */
-        }
-
-        /* Pestaña Buscar: Botón de aplicar filtro y tarjetas de jugadores */
-        body.modo-vip [draggable="true"] {
-          border: 2px solid #FFC107 !important; /* Borde amarillito a tarjetas */
-        }
+        body.modo-vip .hub-btn .hub-btn-title { color: #FFC107 !important; font-weight: 900 !important; }
+        body.modo-vip .hub-btn .hub-btn-sub { color: rgba(255,255,255,0.7) !important; }
+        body.modo-vip [draggable="true"] { border: 2px solid #FFC107 !important; }
         
-        /* Apuntamos al botón de filtrar, pero evitamos dañar los tabs de arriba */
         body.modo-vip #main .btn[onclick*="render"], 
         body.modo-vip #main .btn[onclick*="buscar"], 
         body.modo-vip #main .btn[onclick*="filter"] {
-          border: 2px solid #FFC107 !important; /* Borde amarillito al botón */
+          border: 2px solid #FFC107 !important;
         }
-            /* ARREGLO PESTAÑA RONDA */
-body.modo-vip h2, 
-body.modo-vip .sec-lbl {
-  color: #FFC107 !important; /* Título "¿Cómo quieres lanzar?" en dorado */
-}
-
-body.modo-vip .hub-btn, 
-body.modo-vip .hub-btn div, 
-body.modo-vip .hub-btn p, 
-body.modo-vip .hub-btn span {
-  color: #FFFFFF !important; /* Letras blancas para todo el interior */
-}
-
-body.modo-vip .hub-btn .hub-btn-title {
-  color: #FFC107 !important; /* Los títulos "ENTRENAMIENTO" en dorado */
-  font-weight: 900 !important;
-}
-
-body.modo-vip .hub-btn {
-  background: rgba(15, 36, 64, 0.8) !important; /* Fondo azul oscuro VIP */
-  border: 1px solid #FFC107 !important;         /* Borde dorado */
-}
-/* =========================================================
-           PARCHES DE DISEÑO VIP (Ronda, Parrilla, Buscar, Efectividad)
-           ========================================================= */
         
-        /* 1. Eliminar barrita de scroll y agrandar contenedor */
-        body.modo-vip #main, body.modo-vip .main {
-          max-width: 1100px !important;
-          height: auto !important;
-          max-height: none !important;
-          overflow: visible !important;
-        }
-
-        /* 2. Pestaña Ronda: Forzar letras oscuras sobre el fondo blanco */
-        body.modo-vip .sec-lbl,
-        body.modo-vip .hub-btn,
-        body.modo-vip .hub-btn-title,
-        body.modo-vip .hub-btn-sub {
-          color: #071324 !important; /* Azul oscuro (casi negro) para lectura perfecta */
-          border-color: #071324 !important; /* Borde oscuro para que combine */
-        }
-
-        /* 3. Pestaña Parrilla: Etiqueta "En pareja" */
-        body.modo-vip .parrilla-item {
-          color: #FFFFFF !important; /* Nombres en blanco */
-        }
-        body.modo-vip .parrilla-item div {
-          color: rgba(255, 255, 255, 0.7) !important; /* Texto de parejas en gris claro */
-        }
-        body.modo-vip .parrilla-item span,
-        body.modo-vip span.sbadge {
-          color: #000000 !important; /* Letras negras */
-          background: #FFC107 !important; /* Fondo dorado brillante */
+        body.modo-vip h2, body.modo-vip .sec-lbl { color: #FFC107 !important; border-color: #071324 !important;}
+        body.modo-vip .sec-lbl, body.modo-vip .hub-btn, body.modo-vip .hub-btn-title, body.modo-vip .hub-btn-sub { color: #071324 !important; }
+        body.modo-vip .hub-btn, body.modo-vip .hub-btn div, body.modo-vip .hub-btn p, body.modo-vip .hub-btn span { color: #FFFFFF !important; }
+        
+        body.modo-vip .parrilla-item { color: #FFFFFF !important; }
+        body.modo-vip .parrilla-item div { color: rgba(255, 255, 255, 0.7) !important; }
+        body.modo-vip .parrilla-item span, body.modo-vip span.sbadge {
+          color: #000000 !important;
+          background: #FFC107 !important;
           padding: 2px 6px !important;
           border-radius: 4px !important;
           font-weight: 900 !important;
         }
 
-        /* 4. Pestaña Buscar: Bordes amarillos a jugadores y botón (SIN DAÑAR EL MENÚ) */
-        body.modo-vip .player-chip, 
-        body.modo-vip [draggable="true"] {
+        body.modo-vip .player-chip, body.modo-vip [draggable="true"] {
           border: 2px solid #FFC107 !important;
           box-shadow: 0 0 5px rgba(255, 193, 7, 0.3) !important;
         }
-        /* Al usar ".btn" nos aseguramos de que no toque las pestañas del menú (que usan .tbtn) */
-        body.modo-vip .btn[onclick*="buscar"], 
-        body.modo-vip .btn[onclick*="Buscar"] {
+        body.modo-vip .btn[onclick*="buscar"], body.modo-vip .btn[onclick*="Buscar"] {
           border: 2px solid #FFC107 !important;
           color: #FFC107 !important;
           background: rgba(255, 193, 7, 0.1) !important;
         }
-
-        /* 5. Pestaña Efectividad: Arreglo de "Falló completamente" */
         body.modo-vip .fail-chip {
-          background: #7f1d1d !important; /* Fondo rojo oscuro sangre */
-          color: #ffffff !important; /* Letras blancas */
+          background: #7f1d1d !important;
+          color: #ffffff !important;
           border: 1px solid #ef4444 !important;
         }
-
-
       `;
       document.head.appendChild(styleEl);
     }
   } else {
-    // --- MODO NORMAL (Apagamos todo si entra alguien que no eres tú) ---
     document.body.classList.remove('modo-vip');
     if (styleEl) styleEl.remove();
   }
-}
-function render() {
-  aplicarTemaGlobal();
-
-  const el = document.getElementById('main');
-  if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
-
-  if (usuarioActual && usuarioActual.rol === 'jugador') {
-    const miJugador = players.find(p => (p.username === usuarioActual.username) || (p.name === usuarioActual.username));
-    if (miJugador) {
-      const pid = miJugador.id;
-      runsFiltradas = runs.filter(r => {
-        const az = pairs.find(pr => pr.id === r.azulPairId);
-        const ro = pairs.find(pr => pr.id === r.rojaPairId);
-        return (az && (az.p1 === pid || az.p2 === pid)) || (ro && (ro.p1 === pid || ro.p2 === pid));
-      });
-    } else { runsFiltradas = []; }
-  } else { runsFiltradas = runs; }
-
-  // Enrutador de pestañas
-  if(tab==='ronda')            el.innerHTML = renderRonda();
-  else if(tab==='entrenamientos') el.innerHTML = renderEntrenamientos();
-  else if(tab==='parrilla')    el.innerHTML = renderParrilla();
-  else if(tab==='estadisticas') el.innerHTML = renderEstadisticas();
-  else if(tab==='graficas')    el.innerHTML = renderGraficas();
-  else if(tab==='efectividad') el.innerHTML = renderEfectividad();
-  else if(tab==='buscar')      el.innerHTML = renderBuscar();
-  else if(tab==='admin')       { renderAdminPanel(); return; } 
-  
-  if(roundMode==='timer') _updateTimerDOM();
 }
 
 /* ═══════════════════════════════════════════
@@ -1613,76 +1610,79 @@ function render() {
 
 async function renderAdminPanel() {
   const el = document.getElementById('main');
-  el.innerHTML = `
-    <div style="text-align:center; padding:60px;">
-      <div class="loader"></div>
-      <p style="color:var(--gold); font-weight:bold; margin-top:15px; letter-spacing:1px;">AUTENTICANDO NIVEL DE ACCESO...</p>
-    </div>`;
+  el.innerHTML = '<div style="text-align:center; padding:60px; background:#0e1f35; color:#00c2d4; min-height:100vh;"><b>CARGANDO PANEL...</b></div>';
 
   try {
     const miRol = (usuarioActual.rol || "").toLowerCase().trim();
     const esSuper = (miRol === 'superadmin');
+    const miTeamId = usuarioActual.teamId;
 
     const snapUsers = await db.ref('users').once('value');
     const allUsers = snapUsers.val() || {};
     
     let allTeams = {};
-    if(esSuper) {
-      const snapTeams = await db.ref('teams').once('value');
-      allTeams = snapTeams.val() || {};
-    }
+    const snapTeams = await db.ref('teams').once('value');
+    allTeams = snapTeams.val() || {};
 
-    let html = `<div style="max-width: 800px; margin: 0 auto; padding: 10px;">`;
+    let html = '<div style="max-width:900px; margin:0 auto; padding:20px; min-height:100vh; background:#0e1f35; color:#ffffff;">';
     
+    // Título idéntico, solo cambia color y texto
+    const colorTema = esSuper ? '#FFD700' : '#00c2d4';
+    const titulo = esSuper ? '👑 PANEL SUPERADMIN' : '📋 PANEL ADMINISTRADOR';
+
+    html += `
+      <div style="text-align:center; margin-bottom:40px; border-bottom: 2px solid ${colorTema}; padding-bottom:20px;">
+        <h2 style="color:${colorTema}; font-size:2rem; font-weight:900; text-transform:uppercase; margin:0;">${titulo}</h2>
+      </div>`;
+
     if(esSuper) {
-      html += `
-        <div style="text-align:center; margin-bottom:40px; border-bottom: 2px solid rgba(255,193,7,0.5); padding-bottom:20px;">
-          <div style="font-size:12px; color:#FFC107; font-weight:900; letter-spacing:4px; margin-bottom:10px;">PROTOCOLO ACTIVO</div>
-          <h2 style="color:#FFD700; font-size:2.4rem; font-weight:900; text-transform:uppercase; text-shadow: 0 0 20px rgba(255,215,0,0.6);">👑 SUPERADMIN</h2>
-        </div>`;
-      
+      // --- BUCLE PARA SUPERADMIN (TODOS LOS EQUIPOS) ---
       for (let teamKey in allTeams) {
         html += `
-          <div style="margin-top:40px; background: linear-gradient(90deg, rgba(255,193,7,0.15), transparent); padding: 16px; border-radius: 8px; color:#FFC107; font-weight:800; border-left: 6px solid #FFC107; display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:1.25rem; text-shadow: 0 0 10px rgba(255,193,7,0.3);">📍 EQUIPO: ${allTeams[teamKey].name}</span>
-            <span style="background: rgba(255,193,7,0.1); padding: 4px 10px; border-radius: 4px; font-family:'JetBrains Mono'; font-size:11px; border: 1px solid rgba(255,193,7,0.3); color:#FFF;">ID: ${teamKey}</span>
+          <div style="margin-top:30px; background: rgba(255,193,7,0.1); padding: 12px 20px; border-radius: 8px; color:#FFC107; font-weight:800; border-left: 5px solid #FFC107; display:flex; justify-content:space-between; align-items:center;">
+            <span>📍 EQUIPO: ${allTeams[teamKey].name}</span>
           </div>
-          <div style="display:grid; gap:12px; margin-top:15px; padding-left:5px;">`;
+          <div style="display:grid; gap:10px; margin-top:15px;">`;
           
-        let hayGente = false;
-        for (let uKey in allUsers) {
-          if(allUsers[uKey].teamId === teamKey) {
-            hayGente = true;
-            html += generarTarjetaUsuario(allUsers[uKey], uKey); 
+        for (let uId in allUsers) {
+          if(allUsers[uId].teamId === teamKey) {
+            html += generarTarjetaUsuario(allUsers[uId], uId); 
           }
         }
-        if(!hayGente) html += `<div style="color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.03); font-size:13px; padding:15px; border:1px dashed rgba(255,193,7,0.3); border-radius:8px; text-align:center;">Sin personal registrado.</div>`;
         html += `</div>`;
       }
     } 
     else {
-      html += `
-        <div style="border-bottom: 2px solid #10B981; padding-bottom:15px; margin-bottom:25px;">
-          <h2 style="color:#10B981; font-weight:900; display:flex; align-items:center; gap:10px;">📋 Gestión de Equipo: <span style="color:#fff">${usuarioActual.teamName}</span></h2>
-        </div>
-        <div style="display:grid; gap:12px;">`;
+      // --- BUCLE PARA ADMIN (MISMA ESTRUCTURA, SOLO SU EQUIPO) ---
+      const miEquipoData = allTeams[miTeamId] || { name: usuarioActual.teamName || "Mi Equipo" };
       
+      html += `
+        <div style="margin-top:30px; background: rgba(0,194,212,0.1); padding: 12px 20px; border-radius: 8px; color:#00c2d4; font-weight:800; border-left: 5px solid #00c2d4; display:flex; justify-content:space-between; align-items:center;">
+          <span>📍 EQUIPO: ${miEquipoData.name}</span>
+        </div>
+        <div style="display:grid; gap:10px; margin-top:15px;">`;
+        
       let hayGente = false;
-      for (let uKey in allUsers) {
-        if(allUsers[uKey].teamId === currentTeamId) { 
+      for (let uId in allUsers) {
+        if(allUsers[uId].teamId === miTeamId) {
           hayGente = true;
-          html += generarTarjetaUsuario(allUsers[uKey], uKey);
+          // USA TU FUNCIÓN ORIGINAL QUE YA TIENE LOS INPUTS Y ESTADÍSTICAS
+          html += generarTarjetaUsuario(allUsers[uId], uId); 
         }
       }
-      if(!hayGente) html += `<div class="card" style="text-align:center; color:#FFF;">No hay jugadores registrados aún.</div>`;
+      
+      if(!hayGente) {
+        html += `<div style="padding:20px; color:#aaa; text-align:center;">No hay usuarios en este equipo.</div>`;
+      }
       html += `</div>`;
     }
 
-    html += `</div>`;
+    html += '</div>';
     el.innerHTML = html;
 
   } catch(e) {
-    el.innerHTML = `<div class="card" style="border:1px solid var(--red); color:var(--red);">Error en la conexión segura: ${e.message}</div>`;
+    console.error(e);
+    el.innerHTML = `<div style="background:#0e1f35; color:red; padding:40px; text-align:center;">ERROR: ${e.message}</div>`;
   }
 }
 
@@ -1781,7 +1781,6 @@ function switchTab(t){
 }
 function switchStatsSub(t){statsSubTab=t;render();}
 function switchEffSub(t){effSubTab=t;render();}
-
 /* ═══════════════════════════════════════════
    TAB: RONDA
 ═══════════════════════════════════════════ */
