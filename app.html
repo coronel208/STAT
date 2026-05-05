@@ -106,23 +106,29 @@ body{
   border:1px solid rgba(0,194,212,0.35);letter-spacing:0.3px;
 }
 
-/* ══ TABS ══ */
+/* ══ TABS Y MENÚ PRINCIPAL AJUSTADO ══ */
 .tabs{
-  display:flex;background:#fff;
-  border-bottom:2px solid var(--border);
-  padding:0 16px;gap:0;
-  position:sticky;top:56px;z-index:199;
-  overflow-x:auto;
-  box-shadow:0 2px 8px rgba(14,31,53,0.06);
+  display:flex !important;
+  flex-wrap:wrap !important;
+  height:auto !important;
   min-height:46px;
+  background:#fff;
+  border-bottom:2px solid var(--border);
+  padding:0 16px 5px !important;
+  gap:5px !important;
+  position:sticky;top:56px;z-index:199;
+  overflow-y:hidden !important;
+  overflow-x:hidden !important;
+  box-shadow:0 2px 8px rgba(14,31,53,0.06);
+  justify-content:center;
 }
-.tabs::-webkit-scrollbar{height:0;}
 .tbtn{
-  font-weight:700;font-size:0.75rem;padding:12px 12px;
+  font-weight:700;font-size:0.75rem;padding:12px 12px !important;
   letter-spacing:0.1px;
   border-radius:0;margin-bottom:-2px;
   color:var(--text3);background:transparent;border:none;
-  cursor:pointer;white-space:nowrap;flex-shrink:0;
+  cursor:pointer;white-space:nowrap;
+  flex:1 1 auto !important;
   border-bottom:3px solid transparent;
   transition:color 0.15s,border-color 0.15s,background 0.15s;
 }
@@ -538,60 +544,105 @@ input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--te
 </div>
 
 <!-- Login screen -->
-<div class="login-wrap" id="login-wrap" style="display:none">
-  <div class="login-box">
-    <img src="images/logo_stat.png" alt="STAT" class="login-logo" style="width:160px;margin:0 auto 8px;display:block;">
-    <div style="font-size:0.68rem;font-weight:700;color:var(--text3);text-align:center;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:2px">Scoring &amp; Team Analytics Tool</div>
-    <div class="login-sub">Temporada 2025–2026 · Acceso por equipo</div>
-
-    <!-- Team name field -->
-    <div id="login-step-name">
-      <div class="login-fg">
-        <div class="login-lbl">Nombre del equipo</div>
-        <input type="text" id="inp-team" placeholder="ej. Los Constructores" oninput="loginNameInput()" onkeydown="if(event.key==='Enter')loginNext()">
-      </div>
-      <div class="login-err" id="login-err-name"></div>
-      <button class="btn btn-green" style="width:100%;margin-top:4px;justify-content:center;font-size:0.95rem;" onclick="loginNext()">Continuar →</button>
+<div class="login-wrap" id="login-wrap" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; background:#0e1f35; font-family:sans-serif;">
+  <div style="background:#162a47; border:2px solid #00c2d4; border-radius:12px; padding:30px; width:90%; max-width:400px; box-shadow:0 10px 30px rgba(0,0,0,0.5); color:white;">
+    
+    <img src="images/logo_stat.png" alt="STAT" style="width:140px; margin:0 auto 10px; display:block;">
+    <div style="text-align:center; font-size:10px; color:#00c2d4; font-weight:700; margin-bottom:25px; letter-spacing:1.5px; text-transform:uppercase;">
+      Scoring & Team Analytics Tool
     </div>
 
-    <!-- PIN entry -->
-    <div id="login-step-pin" style="display:none">
-      <div class="team-badge">
-        <span class="team-badge-name" id="login-team-display"></span>
-        <button class="btn btn-sm" onclick="loginBack()">Cambiar</button>
+    <div id="step-initial">
+      <h3 style="text-align:center; margin-bottom:20px; color:#ffb400; font-size:16px; font-weight:800;">BIENVENIDO</h3>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <button onclick="showStep('step-login')" style="padding:16px; background:#ffb400; color:#0e1f35; border:none; border-radius:8px; font-weight:900; cursor:pointer; font-size:15px; text-transform:uppercase;">Iniciar Sesión</button>
+        <button onclick="showStep('step-reg-role')" style="padding:16px; background:transparent; border:2px solid #00c2d4; color:#00c2d4; border-radius:8px; font-weight:900; cursor:pointer; font-size:15px; text-transform:uppercase;">Crear Cuenta Nueva</button>
       </div>
-      <div class="login-fg">
-        <div class="login-lbl" id="pin-label">PIN del equipo (4 dígitos)</div>
-        <div class="pin-row">
-          <input class="pin-input" id="pin0" type="tel" maxlength="1" oninput="pinInput(0)" onkeydown="pinKey(event,0)">
-          <input class="pin-input" id="pin1" type="tel" maxlength="1" oninput="pinInput(1)" onkeydown="pinKey(event,1)">
-          <input class="pin-input" id="pin2" type="tel" maxlength="1" oninput="pinInput(2)" onkeydown="pinKey(event,2)">
-          <input class="pin-input" id="pin3" type="tel" maxlength="1" oninput="pinInput(3)" onkeydown="pinKey(event,3)">
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin-top:6px" id="pin-hint"></div>
-      </div>
-      <div class="login-err" id="login-err-pin"></div>
-      <button class="btn btn-green" style="width:100%;margin-top:4px;justify-content:center;font-size:0.95rem;" id="login-btn-enter" onclick="loginEnter()">Entrar al equipo</button>
     </div>
-  </div>
-  <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:20px;text-align:center;font-weight:500">
-    Los datos se guardan en la nube · Accede desde cualquier dispositivo
+
+    <div id="step-login" style="display:none;">
+      <h3 style="text-align:center; margin-bottom:15px; color:#00c2d4; font-weight:bold;">INICIAR SESIÓN</h3>
+      <input type="text" id="login-user" placeholder="Usuario" style="width:100%; padding:14px; border-radius:6px; border:none; margin-bottom:12px; background:#FFFFFF; color:#000000; font-weight:bold; font-size:16px; box-sizing:border-box;">
+      <input type="password" id="login-pass" placeholder="Contraseña" style="width:100%; padding:14px; border-radius:6px; border:none; margin-bottom:20px; background:#FFFFFF; color:#000000; font-weight:bold; font-size:16px; box-sizing:border-box;">
+      
+      <button onclick="doLogin()" id="btn-login" style="width:100%; background:#ffb400; color:#0e1f35; padding:16px; border:none; border-radius:8px; font-weight:900; cursor:pointer; font-size:15px;">ENTRAR</button>
+      <button onclick="showStep('step-initial')" style="width:100%; background:transparent; color:rgba(255,255,255,0.5); border:none; margin-top:10px; cursor:pointer; font-size:12px;">← Volver</button>
+    </div>
+
+    <div id="step-reg-role" style="display:none;">
+      <h3 style="text-align:center; margin-bottom:20px; color:#ffb400; font-size:16px; font-weight:800;">¿QUIÉN ERES?</h3>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <button onclick="showStep('step-reg-coach')" style="padding:16px; background:#FFFFFF; color:#000000; border:none; border-radius:8px; font-weight:900; cursor:pointer; font-size:15px; text-transform:uppercase;">Soy Entrenador</button>
+        <button onclick="showStep('step-reg-player')" style="padding:16px; background:transparent; border:2px solid #00c2d4; color:#00c2d4; border-radius:8px; font-weight:900; cursor:pointer; font-size:15px; text-transform:uppercase;">Soy Jugador</button>
+      </div>
+      <button onclick="showStep('step-initial')" style="width:100%; background:transparent; color:rgba(255,255,255,0.5); border:none; margin-top:10px; cursor:pointer; font-size:12px;">← Volver</button>
+    </div>
+
+    <div id="step-reg-coach" style="display:none;">
+      <h3 style="text-align:center; color:#ffb400; font-weight:bold; margin-bottom:15px;">CUENTA DE ENTRENADOR</h3>
+      
+      <div style="display:flex; gap:10px; margin-bottom:5px;">
+        <input type="text" id="rc-nombre" placeholder="Nombre(s)" oninput="previewUser('rc-nombre', 'rc-apellido', 'rc-user-preview')" style="flex:1; padding:14px; border-radius:6px; background:#FFF; color:#000; font-weight:bold; border:none; box-sizing:border-box;">
+        <input type="text" id="rc-apellido" placeholder="Apellido(s)" oninput="previewUser('rc-nombre', 'rc-apellido', 'rc-user-preview')" style="flex:1; padding:14px; border-radius:6px; background:#FFF; color:#000; font-weight:bold; border:none; box-sizing:border-box;">
+      </div>
+      <div id="rc-user-preview" style="font-size:11px; color:#00c2d4; margin-bottom:10px; text-align:right; font-weight:bold;">Tu usuario será: ---</div>
+      
+      <input type="password" id="rc-pass" placeholder="Crea una Contraseña" style="width:100%; padding:14px; border-radius:6px; margin-bottom:15px; background:#FFF; color:#000; font-weight:bold; border:none; box-sizing:border-box;">
+      
+      <input type="text" id="rc-team" placeholder="Nombre exacto del equipo" style="width:100%; padding:14px; border-radius:6px; margin-bottom:10px; background:#FFF; color:#000; font-weight:bold; border:none; box-sizing:border-box;">
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <input type="text" id="rc-country" placeholder="País" style="flex:1; padding:14px; border-radius:6px; background:#FFF; color:#000; font-weight:bold; border:none; box-sizing:border-box;">
+        <input type="text" id="rc-city" placeholder="Ciudad" style="flex:1; padding:14px; border-radius:6px; background:#FFF; color:#000; font-weight:bold; border:none; box-sizing:border-box;">
+      </div>
+      
+      <button onclick="doRegisterCoach()" style="width:100%; background:#00c2d4; color:#0e1f35; padding:16px; border:none; border-radius:8px; font-weight:900; cursor:pointer;">REGISTRAR EQUIPO</button>
+      <button onclick="showStep('step-reg-role')" style="width:100%; background:transparent; color:rgba(255,255,255,0.5); border:none; margin-top:10px; cursor:pointer; font-size:12px;">← Volver</button>
+    </div>
+
+    <div id="step-reg-player" style="display:none;">
+      <h3 style="text-align:center; color:#ffb400; font-weight:bold; margin-bottom:15px;">CUENTA DE JUGADOR</h3>
+      
+      <div style="display:flex; gap:10px; margin-bottom:5px;">
+        <input type="text" id="rp-nombre" placeholder="Nombre(s)" oninput="previewUser('rp-nombre', 'rp-apellido', 'rp-user-preview')" style="flex:1; padding:14px; border-radius:6px; background:#FFF; color:#000; font-weight:bold; border:none; box-sizing:border-box;">
+        <input type="text" id="rp-apellido" placeholder="Apellido(s)" oninput="previewUser('rp-nombre', 'rp-apellido', 'rp-user-preview')" style="flex:1; padding:14px; border-radius:6px; background:#FFF; color:#000; font-weight:bold; border:none; box-sizing:border-box;">
+      </div>
+      <div id="rp-user-preview" style="font-size:11px; color:#00c2d4; margin-bottom:10px; text-align:right; font-weight:bold;">Tu usuario será: ---</div>
+      
+      <input type="password" id="rp-pass" placeholder="Crea una Contraseña" style="width:100%; padding:14px; border-radius:6px; margin-bottom:15px; background:#FFF; color:#000; font-weight:bold; border:none; box-sizing:border-box;">
+      
+      <input type="text" id="rp-code" placeholder="CÓDIGO (Ej: STAT-XXXX)" style="width:100%; padding:14px; border-radius:6px; margin-bottom:20px; background:#FFF; color:#000; font-weight:900; border:none; box-sizing:border-box; text-align:center; font-size:18px; text-transform:uppercase;">
+      
+      <button onclick="doRegisterPlayer()" style="width:100%; background:#00c2d4; color:#0e1f35; padding:16px; border:none; border-radius:8px; font-weight:900; cursor:pointer;">UNIRME AL EQUIPO</button>
+      <button onclick="showStep('step-reg-role')" style="width:100%; background:transparent; color:rgba(255,255,255,0.5); border:none; margin-top:10px; cursor:pointer; font-size:12px;">← Volver</button>
+    </div>
+
   </div>
 </div>
 <header class="hdr">
   <div style="display:flex;align-items:center;gap:12px">
     <div style="display:flex;align-items:center;gap:8px;">
-      <img src="images/icon_stat.png" alt="" onclick="adminLogoClick()" style="height:28px;width:28px;border-radius:6px;object-fit:cover;cursor:pointer;" title="">
+      <img src="images/icon_stat.png" alt="" style="height:28px;width:28px;border-radius:6px;object-fit:cover;" title="">
       <span style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:1px;line-height:1;">STAT</span>
     </div>
     <div style="width:1px;height:22px;background:rgba(255,255,255,0.15);"></div>
     <span style="font-size:0.6rem;font-weight:700;color:rgba(255,255,255,0.28);letter-spacing:1.5px;text-transform:uppercase;user-select:none;">Temporada 2025–2026</span>
   </div>
+
   <div style="display:flex;align-items:center;gap:10px">
+    
+    <button id="btn-admin-panel" onclick="switchTab('admin')" style="display:none; background:none; border:1px solid var(--gold); color:var(--gold); padding:4px 8px; border-radius:4px; font-size:11px; font-weight:800; cursor:pointer; text-transform:uppercase; transition: 0.2s;">
+      ⚙️ Panel
+    </button>
+
     <span id="hdr-team" style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.88);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,194,212,0.12);padding:3px 11px;border-radius:20px;border:1px solid rgba(0,194,212,0.3)"></span>
+    
+    <span id="hdr-user" style="font-size:10px; font-weight:600; opacity:0.9; letter-spacing:0.5px; text-transform:uppercase;"></span>
+
+    <span id="hdr-invite" style="display:none; font-size:10px; font-weight:900; color:#0e1f35; background:#ffb400; padding:3px 8px; border-radius:6px; letter-spacing:1px;"></span>
+
     <span class="pill" id="hdr-sync">● En línea</span>
     <a href="index.html" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 10px;font-size:11px;text-decoration:none;font-weight:600;letter-spacing:.3px;margin-right:2px">← Inicio</a>
-    <button id="hdr-logout" onclick="logout()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:none;letter-spacing:0.3px;">Salir</button>
+    <button id="hdr-logout" onclick="doLogout()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:none;letter-spacing:0.3px;">Salir</button>
   </div>
 </header>
 <div class="tabs" id="tabs-bar">
@@ -603,6 +654,8 @@ input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--te
   <button class="tbtn"        data-tab="graficas"       onclick="switchTab('graficas')">📈 Gráficas</button>
   <button class="tbtn"        data-tab="efectividad"    onclick="switchTab('efectividad')">🎯 Efectividad</button>
   <button class="tbtn"        data-tab="buscar"         onclick="switchTab('buscar')">🔍 Buscar</button>
+  
+  <button class="tbtn"        data-tab="admin"          onclick="switchTab('admin')" id="tb-admin" style="display:none; color: var(--gold); border-bottom-color: var(--gold);">⚙️ <span id="txt-tab-admin">Admin</span></button>
 </div>
 <div class="main" id="main"></div>
 <div class="toast" id="toast"></div>
@@ -666,6 +719,8 @@ const MISSIONS=[
 ═══════════════════════════════════════════ */
 let tab='ronda';
 let statsSubTab='global';
+let lanzadaDetalle = null; // Almacenará el ID (L1, L2...) de la lanzada seleccionada
+let filtroLanzadaInterno = 'todos';
 // Inner tab per outer section: 'ranking'|'jugadores'|'parejas'|'cuadrillas'
 let statsInner={'global':'ranking','rondas-sueltas':'ranking','entrenamientos':'ranking'};
 // Per-training inner tab (keyed by training id)
@@ -798,15 +853,26 @@ function teamSlug(name){
 function save(){
   if(!currentTeamId) return;
   clearTimeout(syncTimeout);
-  // Show syncing indicator
+  
   const dot = document.getElementById('hdr-sync');
   if(dot) dot.textContent = '↑ Guardando…';
+
   syncTimeout = setTimeout(async ()=>{
-    try{
-      await db.ref('teams/'+currentTeamId+'/data').set({players,pairs,trainings,runs});
+    try {
+      // Definimos exactamente qué ramas actualizar dentro de /data/
+      // Esto es mucho más seguro que hacer un .set() de todo el objeto
+      const updates = {
+        [`teams/${currentTeamId}/data/players`]: players,
+        [`teams/${currentTeamId}/data/pairs`]: pairs,
+        [`teams/${currentTeamId}/data/trainings`]: trainings,
+        [`teams/${currentTeamId}/data/runs`]: runs
+      };
+
+      await db.ref().update(updates);
+      
       if(dot) dot.textContent = '● En línea';
-    } catch(e){
-      console.error('Firebase save error',e);
+    } catch(e) {
+      console.error('Firebase save error', e);
       if(dot) dot.textContent = '⚠ Sin conexión';
     }
   }, 800);
@@ -847,136 +913,225 @@ function startRealtimeSync(){
 }
 
 /* ═══════════════════════════════════════════
-   LOGIN LOGIC
+   LOGIN LOGIC (SaaS MULTI-PASO REDISEÑADO)
 ═══════════════════════════════════════════ */
-let loginTeamName = '';
-let loginIsNew = false;
+let usuarioActual = null;
 
-function loginNameInput(){
-  document.getElementById('login-err-name').classList.remove('show');
-}
-
-function loginNext(){
-  const name = document.getElementById('inp-team').value.trim();
-  if(!name){ showLoginErr('name','Escribe el nombre del equipo'); return; }
-  loginTeamName = name;
-  document.getElementById('login-team-display').textContent = name;
-  document.getElementById('login-step-name').style.display='none';
-  document.getElementById('login-step-pin').style.display='block';
-  // Check if team exists to set the right label
-  const slug = teamSlug(name);
-  db.ref('teams/'+slug+'/pin').get().then(snap=>{
-    loginIsNew = !snap.exists();
-    document.getElementById('pin-label').textContent = loginIsNew
-      ? 'Crear PIN del equipo (4 dígitos)'
-      : 'PIN del equipo';
-    document.getElementById('login-btn-enter').textContent = loginIsNew
-      ? 'Crear equipo'
-      : 'Entrar al equipo';
-    document.getElementById('pin-hint').textContent = loginIsNew
-      ? 'Este PIN te servirá para acceder desde cualquier dispositivo'
-      : 'Ingresa el PIN para acceder a los datos de tu equipo';
-    document.getElementById('pin0').focus();
+// Mostrar solo el paso necesario en la ventana de login
+function showStep(stepId) {
+  ['step-initial', 'step-login', 'step-reg-role', 'step-reg-coach', 'step-reg-player'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.display = 'none';
   });
+  document.getElementById(stepId).style.display = 'block';
 }
 
-function loginBack(){
-  document.getElementById('login-step-pin').style.display='none';
-  document.getElementById('login-step-name').style.display='block';
-  clearPins();
+// Generar usuario: Extrae solo la primera palabra del nombre y la primera del apellido
+function generarUsername(nombreStr, apellidoStr) {
+  if (!nombreStr && !apellidoStr) return '';
+  
+  const limpiar = (str) => {
+    return str.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(' ')[0] || '';
+  };
+  
+  const primerNombre = limpiar(nombreStr);
+  const primerApellido = limpiar(apellidoStr);
+  
+  if (primerNombre && primerApellido) return `${primerNombre}_${primerApellido}`;
+  if (primerNombre) return primerNombre;
+  if (primerApellido) return primerApellido;
+  return '';
 }
 
-function pinInput(i){
-  const val = document.getElementById('pin'+i).value;
-  if(val && i < 3) document.getElementById('pin'+(i+1)).focus();
-  if(val && i===3) loginEnter();
-  document.getElementById('login-err-pin').classList.remove('show');
-}
-function pinKey(e,i){
-  if(e.key==='Backspace'&&!document.getElementById('pin'+i).value&&i>0){
-    document.getElementById('pin'+(i-1)).focus();
-  }
-}
-function clearPins(){
-  [0,1,2,3].forEach(i=>document.getElementById('pin'+i).value='');
-  document.getElementById('pin0').focus();
-}
-function getPIN(){
-  return [0,1,2,3].map(i=>document.getElementById('pin'+i).value).join('');
+// Previsualizar el usuario mientras escribe
+function previewUser(idNombre, idApellido, previewId) {
+  const nombre = document.getElementById(idNombre).value;
+  const apellido = document.getElementById(idApellido).value;
+  const user = generarUsername(nombre, apellido);
+  document.getElementById(previewId).textContent = user ? `Tu usuario será: ${user}` : 'Tu usuario será: ---';
 }
 
-async function loginEnter(){
-  const pin = getPIN();
-  if(pin.length!==4||!/^\d{4}$/.test(pin)){
-    showLoginErr('pin','El PIN debe ser 4 dígitos numéricos'); return;
-  }
-  const slug = teamSlug(loginTeamName);
-  const btn = document.getElementById('login-btn-enter');
-  btn.textContent = 'Verificando…'; btn.disabled = true;
-  try{
-    const snap = await db.ref('teams/'+slug+'/pin').get();
-    if(!snap.exists()){
-      // New team — create it
-      await db.ref('teams/'+slug).set({pin, name: loginTeamName, created: Date.now()});
-      await enterApp(slug, loginTeamName);
-    } else {
-      // Existing team — check PIN
-      if(snap.val()!==pin){
-        showLoginErr('pin','PIN incorrecto. Inténtalo de nuevo.');
-        btn.textContent = loginIsNew?'Crear equipo':'Entrar al equipo';
-        btn.disabled = false;
-        clearPins();
-        return;
-      }
-      await enterApp(slug, loginTeamName);
+// ─── LOGIN ───
+async function doLogin() {
+  const user = document.getElementById('login-user').value.trim().toLowerCase().replace(/\s+/g, '_');
+  const pass = document.getElementById('login-pass').value;
+
+  if(!user || !pass) return alert("Escribe tu usuario y contraseña.");
+
+  const btn = document.getElementById('btn-login');
+  btn.textContent = 'Verificando...'; btn.disabled = true;
+
+  try {
+    const snap = await db.ref(`users/${user}`).once('value');
+    if(!snap.exists()) {
+      alert("Este usuario no existe. Por favor, regístrate primero.");
+      btn.textContent = 'ENTRAR'; btn.disabled = false;
+      showStep('step-reg-role');
+      return;
     }
-  } catch(e){
-    showLoginErr('pin','Error de conexión. Verifica tu internet.');
-    btn.textContent = loginIsNew?'Crear equipo':'Entrar al equipo';
-    btn.disabled = false;
+
+    const data = snap.val();
+    if(data.password === pass) {
+      await accesoPermitido(data);
+    } else {
+      alert("Contraseña incorrecta.");
+      btn.textContent = 'ENTRAR'; btn.disabled = false;
+    }
+  } catch(e) { alert("Error: " + e.message); btn.textContent = 'ENTRAR'; btn.disabled = false; }
+}
+
+// ─── REGISTRO ENTRENADOR ───
+async function doRegisterCoach() {
+  const nombre = document.getElementById('rc-nombre').value.trim();
+  const apellido = document.getElementById('rc-apellido').value.trim();
+  const pass = document.getElementById('rc-pass').value;
+  const tName = document.getElementById('rc-team').value.trim();
+  const tCountry = document.getElementById('rc-country').value.trim();
+  const tCity = document.getElementById('rc-city').value.trim();
+
+  if(!nombre || !apellido || !pass || !tName || !tCountry || !tCity) return alert("Completa todos los datos.");
+
+  const user = generarUsername(nombre, apellido);
+  const nombreCompleto = `${nombre} ${apellido}`; 
+
+  try {
+    const snap = await db.ref(`users/${user}`).once('value');
+    if(snap.exists()) {
+      alert("Este usuario ya está registrado. Ve a Iniciar Sesión.");
+      showStep('step-login');
+      document.getElementById('login-user').value = user;
+      return;
+    }
+
+    const slug = teamSlug(tName); 
+    const codigo = 'STAT-' + Math.random().toString(36).substring(2,6).toUpperCase();
+
+    const teamUpdate = { name: tName, country: tCountry, city: tCity, inviteCode: codigo, coach: user, lastActivity: Date.now() };
+    const userData = { username: user, nombre: nombreCompleto, password: pass, rol: 'entrenador', teamId: slug, teamName: tName, inviteCode: codigo };
+
+    await db.ref('teams/'+slug).update(teamUpdate);
+    await db.ref(`users/${user}`).set(userData);
+    
+    alert(`¡Equipo vinculado!\nCódigo para tus jugadores: ${codigo}\nTu usuario es: ${user}`);
+    await accesoPermitido(userData);
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+// ─── REGISTRO JUGADOR (CON AUTO-VINCULACIÓN) ───
+async function doRegisterPlayer() {
+  const nombre = document.getElementById('rp-nombre').value.trim();
+  const apellido = document.getElementById('rp-apellido').value.trim();
+  const pass = document.getElementById('rp-pass').value;
+  const codigo = document.getElementById('rp-code').value.toUpperCase().trim();
+
+  if(!nombre || !apellido || !pass || !codigo) return alert("Completa todos los campos.");
+
+  const user = generarUsername(nombre, apellido);
+  const nombreCompleto = `${nombre} ${apellido}`; 
+
+  try {
+    // 1. Verificar si el usuario ya existe en el sistema
+    const snap = await db.ref(`users/${user}`).once('value');
+    if(snap.exists()) {
+      alert("Este usuario ya está registrado. Ve a Iniciar Sesión.");
+      showStep('step-login');
+      document.getElementById('login-user').value = user;
+      return;
+    }
+
+    // 2. Verificar si el código del equipo es válido
+    const eqSnap = await db.ref('teams').orderByChild('inviteCode').equalTo(codigo).once('value');
+    if(!eqSnap.exists()) return alert("El código de equipo es inválido.");
+    
+    const idEq = Object.keys(eqSnap.val())[0];
+    const teamName = eqSnap.val()[idEq].name;
+
+    // ─── AUTO-AGREGAR O VINCULAR JUGADOR A LA PARRILLA ───
+    const teamPlayersSnap = await db.ref(`teams/${idEq}/data/players`).once('value');
+    let currentPlayers = teamPlayersSnap.exists() ? teamPlayersSnap.val() : [];
+    
+    let jugadorEncontrado = false;
+    
+    // Buscar si el jugador ya existe en la parrilla (ignorando mayúsculas/minúsculas)
+    for (let i = 0; i < currentPlayers.length; i++) {
+      if (currentPlayers[i].name.toLowerCase() === nombreCompleto.toLowerCase()) {
+        currentPlayers[i].username = user; // Lo vinculamos guardando su username
+        jugadorEncontrado = true;
+        break;
+      }
+    }
+    
+    // Si no existía, lo agregamos como un jugador nuevo a la parrilla
+    if (!jugadorEncontrado) {
+      const nuevoId = Date.now().toString(36) + Math.random().toString(36).slice(2,5); // Simula la función uid()
+      currentPlayers.push({
+        id: nuevoId,
+        name: nombreCompleto,
+        username: user // Importante para saber quién es quién luego
+      });
+    }
+    
+    // Actualizamos la parrilla del equipo en Firebase
+    await db.ref(`teams/${idEq}/data/players`).set(currentPlayers);
+    // ──────────────────────────────────────────────────────
+
+    // 3. Crear la cuenta del usuario
+    const userData = { username: user, nombre: nombreCompleto, password: pass, rol: 'jugador', teamId: idEq, teamName: teamName };
+    await db.ref(`users/${user}`).set(userData);
+    
+    alert(`¡Registro exitoso!\nTu usuario es: ${user}`);
+    await accesoPermitido(userData);
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+// ─── PERMISOS Y CARGA EN LA APP ───
+async function accesoPermitido(datos) {
+  usuarioActual = datos;
+  localStorage.setItem('stat_saas_session', JSON.stringify(datos));
+  
+  currentTeamId = datos.teamId;
+  currentTeamName = datos.teamName;
+  
+  await loadTeamData(); 
+  
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('hdr-team').textContent = datos.teamName;
+  
+  const isCoach = (datos.rol === 'entrenador' || datos.rol === 'superadmin');
+  const colorUsuario = isCoach ? '#ffb400' : '#00c2d4'; 
+  const icono = isCoach ? '📋' : '👤';
+
+  if(document.getElementById('hdr-user')) {
+    document.getElementById('hdr-user').innerHTML = `<span style="color:${colorUsuario}; font-weight:bold;">${icono} ${datos.username}</span>`;
   }
-}
+  
+  // MOSTRAR BOTÓN DE ADMIN EN EL HEADER SEGÚN ROL
+  const btnAdmin = document.getElementById('btn-admin-panel');
+  if(btnAdmin) {
+    if(datos.rol === 'entrenador' || datos.rol === 'superadmin') {
+      btnAdmin.style.display = 'inline-block';
+      btnAdmin.textContent = datos.rol === 'superadmin' ? '🛡️ SuperAdmin' : '⚙️ Panel';
+    } else {
+      btnAdmin.style.display = 'none';
+    }
+  }
 
-async function enterApp(slug, name){
-  currentTeamId = slug;
-  currentTeamName = name;
-  // Cache in localStorage for quick re-login
-  localStorage.setItem('fll_last_team', JSON.stringify({slug, name}));
-  await loadTeamData();
-  // Hide login, show app
-  document.getElementById('login-wrap').style.display='none';
-  document.getElementById('hdr-team').textContent = name;
-  document.getElementById('hdr-logout').style.display='';
-  startRealtimeSync();
-  render();
-}
+  // MOSTRAR CÓDIGO DE INVITACIÓN SOLO AL ENTRENADOR
+  const inviteBadge = document.getElementById('hdr-invite');
+  if(inviteBadge) {
+    if(datos.rol === 'entrenador' && datos.inviteCode) {
+      inviteBadge.textContent = `CÓDIGO: ${datos.inviteCode}`;
+      inviteBadge.style.display = 'inline-block';
+    } else {
+      inviteBadge.style.display = 'none';
+    }
+  }
 
-function showLoginErr(field, msg){
-  const el = document.getElementById('login-err-'+field);
-  el.textContent = msg; el.classList.add('show');
-}
+  document.getElementById('hdr-logout').style.display = 'block';
 
-function logout(){
-  // Show inline modal — confirm() is blocked on GitHub Pages
-  document.getElementById('logout-modal').style.display='flex';
+  startRealtimeSync(); 
+  render(); 
 }
-function doLogout(){
-  document.getElementById('logout-modal').style.display='none';
-  if(realtimeListener){db.ref('teams/'+currentTeamId+'/data').off('value',realtimeListener);realtimeListener=null;}
-  currentTeamId=null;currentTeamName=null;
-  players=[];pairs=[];trainings=[];runs=[];
-  activeTrainingId=null;roundMode='hub';tab='ronda';
-  localStorage.removeItem('fll_last_team');
-  document.getElementById('hdr-team').textContent='';
-  document.getElementById('hdr-logout').style.display='none';
-  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='ronda'));
-  document.getElementById('login-step-pin').style.display='none';
-  document.getElementById('login-step-name').style.display='block';
-  document.getElementById('inp-team').value='';
-  clearPins();
-  document.getElementById('login-wrap').style.display='flex';
-}
-
 /* ═══════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════ */
@@ -1020,6 +1175,16 @@ function calcScore(ms){
     else if(p.type==='token')t+=TOKEN_SCORES[ms[p.id]??6]||0;
   }));
   return t;
+}
+function extraerFechaDeRonda(nombre) {
+  if(!nombre) return null;
+  // Esta expresión regular busca el formato DD/MM/YYYY
+  const match = nombre.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if(match) {
+    // Lo convierte a YYYY-MM-DD para que el calendario lo reconozca
+    return `${match[3]}-${match[2]}-${match[1]}`;
+  }
+  return null;
 }
 function mScoreFor(m,ms){
   let t=0;
@@ -1181,18 +1346,400 @@ function _irBuscarPromedio(){
   render();
 }
 
-function render(){
-  const el=document.getElementById('main');
-  if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
-  if(tab==='ronda')            el.innerHTML=renderRonda();
-  else if(tab==='entrenamientos')el.innerHTML=renderEntrenamientos();
-  else if(tab==='parrilla')    el.innerHTML=renderParrilla();
+// Variable global para guardar solo las rondas que el jugador puede ver
+let runsFiltradas = [];
+
+function render() {
+  const el = document.getElementById('main');
+  if (typeof _ensureRunPairs === 'function' && _ensureRunPairs()) save();
+
+  // --- Lógica de filtrado por rol (se mantiene igual) ---
+  if (usuarioActual && usuarioActual.rol === 'jugador') {
+    const miJugador = players.find(p => (p.username === usuarioActual.username) || (p.name === usuarioActual.username));
+    if (miJugador) {
+      const pid = miJugador.id;
+      runsFiltradas = runs.filter(r => {
+        const az = pairs.find(pr => pr.id === r.azulPairId);
+        const ro = pairs.find(pr => pr.id === r.rojaPairId);
+        return (az && (az.p1 === pid || az.p2 === pid)) || (ro && (ro.p1 === pid || ro.p2 === pid)) || (r.azulP1 === pid || r.azulP2 === pid || r.rojaP1 === pid || r.rojaP2 === pid);
+      });
+    } else { runsFiltradas = []; }
+  } else { runsFiltradas = runs; }
+
+  // --- ENRUTADOR CORREGIDO ---
+  // Si la pestaña es 'jugadores' o 'parejas', forzamos que use la lógica de Efectividad
+  if (tab === 'ronda') el.innerHTML = renderRonda();
+  else if (tab === 'entrenamientos') el.innerHTML = renderEntrenamientos();
+  else if (tab === 'parrilla') el.innerHTML = renderParrilla();
+  else if (tab === 'estadisticas') el.innerHTML = renderEstadisticas();
+  else if (tab === 'graficas') el.innerHTML = renderGraficas();
+  else if (tab === 'efectividad' || tab === 'jugadores' || tab === 'parejas') {
+    el.innerHTML = renderEfectividad(); 
+  }
+  else if (tab === 'buscar') el.innerHTML = renderBuscar();
+  else if (tab === 'admin') { renderAdminPanel(); return; }
+
+  if (roundMode === 'timer') _updateTimerDOM();
+}
+/* ═══════════════════════════════════════════
+   SISTEMA DE TEMAS Y RENDERIZADO GLOBAL (VIP DEFINITIVO)
+═══════════════════════════════════════════ */
+
+function aplicarTemaGlobal() {
+  const miRol = (usuarioActual && usuarioActual.rol) ? usuarioActual.rol.toLowerCase().trim() : "";
+  const esSuper = (miRol === 'superadmin');
   
-  else if(tab==='estadisticas')el.innerHTML=renderEstadisticas();
-  else if(tab==='graficas')    el.innerHTML=renderGraficas();
-  else if(tab==='efectividad') el.innerHTML=renderEfectividad();
-  else if(tab==='buscar')      el.innerHTML=renderBuscar();
-  if(roundMode==='timer')_updateTimerDOM();
+  // Buscamos si ya existe el estilo VIP
+  let styleEl = document.getElementById('vip-superadmin-styles');
+
+  if (esSuper) {
+    // Le ponemos una "etiqueta" al body para saber que estamos en modo VIP
+    document.body.classList.add('modo-vip');
+
+    // Inyectamos el CSS mágico solo si no existe
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'vip-superadmin-styles';
+      styleEl.innerHTML = `
+        /* Variables Globales VIP */
+        body.modo-vip {
+          --bg: #071324 !important;
+          --surface: rgba(15, 36, 64, 0.6) !important;
+          --surface2: rgba(22, 49, 84, 0.8) !important;
+          --cyan: #FFC107 !important;
+          --teal: #F5A623 !important;
+          --gold: #FFD700 !important;
+          --text: #FFFFFF !important;
+          --text2: rgba(255,255,255,0.85) !important;
+          background-color: #071324 !important;
+          background-image: radial-gradient(circle at top, #0c1e36 0%, #050d18 100%) !important;
+          background-attachment: fixed !important;
+          color: #FFFFFF !important;
+        }
+
+        /* 1. Arreglo de Letras Invisibles */
+        body.modo-vip div, body.modo-vip span, body.modo-vip p, body.modo-vip h1, body.modo-vip h2, body.modo-vip h3 {
+          color: inherit; 
+        }
+        body.modo-vip input, body.modo-vip select, body.modo-vip textarea, body.modo-vip .card {
+          color: #FFFFFF !important;
+        }
+        body.modo-vip .text-muted, body.modo-vip .text-gray {
+          color: rgba(255,255,255,0.6) !important;
+        }
+
+        /* 2. Arreglo del Menú */
+        body.modo-vip header, body.modo-vip .tabs, body.modo-vip nav, body.modo-vip .bottom-bar {
+          background: rgba(30, 45, 65, 0.85) !important;
+          backdrop-filter: blur(12px) !important;
+          border-bottom: 2px solid rgba(255, 193, 7, 0.4) !important;
+          border-top: 1px solid rgba(255, 193, 7, 0.2) !important;
+        }
+
+        /* 3. Arreglo de Pestañas (Glow dinámico) */
+        body.modo-vip .tbtn.active, body.modo-vip .tab.active, body.modo-vip .nav-item.active {
+          color: #FFC107 !important;
+          border-bottom-color: #FFC107 !important;
+          text-shadow: 0 0 12px rgba(255, 193, 7, 0.5) !important;
+        }
+        
+        body.modo-vip .tbtn:not(.active):hover, body.modo-vip .tab:not(.active):hover {
+          color: #F5A623 !important;
+        }
+
+        /* 4. Contenedor Principal (Lujo sutil y arreglo de scroll) */
+        body.modo-vip #main, body.modo-vip .main {
+          box-shadow: 0 0 50px rgba(245, 166, 35, 0.1) !important;
+          border: 1px solid rgba(255, 215, 0, 0.15) !important;
+          background: rgba(10, 25, 45, 0.4) !important;
+          backdrop-filter: blur(10px) !important;
+          
+          /* Solución barrita de scroll: ensanchamos y forzamos visible */
+          max-width: 1200px !important;
+          overflow: visible !important;
+          height: auto !important;
+        }
+
+        /* 5. PARCHES SOLICITADOS */
+        
+        /* Pestaña Ronda: Botones de Entrenamiento y Lanzada Suelta (.hub-btn) */
+        body.modo-vip .hub-btn {
+          background: rgba(15, 36, 64, 0.8) !important; /* Fondo azul oscuro VIP */
+          border: 1px solid #FFC107 !important;         /* Borde dorado */
+          color: #FFFFFF !important;                    /* Texto blanco forzado */
+        }
+        body.modo-vip .hub-btn .hub-btn-title {
+          color: #FFD700 !important;                    /* Título dorado */
+        }
+        body.modo-vip .hub-btn .hub-btn-sub {
+          color: rgba(255,255,255,0.7) !important;      /* Subtítulo un poco más gris */
+        }
+
+        /* Pestaña Buscar: Botón de aplicar filtro y tarjetas de jugadores */
+        body.modo-vip [draggable="true"] {
+          border: 2px solid #FFC107 !important; /* Borde amarillito a tarjetas */
+        }
+        
+        /* Apuntamos al botón de filtrar, pero evitamos dañar los tabs de arriba */
+        body.modo-vip #main .btn[onclick*="render"], 
+        body.modo-vip #main .btn[onclick*="buscar"], 
+        body.modo-vip #main .btn[onclick*="filter"] {
+          border: 2px solid #FFC107 !important; /* Borde amarillito al botón */
+        }
+            /* ARREGLO PESTAÑA RONDA */
+body.modo-vip h2, 
+body.modo-vip .sec-lbl {
+  color: #FFC107 !important; /* Título "¿Cómo quieres lanzar?" en dorado */
+}
+
+body.modo-vip .hub-btn, 
+body.modo-vip .hub-btn div, 
+body.modo-vip .hub-btn p, 
+body.modo-vip .hub-btn span {
+  color: #FFFFFF !important; /* Letras blancas para todo el interior */
+}
+
+body.modo-vip .hub-btn .hub-btn-title {
+  color: #FFC107 !important; /* Los títulos "ENTRENAMIENTO" en dorado */
+  font-weight: 900 !important;
+}
+
+body.modo-vip .hub-btn {
+  background: rgba(15, 36, 64, 0.8) !important; /* Fondo azul oscuro VIP */
+  border: 1px solid #FFC107 !important;         /* Borde dorado */
+}
+/* =========================================================
+           PARCHES DE DISEÑO VIP (Ronda, Parrilla, Buscar, Efectividad)
+           ========================================================= */
+        
+        /* 1. Eliminar barrita de scroll y agrandar contenedor */
+        body.modo-vip #main, body.modo-vip .main {
+          max-width: 1100px !important;
+          height: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+
+        /* 2. Pestaña Ronda: Forzar letras oscuras sobre el fondo blanco */
+        body.modo-vip .sec-lbl,
+        body.modo-vip .hub-btn,
+        body.modo-vip .hub-btn-title,
+        body.modo-vip .hub-btn-sub {
+          color: #071324 !important; /* Azul oscuro (casi negro) para lectura perfecta */
+          border-color: #071324 !important; /* Borde oscuro para que combine */
+        }
+
+        /* 3. Pestaña Parrilla: Etiqueta "En pareja" */
+        body.modo-vip .parrilla-item {
+          color: #FFFFFF !important; /* Nombres en blanco */
+        }
+        body.modo-vip .parrilla-item div {
+          color: rgba(255, 255, 255, 0.7) !important; /* Texto de parejas en gris claro */
+        }
+        body.modo-vip .parrilla-item span,
+        body.modo-vip span.sbadge {
+          color: #000000 !important; /* Letras negras */
+          background: #FFC107 !important; /* Fondo dorado brillante */
+          padding: 2px 6px !important;
+          border-radius: 4px !important;
+          font-weight: 900 !important;
+        }
+
+        /* 4. Pestaña Buscar: Bordes amarillos a jugadores y botón (SIN DAÑAR EL MENÚ) */
+        body.modo-vip .player-chip, 
+        body.modo-vip [draggable="true"] {
+          border: 2px solid #FFC107 !important;
+          box-shadow: 0 0 5px rgba(255, 193, 7, 0.3) !important;
+        }
+        /* Al usar ".btn" nos aseguramos de que no toque las pestañas del menú (que usan .tbtn) */
+        body.modo-vip .btn[onclick*="buscar"], 
+        body.modo-vip .btn[onclick*="Buscar"] {
+          border: 2px solid #FFC107 !important;
+          color: #FFC107 !important;
+          background: rgba(255, 193, 7, 0.1) !important;
+        }
+
+        /* 5. Pestaña Efectividad: Arreglo de "Falló completamente" */
+        body.modo-vip .fail-chip {
+          background: #7f1d1d !important; /* Fondo rojo oscuro sangre */
+          color: #ffffff !important; /* Letras blancas */
+          border: 1px solid #ef4444 !important;
+        }
+
+
+      `;
+      document.head.appendChild(styleEl);
+    }
+  } else {
+    // --- MODO NORMAL (Apagamos todo si entra alguien que no eres tú) ---
+    document.body.classList.remove('modo-vip');
+    if (styleEl) styleEl.remove();
+  }
+}
+function render() {
+  aplicarTemaGlobal();
+
+  const el = document.getElementById('main');
+  if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
+
+  if (usuarioActual && usuarioActual.rol === 'jugador') {
+    const miJugador = players.find(p => (p.username === usuarioActual.username) || (p.name === usuarioActual.username));
+    if (miJugador) {
+      const pid = miJugador.id;
+      runsFiltradas = runs.filter(r => {
+        const az = pairs.find(pr => pr.id === r.azulPairId);
+        const ro = pairs.find(pr => pr.id === r.rojaPairId);
+        return (az && (az.p1 === pid || az.p2 === pid)) || (ro && (ro.p1 === pid || ro.p2 === pid));
+      });
+    } else { runsFiltradas = []; }
+  } else { runsFiltradas = runs; }
+
+  // Enrutador de pestañas
+  if(tab==='ronda')            el.innerHTML = renderRonda();
+  else if(tab==='entrenamientos') el.innerHTML = renderEntrenamientos();
+  else if(tab==='parrilla')    el.innerHTML = renderParrilla();
+  else if(tab==='estadisticas') el.innerHTML = renderEstadisticas();
+  else if(tab==='graficas')    el.innerHTML = renderGraficas();
+  else if(tab==='efectividad') el.innerHTML = renderEfectividad();
+  else if(tab==='buscar')      el.innerHTML = renderBuscar();
+  else if(tab==='admin')       { renderAdminPanel(); return; } 
+  
+  if(roundMode==='timer') _updateTimerDOM();
+}
+
+/* ═══════════════════════════════════════════
+   LÓGICA DEL PANEL DE ADMINISTRACIÓN
+═══════════════════════════════════════════ */
+
+async function renderAdminPanel() {
+  const el = document.getElementById('main');
+  el.innerHTML = `
+    <div style="text-align:center; padding:60px;">
+      <div class="loader"></div>
+      <p style="color:var(--gold); font-weight:bold; margin-top:15px; letter-spacing:1px;">AUTENTICANDO NIVEL DE ACCESO...</p>
+    </div>`;
+
+  try {
+    const miRol = (usuarioActual.rol || "").toLowerCase().trim();
+    const esSuper = (miRol === 'superadmin');
+
+    const snapUsers = await db.ref('users').once('value');
+    const allUsers = snapUsers.val() || {};
+    
+    let allTeams = {};
+    if(esSuper) {
+      const snapTeams = await db.ref('teams').once('value');
+      allTeams = snapTeams.val() || {};
+    }
+
+    let html = `<div style="max-width: 800px; margin: 0 auto; padding: 10px;">`;
+    
+    if(esSuper) {
+      html += `
+        <div style="text-align:center; margin-bottom:40px; border-bottom: 2px solid rgba(255,193,7,0.5); padding-bottom:20px;">
+          <div style="font-size:12px; color:#FFC107; font-weight:900; letter-spacing:4px; margin-bottom:10px;">PROTOCOLO ACTIVO</div>
+          <h2 style="color:#FFD700; font-size:2.4rem; font-weight:900; text-transform:uppercase; text-shadow: 0 0 20px rgba(255,215,0,0.6);">👑 SUPERADMIN</h2>
+        </div>`;
+      
+      for (let teamKey in allTeams) {
+        html += `
+          <div style="margin-top:40px; background: linear-gradient(90deg, rgba(255,193,7,0.15), transparent); padding: 16px; border-radius: 8px; color:#FFC107; font-weight:800; border-left: 6px solid #FFC107; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:1.25rem; text-shadow: 0 0 10px rgba(255,193,7,0.3);">📍 EQUIPO: ${allTeams[teamKey].name}</span>
+            <span style="background: rgba(255,193,7,0.1); padding: 4px 10px; border-radius: 4px; font-family:'JetBrains Mono'; font-size:11px; border: 1px solid rgba(255,193,7,0.3); color:#FFF;">ID: ${teamKey}</span>
+          </div>
+          <div style="display:grid; gap:12px; margin-top:15px; padding-left:5px;">`;
+          
+        let hayGente = false;
+        for (let uKey in allUsers) {
+          if(allUsers[uKey].teamId === teamKey) {
+            hayGente = true;
+            html += generarTarjetaUsuario(allUsers[uKey], uKey); 
+          }
+        }
+        if(!hayGente) html += `<div style="color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.03); font-size:13px; padding:15px; border:1px dashed rgba(255,193,7,0.3); border-radius:8px; text-align:center;">Sin personal registrado.</div>`;
+        html += `</div>`;
+      }
+    } 
+    else {
+      html += `
+        <div style="border-bottom: 2px solid #10B981; padding-bottom:15px; margin-bottom:25px;">
+          <h2 style="color:#10B981; font-weight:900; display:flex; align-items:center; gap:10px;">📋 Gestión de Equipo: <span style="color:#fff">${usuarioActual.teamName}</span></h2>
+        </div>
+        <div style="display:grid; gap:12px;">`;
+      
+      let hayGente = false;
+      for (let uKey in allUsers) {
+        if(allUsers[uKey].teamId === currentTeamId) { 
+          hayGente = true;
+          html += generarTarjetaUsuario(allUsers[uKey], uKey);
+        }
+      }
+      if(!hayGente) html += `<div class="card" style="text-align:center; color:#FFF;">No hay jugadores registrados aún.</div>`;
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+    el.innerHTML = html;
+
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="border:1px solid var(--red); color:var(--red);">Error en la conexión segura: ${e.message}</div>`;
+  }
+}
+
+function generarTarjetaUsuario(u, uKey) {
+  const rol = (u.rol || "").toLowerCase();
+  
+  let color = "#00C2D4"; 
+  let icono = "👤";
+  let resplandor = "none";
+  let bgTarjeta = "rgba(255,255,255,0.05)"; 
+  
+  if(rol === 'superadmin') {
+    color = "#FFD700"; 
+    icono = "👑";
+    resplandor = "0 0 15px rgba(255,215,0,0.15)";
+    bgTarjeta = "rgba(255,215,0,0.08)"; 
+  } else if(rol === 'entrenador') {
+    color = "#10B981"; 
+    icono = "📋";
+  }
+  
+  return `
+    <div class="card" style="background: ${bgTarjeta}; border-left: 5px solid ${color}; box-shadow: ${resplandor}; padding:18px; display:flex; justify-content:space-between; align-items:center; border-top: 1px solid rgba(255,255,255,0.08); transition: transform 0.2s;">
+      <div>
+        <div style="font-weight:900; color:#fff; font-size:1.15rem; display:flex; align-items:center; gap:10px;">
+          ${icono} ${u.nombre}
+          <span style="font-size:9px; background:${color}; color:#000; padding:2px 8px; border-radius:12px; text-transform:uppercase; font-weight:900; letter-spacing:1px;">${rol}</span>
+        </div>
+        <div style="font-size:13px; color:rgba(255,255,255,0.8); margin-top:8px;">
+          ACCESO: <b style="color:#fff; font-family:'JetBrains Mono'; background:rgba(0,0,0,0.4); padding:2px 6px; border-radius:4px;">${u.username}</b>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="background:rgba(0,0,0,0.4); padding:8px 15px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); margin-bottom:8px; display:inline-block;">
+          <div style="font-size:9px; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;">Contraseña</div>
+          <div style="font-family:'JetBrains Mono'; color:${color}; font-weight:900; font-size:1.3rem;">${u.password}</div>
+        </div>
+        <br>
+        <button onclick="cambiarPasswordUsuario('${uKey}', '${u.username}')" 
+                style="background:${color}15; border:1px solid ${color}; color:${color}; padding:6px 15px; border-radius:5px; font-size:10px; font-weight:900; cursor:pointer; text-transform:uppercase; transition:0.3s;">
+          ✏️ Cambiar Clave
+        </button>
+      </div>
+    </div>`;
+}
+
+async function cambiarPasswordUsuario(userKey, username) {
+  const nueva = prompt(`SISTEMA DE SEGURIDAD\n\nNueva contraseña para [${username}]:`);
+  if (!nueva || nueva.trim().length < 4) {
+    if(nueva !== null) alert("La contraseña es demasiado corta.");
+    return;
+  }
+  try {
+    await db.ref('users/' + userKey + '/password').set(nueva.trim());
+    showToast('¡Base de datos actualizada con éxito! ✓');
+    renderAdminPanel();
+  } catch(e) { alert("Error al escribir en Firebase: " + e.message); }
 }
 
 function _irBuscarJugador(pid, pname){
@@ -1212,12 +1759,24 @@ function _irBuscarPareja(prid, prname){
 function switchTab(t){
   if((timerRunning||roundMode==='countdown')&&t!=='ronda'){showToast('⏱ Hay un contador activo');return;}
   if(tab==='buscar'&&t!=='buscar') _aplicarBuscar();
+  
   // Reset wizard if navigating away mid-creation
   if(tab==='entrenamientos'&&t!=='entrenamientos'&&trainWizStep!=='setup'){
     trainWizStep='setup';trainWizCurrentRound=0;trainWizSlots=[];
   }
-  tab=t;
-  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  
+  tab = t;
+  
+  // Actualizar las pestañas de abajo (deselecciona todas si estamos en admin)
+  document.querySelectorAll('.tbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  
+  // Actualizar el botón de Admin del Header
+  const btnHeader = document.getElementById('btn-admin-panel');
+  if(btnHeader) {
+    btnHeader.style.background = (t === 'admin') ? 'var(--gold)' : 'none';
+    btnHeader.style.color = (t === 'admin') ? 'var(--navy)' : 'var(--gold)';
+  }
+
   render();
 }
 function switchStatsSub(t){statsSubTab=t;render();}
@@ -1240,21 +1799,24 @@ function renderRonda(){
 /* ── HUB ── */
 function renderHub(){
   const at=trainings.find(t=>t.status==='active'||t.status==='paused');
+  
+  // ARREGLO VIP: Se cambiaron los colores de fondo a azules oscuros
+  // y se forzaron textos a blanco/dorado para garantizar contraste
   const banner=at?
-    `<div style="background:${at.status==='active'?'var(--amber-l)':'var(--surface2)'};border:1px solid ${at.status==='active'?'#F5C4B3':'var(--border2)'};border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    `<div style="background:rgba(15, 36, 64, 0.95);border:1px solid ${at.status==='active'?'#FFC107':'var(--border2)'};border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div>
-        <div style="font-family:inherit;font-size:13px;font-weight:700;color:${at.status==='active'?'var(--amber)':'var(--text3)'}">ENTRENAMIENTO ${at.status==='active'?'ACTIVO':'PAUSADO'}</div>
-        <div style="font-size:15px;font-weight:500">${at.name}</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:2px">${at.rounds.filter(r=>r.completed).length}/${at.rounds.length} rondas completadas</div>
+        <div style="font-family:inherit;font-size:13px;font-weight:900;color:${at.status==='active'?'#FFC107':'#FFFFFF'}">ENTRENAMIENTO ${at.status==='active'?'ACTIVO':'PAUSADO'}</div>
+        <div style="font-size:15px;font-weight:500;color:#FFFFFF">${at.name}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px">${at.rounds.filter(r=>r.completed).length}/${at.rounds.length} rondas completadas</div>
       </div>
-      <button class="btn ${at.status==='active'?'btn-amber':'btn-green'}" onclick="resumeTraining('${at.id}')">${at.status==='active'?'Continuar':'▶ Reanudar'}</button>
+      <button class="btn ${at.status==='active'?'btn-amber':'btn-green'}" style="color:#000; font-weight:bold" onclick="resumeTraining('${at.id}')">${at.status==='active'?'Continuar':'▶ Reanudar'}</button>
     </div>`:
-    `<div style="background:var(--green-l);border:1px solid var(--green-b);border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    `<div style="background:rgba(15, 36, 64, 0.95);border:1px solid #FFC107;border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div>
-        <div style="font-family:inherit;font-size:13px;font-weight:700;color:var(--green)">ENTRENAMIENTO</div>
-        <div style="font-size:13px;color:var(--text2)">Planifica desde la pestaña <strong>Entrenamientos</strong></div>
+        <div style="font-family:inherit;font-size:13px;font-weight:900;color:#FFC107">ENTRENAMIENTO</div>
+        <div style="font-size:13px;color:#FFFFFF">Planifica desde la pestaña <strong style="color:#FFD700">Entrenamientos</strong></div>
       </div>
-      <button class="btn btn-sm" onclick="switchTab('entrenamientos')">Ver entrenamientos</button>
+      <button class="btn btn-sm" style="background:#FFC107; color:#000; font-weight:bold; border:none;" onclick="switchTab('entrenamientos')">Ver entrenamientos</button>
     </div>`;
 
   // Loose runs list with inline delete
@@ -1294,16 +1856,17 @@ function renderHub(){
       }).join('')}
     </div>`:''
 
-  return`<div style="margin-bottom:10px;font-size:13px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.5px;font-family:inherit">¿Cómo quieres lanzar?</div>
+  // ARREGLO VIP: Se modificó el título principal y el diseño del botón "Lanzada suelta" para contraste VIP
+  return`<div style="margin-bottom:10px;font-size:14px;color:#FFC107;font-weight:900;text-transform:uppercase;letter-spacing:.5px;font-family:inherit">¿Cómo quieres lanzar?</div>
   ${banner}
-  <button class="hub-btn" onclick="startLoose()">
+  <button class="hub-btn" style="background:rgba(15, 36, 64, 0.95); border:1px solid #FFC107;" onclick="startLoose()">
     <div style="display:flex;align-items:center;gap:12px">
       <div style="width:44px;height:44px;border-radius:var(--r);background:var(--blue-l);border:1px solid var(--blue-b);display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#185FA5" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       </div>
       <div>
-        <div class="hub-btn-title">Lanzada suelta</div>
-        <div class="hub-btn-sub">Sin entrenamiento — elige parejas, corre el contador y registra misiones</div>
+        <div class="hub-btn-title" style="color:#FFC107; font-weight:900;">Lanzada suelta</div>
+        <div class="hub-btn-sub" style="color:#FFFFFF;">Sin entrenamiento — elige parejas, corre el contador y registra misiones</div>
       </div>
     </div>
   </button>
@@ -1889,27 +2452,59 @@ function saveRun(){
   }
   const score=calcScore(mState);
   const snap=JSON.parse(JSON.stringify(mState));
+  
   // Auto-create pairs from individual player slots
   _syncPendingPairs();
-  const run={id:uid(),roundName:pendingRound.roundName.trim(),note:pendingRound.note.trim(),
-    azulPairId:pendingRound.azulPairId,rojaPairId:pendingRound.rojaPairId,
-    azulP1:pendingRound.azulP1||'',azulP2:pendingRound.azulP2||'',
-    rojaP1:pendingRound.rojaP1||'',rojaP2:pendingRound.rojaP2||'',
-    cuadrillaName:(pendingRound.cuadrillaName||'').trim(),
-    missions:snap,score,ts:Date.now(),
-    trainingId:pendingRound.trainingId||null,trainingRoundId:pendingRound.trainingRoundId||null};
+
+  // --- EL CAMBIO PROFESIONAL AQUÍ ---
+  const run = {
+    id: uid(),
+    roundName: pendingRound.roundName.trim(),
+    note: pendingRound.note.trim(),
+    azulPairId: pendingRound.azulPairId,
+    rojaPairId: pendingRound.rojaPairId,
+    azulP1: pendingRound.azulP1 || '',
+    azulP2: pendingRound.azulP2 || '',
+    rojaP1: pendingRound.rojaP1 || '',
+    rojaP2: pendingRound.rojaP2 || '',
+    cuadrillaName: (pendingRound.cuadrillaName || '').trim(),
+    missions: snap,
+    score: score,
+    ts: Date.now(),
+    trainingId: pendingRound.trainingId || null,
+    trainingRoundId: pendingRound.trainingRoundId || null,
+    // --- FIRMA PROFESIONAL ---
+    savedBy: (typeof usuarioActual !== 'undefined' && usuarioActual) ? usuarioActual.username : 'invitado',
+    savedByRole: (typeof usuarioActual !== 'undefined' && usuarioActual) ? usuarioActual.rol : 'jugador'
+};
+  // ----------------------------------
+
   runs.push(run);
-  if(pendingRound.trainingId&&pendingRound.trainingRoundId){
+  
+  if(pendingRound.trainingId && pendingRound.trainingRoundId){
     const t=getTraining(pendingRound.trainingId);
-    if(t){const r=t.rounds.find(x=>x.id===pendingRound.trainingRoundId);if(r)r.completed=true;}
+    if(t){
+      const r=t.rounds.find(x=>x.id===pendingRound.trainingRoundId);
+      if(r) r.completed=true;
+    }
   }
+  
   save();
   stopTimerCleanup();
   showToast(`Guardado: ${score} pts`);
-  const wasT=!!pendingRound.trainingId;const tid=pendingRound.trainingId;
+  
+  const wasT=!!pendingRound.trainingId;
+  const tid=pendingRound.trainingId;
+  
   pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',trainingId:null,trainingRoundId:null,azulP1:'',azulP2:'',rojaP1:'',rojaP2:''};
   mState={};
-  if(wasT){activeTrainingId=tid;roundMode='training-start';}else roundMode='hub';
+  
+  if(wasT){
+    activeTrainingId=tid;
+    roundMode='training-start';
+  } else {
+    roundMode='hub';
+  }
   render();
 }
 
@@ -2232,7 +2827,6 @@ function renderEntrenamientos(){
       const filled=[slot.azulP1,slot.azulP2,slot.rojaP1,slot.rojaP2].filter(Boolean).length;
 
       return`<div class="form-card">
-        <!-- Progress -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <div>
             <div style="font-family:inherit;font-size:15px;font-weight:800">${nTrainName||'Entrenamiento'}</div>
@@ -2244,20 +2838,17 @@ function renderEntrenamientos(){
           <div style="height:4px;background:var(--green-d);border-radius:4px;width:${Math.max(4,Math.round(((idx+1)/totalR)*100))}%;transition:width .3s"></div>
         </div>
 
-        <!-- Cuadrilla name -->
         <div class="fg" style="margin-bottom:10px">
           <div class="field-lbl">Nombre de la cuadrilla <span style="font-size:11px;color:var(--text3)">(opcional)</span></div>
           <input type="text" placeholder="ej. Cuadrilla A, Los Rápidos..." value="${slot.cuadrillaName||''}"
             oninput="trainWizSlots[${idx}].cuadrillaName=this.value">
         </div>
 
-        <!-- Player pool -->
         <div class="field-lbl" style="margin-bottom:6px">Jugadores — arrastra a cada base</div>
         <div class="player-pool" id="tw-pool" ondragover="event.preventDefault()" ondrop="twDropToPool(event)">
           ${chips}
         </div>
 
-        <!-- Bases -->
         <div class="bases-grid" style="margin-top:10px">
           <div class="bbox azul">
             <div class="btit azul"><span class="dot azul"></span>Base Azul</div>
@@ -2287,7 +2878,6 @@ function renderEntrenamientos(){
           </div>
         </div>
 
-        <!-- Navigation -->
         <div style="display:flex;gap:8px;margin-top:14px">
           ${idx>0&&!isEdit?`<button class="btn btn-sm" onclick="trainWizCurrentRound--;render()">← Anterior</button>`:''}
           <div style="flex:1"></div>
@@ -2464,7 +3054,6 @@ function renderEntrenamientos(){
   }).join('');
   return form+list;
 }
-
 function addRoundFromList(tid){
   // Activate training if not active, then open the add-round form in the Ronda tab
   const t=getTraining(tid);if(!t)return;
@@ -2644,50 +3233,58 @@ function delTRResult(tid,rid){
    TAB: PARRILLA
 ═══════════════════════════════════════════ */
 function renderParrilla(){
-  const form=`<div class="form-card">
-    <div class="sec-lbl">Agregar jugador</div>
-    <div style="display:flex;gap:10px;align-items:flex-end">
-      <div style="flex:1">
-        <div class="field-lbl">Nombre del jugador</div>
-        <input type="text" placeholder="ej. María García, Juan Pérez..." value="${nPlayerName}" oninput="nPlayerName=this.value" onkeydown="if(event.key==='Enter')addPlayer()">
-      </div>
-      <button class="btn btn-green" onclick="addPlayer()" style="flex-shrink:0;padding:11px 22px">+ Agregar</button>
-    </div>
-  </div>`;
-  if(!players.length)return form+`<div class="empty">No hay jugadores aún.</div>`;
-  const list=players.map((p,i)=>{
-    const isEd=editingId.players===p.id;
-    const isDel=confDel['p_'+p.id];
-    const inPair=pairs.some(pr=>pr.p1===p.id||pr.p2===p.id);
-    const myPairs=pairs.filter(pr=>pr.p1===p.id||pr.p2===p.id);
-    return`<div class="card" style="padding:14px 18px">
+  
+  // 1. Si no hay jugadores, mostramos un mensaje indicando cómo se agregan ahora
+  if(!players.length) {
+    return `<div class="empty" style="padding:30px; text-align:center;">
+              No hay jugadores aún.<br>
+              <span style="font-size:12px; color:var(--text3); display:block; margin-top:10px;">
+                Tus jugadores aparecerán aquí automáticamente cuando se registren usando el código de invitación del equipo.
+              </span>
+            </div>`;
+  }
+
+  // 2. Renderizamos la lista de jugadores que ya están en el sistema
+  const list = players.map((p,i) => {
+    const isEd = editingId.players === p.id;
+    const isDel = confDel['p_'+p.id];
+    const inPair = pairs.some(pr => pr.p1 === p.id || pr.p2 === p.id);
+    const myPairs = pairs.filter(pr => pr.p1 === p.id || pr.p2 === p.id);
+    
+    const userBadge = p.username ? `<span style="font-size:11px; color:var(--cyan); background:rgba(0,194,212,0.1); padding:2px 6px; border-radius:4px; margin-left:6px;">@${p.username}</span>` : '';
+
+    // ARREGLO VIP PARRILLA: Texto "En pareja" estilizado directamente en HTML,
+    // garantizando fondo dorado brillante y texto oscuro que nunca falla.
+    return `<div class="card" style="padding:14px 18px">
       <div style="display:flex;align-items:center;gap:12px">
         <div style="width:40px;height:40px;border-radius:50%;background:var(--green-l);border:2px solid var(--green-b);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;font-weight:800;color:var(--green-d)">${i+1}</div>
         ${isEd
-          ?`<input type="text" value="${editData.name||''}" oninput="editData.name=this.value" style="flex:1;font-size:15px" onkeydown="if(event.key==='Enter')savePlayerEdit('${p.id}')">`
-          :`<div style="flex:1;min-width:0">
-            <div style="font-size:16px;font-weight:700">${p.name}</div>
-            <div style="font-size:12px;color:var(--text3);margin-top:2px">${myPairs.length?'En: '+myPairs.map(pr=>pr.name).join(', '):'Sin pareja asignada'}</div>
-          </div>`}
+          ? `<input type="text" value="${editData.name||''}" oninput="editData.name=this.value" style="flex:1;font-size:15px" onkeydown="if(event.key==='Enter')savePlayerEdit('${p.id}')">`
+          : `<div style="flex:1;min-width:0">
+              <div style="font-size:16px;font-weight:700">${p.name} ${userBadge}</div>
+              <div style="font-size:12px;color:var(--text3);margin-top:2px">${myPairs.length?'En: '+myPairs.map(pr=>pr.name).join(', '):'Sin pareja asignada'}</div>
+            </div>`}
         <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
-          ${inPair?`<span class="tag tag-green" style="font-size:11px">En pareja</span>`:''}
+          ${inPair ? `<span class="tag" style="background:#FFC107; color:#000000; font-weight:900; padding:4px 8px; border-radius:6px; font-size:11px;">En pareja</span>` : ''}
           ${isEd
-            ?`<button class="btn btn-green btn-sm" onclick="savePlayerEdit('${p.id}')">Guardar</button>
+            ? `<button class="btn btn-green btn-sm" onclick="savePlayerEdit('${p.id}')">Guardar</button>
                <button class="btn btn-sm" onclick="cancelEdit('players')">Cancelar</button>`
-            :`<button class="btn btn-sm" style="padding:5px 12px" onclick="startEdit('players','${p.id}','${p.name}')">Editar</button>
-               ${!isDel?`<button class="btn btn-red btn-sm" onclick="askDel('p_${p.id}','p')">×</button>`:''}`}
+            : `<button class="btn btn-sm" style="padding:5px 12px" onclick="startEdit('players','${p.id}','${p.name}')">Editar</button>
+               ${!isDel ? `<button class="btn btn-red btn-sm" onclick="askDel('p_${p.id}','p')">×</button>` : ''}`}
         </div>
       </div>
-      ${isDel?`<div class="conf" style="margin-top:10px">
+      ${isDel ? `<div class="conf" style="margin-top:10px">
         <span>¿Eliminar a <strong>${p.name}</strong>?${inPair?' Está en una o más parejas.':''}</span>
         <div style="display:flex;gap:6px">
           <button class="btn btn-red btn-sm" onclick="delPlayer('${p.id}')">Confirmar</button>
           <button class="btn btn-sm" onclick="cancelDel('p_${p.id}')">Cancelar</button>
         </div>
-      </div>`:''}
+      </div>` : ''}
     </div>`;
   }).join('');
-  return form+`<div style="font-size:12px;color:var(--text3);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px">${players.length} jugador${players.length!==1?'es':''} registrado${players.length!==1?'s':''}</div>`+list;
+
+  // 3. Retornamos solo el contador de jugadores y la lista
+  return `<div style="font-size:12px;color:var(--text3);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px">${players.length} jugador${players.length!==1?'es':''} registrado${players.length!==1?'s':''}</div>` + list;
 }
 
 /* ═══════════════════════════════════════════
@@ -2818,23 +3415,30 @@ function _summaryPanel(allRuns,periodRuns){
   </div>`;
 }
 
+/* ═══════════════════════════════════════════
+   TAB: ESTADÍSTICAS (FILTRADO 100% POR JUGADOR)
+═══════════════════════════════════════════ */
+
 function renderEstadisticas(){
-  if(!runs.length)return`<div class="empty">Guarda rondas desde <strong>Ronda</strong> para ver estadísticas.</div>`;
+  // 1. Usamos exclusivamente runsFiltradas para que el jugador solo vea lo suyo
+  if(!runsFiltradas.length) return `<div class="empty">No hay suficientes rondas registradas para ver estadísticas.</div>`;
+  
   const nav=`<div class="sub-tabs">
-    <button class="sub-tbtn ${statsSubTab==='global'?'active':''}"         onclick="switchStatsSub('global')">Global</button>
-    <button class="sub-tbtn ${statsSubTab==='promedios'?'active':''}"      onclick="switchStatsSub('promedios')">Promedio</button>
+    <button class="sub-tbtn ${statsSubTab==='global'?'active':''}" onclick="switchStatsSub('global')">Global</button>
+    <button class="sub-tbtn ${statsSubTab==='promedios'?'active':''}" onclick="switchStatsSub('promedios')">Promedio</button>
     <button class="sub-tbtn ${statsSubTab==='rondas-sueltas'?'active':''}" onclick="switchStatsSub('rondas-sueltas')">Rondas sueltas</button>
     <button class="sub-tbtn ${statsSubTab==='entrenamientos'?'active':''}" onclick="switchStatsSub('entrenamientos')">Entrenamientos</button>
   </div>`;
+  
   let body='';
   if(statsSubTab==='promedios'){
     body=_promediosPanel();
   } else if(statsSubTab==='global'){
-    body=statsPanel(runs,'global');
+    body=statsPanel(runsFiltradas, 'global');
   } else if(statsSubTab==='rondas-sueltas'){
-    const loose=runs.filter(r=>!r.trainingId);
-    const filtered=_filterByRange(loose);
-    body=loose.length?(_periodSelector()+_summaryPanel(loose,filtered)+statsPanel(filtered,'rondas-sueltas')):`<div class="empty">No hay rondas sueltas guardadas.</div>`;
+    const loose = runsFiltradas.filter(r => !r.trainingId);
+    const filtered = _filterByRange(loose);
+    body = loose.length ? (_periodSelector() + _summaryPanel(loose, filtered) + statsPanel(filtered, 'rondas-sueltas')) : `<div class="empty">No hay rondas sueltas guardadas.</div>`;
   } else {
     body=statsTrainings();
   }
@@ -2843,10 +3447,10 @@ function renderEstadisticas(){
 
 /* ── PROMEDIO sub-tab: por período ── */
 function _promediosPanel(){
-  const filtered=_filterByRange(runs);
-  const perScores=filtered.map(r=>Number(r.score));
-  const avgPer=perScores.length?Math.round(perScores.reduce((a,b)=>a+b,0)/perScores.length):'—';
-  const bestPer=perScores.length?Math.max(...perScores):'—';
+  const filtered = _filterByRange(runsFiltradas);
+  const perScores = filtered.map(r => Number(r.score));
+  const avgPer = perScores.length ? Math.round(perScores.reduce((a,b)=>a+b,0)/perScores.length) : '—';
+  const bestPer = perScores.length ? Math.max(...perScores) : '—';
   return `
     <div class="card" style="padding:14px">
       <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px">Promedio por período</div>
@@ -2894,7 +3498,7 @@ function statsPanel(subset,outerKey){
   if(cur==='ranking')      body=_rankingSection(subset,outerKey);
   else if(cur==='jugadores')body=_playersSection(subset,outerKey);
   else if(cur==='parejas')  body=_pairsSection(subset,outerKey);
-  else                       body=_cuadrillasSection(subset,outerKey);
+  else                      body=_cuadrillasSection(subset,outerKey);
   return nav+body;
 }
 
@@ -2934,7 +3538,7 @@ function _rcard(r,idx,meta){
 /* ── RANKING ── collapsible per run */
 function _rankingSection(subset,prefix){
   const sk=prefix+'_rank';
-  const mapped=[...subset].map((r,i)=>({r,i}));
+  const mapped=[...subset].map(r => ({r, i: runs.indexOf(r)})); // Mantener el ID global original
   const sorted=_sortRunObjs(mapped,sk);
   if(!sorted.length)return`<div class="empty">Sin lanzadas.</div>`;
   const bar=_sortBar(sk,[['score','Puntaje'],['date','Fecha']],'score');
@@ -2997,17 +3601,42 @@ function _rankingSection(subset,prefix){
   }).join('');
 }
 
-/* ── POR JUGADOR ── collapsible per player */
+/* ── VALIDADOR INTELIGENTE DE USUARIO ACTUAL ── */
+function _esElUsuarioActual(playerId) {
+  // Si no hay usuario logueado o es admin/superadmin/entrenador, mostramos a todos sin filtro
+  if (!usuarioActual || usuarioActual.rol !== 'jugador') return true; 
+  
+  const p = getPlayer(playerId);
+  if (!p) return false;
+  
+  // Validamos tanto por el username registrado como por el nombre en la parrilla
+  const matchUsername = (p.username === usuarioActual.username);
+  const matchNombre = (p.name === usuarioActual.nombre) || (p.name === usuarioActual.username);
+  
+  return matchUsername || matchNombre;
+}
+
+/* ── POR JUGADOR (Filtrado Estricto) ── collapsible per player */
 function _playersSection(subset,prefix){
   const pMap={};
-  players.forEach(p=>{pMap[p.id]={p,refs:[],scores:[]};});
-  subset.forEach((r,idx)=>{
+  players.forEach(p=>{
+    // Inicializar SOLAMENTE si es el usuario actual (o si es admin inicializa todos)
+    if (_esElUsuarioActual(p.id)) {
+      pMap[p.id]={p,refs:[],scores:[]};
+    }
+  });
+  
+  subset.forEach((r)=>{
+    const idx = runs.indexOf(r); // Mantener ID de ronda global
     const add=(pid,base,p1,p2)=>{
       let pairId=pid;
       if((!pairId||!getPair(pairId))&&p1&&p2){pairId=autoGetOrCreatePair(p1,p2);if(pairId)r[base+'PairId']=pairId;}
       const pr=getPair(pairId);if(!pr)return;
+      
       [pr.p1,pr.p2].filter(Boolean).forEach(id=>{
-        if(!pMap[id])return;
+        // Si el ID no está en pMap, fue filtrado arriba (es un rival/compañero, no el usuario actual)
+        if(!pMap[id]) return; 
+        
         pMap[id].refs.push({r,idx,base,pairName:pr.name});
         pMap[id].scores.push(Number(r.score));
       });
@@ -3015,9 +3644,12 @@ function _playersSection(subset,prefix){
     add(r.azulPairId,'azul',..._runBasePlayers(r,'azul'));
     add(r.rojaPairId,'roja',..._runBasePlayers(r,'roja'));
   });
+  
   const sk=prefix+'_play';
   const allPlay=_applySort(Object.values(pMap).filter(x=>x.scores.length>0),sk,'score');
-  if(!allPlay.length)return`<div class="empty">Sin datos de jugadores para este conjunto.</div>`;
+  
+  if(!allPlay.length) return `<div class="empty">Sin datos del jugador para este conjunto.</div>`;
+  
   const bar=_sortBar(sk,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas']],'score');
   return bar+allPlay.map(({p,refs,scores})=>{
     const bv=best(scores);const av=avg(scores);const tot=scores.reduce((a,b)=>a+b,0);
@@ -3058,37 +3690,49 @@ function _playersSection(subset,prefix){
   }).join('');
 }
 
-/* ── POR PAREJA ── collapsible per pair */
+/* ── POR PAREJA (Filtrado Estricto) ── collapsible per pair */
 function _pairsSection(subset,prefix){
   const pMap={};
-  // Seed with all known pairs (so empty pairs still show 0 if needed — but filtered later)
-  pairs.forEach(pr=>{pMap[pr.id]={pr,refs:[],scores:[]};});
-  subset.forEach((r,idx)=>{
+  pairs.forEach(pr=>{
+    // Inicializar SOLAMENTE si la pareja incluye al usuario actual (o si es admin)
+    if (_esElUsuarioActual(pr.p1) || _esElUsuarioActual(pr.p2)) {
+      pMap[pr.id]={pr,refs:[],scores:[]};
+    }
+  });
+  
+  subset.forEach((r)=>{
+    const idx = runs.indexOf(r); // Mantener ID global de ronda
     const add=(pid,p1,p2,base)=>{
       let key=pid;
-      // If no pairId but we have both players, auto-create pair on the fly
       if((!key || !pairs.find(p=>p.id===key)) && p1 && p2){
         key=autoGetOrCreatePair(p1,p2);
-        if(key){
-          // Persist the fix back onto the run
-          if(base==='azul') r.azulPairId=key; else r.rojaPairId=key;
-        }
+        if(key){ if(base==='azul') r.azulPairId=key; else r.rojaPairId=key; }
       }
       if(!key) return;
+      const pr = pairs.find(p=>p.id===key);
+      if(!pr) return;
+      
+      // Si la pareja no está en el mapa, es porque no incluye al usuario actual
       if(!pMap[key]){
-        const pr=pairs.find(p=>p.id===key);
-        if(!pr) return;
-        pMap[key]={pr,refs:[],scores:[]};
+        if (_esElUsuarioActual(pr.p1) || _esElUsuarioActual(pr.p2)) {
+           pMap[key]={pr,refs:[],scores:[]}; // En caso de que se haya auto-creado recién
+        } else {
+           return; // Ignorar pareja de rivales por completo
+        }
       }
+      
       pMap[key].refs.push({r,idx,base});
       pMap[key].scores.push(Number(r.score));
     };
     add(r.azulPairId, ..._runBasePlayers(r,'azul'), 'azul');
     add(r.rojaPairId, ..._runBasePlayers(r,'roja'), 'roja');
   });
+  
   const sk2=prefix+'_pair';
   const allPair=_applySort(Object.values(pMap).filter(x=>x.scores.length>0),sk2,'score');
-  if(!allPair.length)return`<div class="empty">Sin datos de parejas para este conjunto.</div>`;
+  
+  if(!allPair.length) return `<div class="empty">Sin datos de parejas para este conjunto.</div>`;
+  
   const bar=_sortBar(sk2,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas']],'score');
   return bar+allPair.map(({pr,refs,scores})=>{
     const bv=best(scores);const av=avg(scores);
@@ -3126,43 +3770,53 @@ function _pairsSection(subset,prefix){
   }).join('');
 }
 
-/* ── POR CUADRILLA ── */
-function _normStr(s){
-  return(s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-}
+/* ── POR CUADRILLA (Filtrado Estricto) ── */
+function _normStr(s){ return(s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); }
 function _bestName(names){
   if(!names.length)return'';
   const score=n=>{
-    let s=0;
-    s+=(n.match(/[áéíóúüñÁÉÍÓÚÜÑ]/g)||[]).length*2;
+    let s=0; s+=(n.match(/[áéíóúüñÁÉÍÓÚÜÑ]/g)||[]).length*2;
     if(n[0]&&n[0]===n[0].toUpperCase()&&n[0]!==n[0].toLowerCase())s+=1;
     return s;
   };
   return names.reduce((a,b)=>score(b)>score(a)?b:a);
 }
+
 function _cuadrillasSection(subset,prefix){
   const groups={};
-  subset.forEach((r,idx)=>{
+  subset.forEach((r)=>{
+    const idx = runs.indexOf(r);
     let az=r.azulPairId||'';let ro=r.rojaPairId||'';
     const [az1,az2]=_runBasePlayers(r,'azul');
     const [ro1,ro2]=_runBasePlayers(r,'roja');
     if((!az||!getPair(az))&&az1&&az2){az=autoGetOrCreatePair(az1,az2)||'';if(az)r.azulPairId=az;}
     if((!ro||!getPair(ro))&&ro1&&ro2){ro=autoGetOrCreatePair(ro1,ro2)||'';if(ro)r.rojaPairId=ro;}
     if(!az&&!ro)return;
+
+    // 🛑 FILTRO: Validar que el usuario actual se encuentre dentro de alguna de las parejas de la cuadrilla
+    const inAzul = _esElUsuarioActual(az1) || _esElUsuarioActual(az2);
+    const inRoja = _esElUsuarioActual(ro1) || _esElUsuarioActual(ro2);
+    
+    // Si el usuario logueado es Jugador y NO está en la cuadrilla en ninguna base, la ignoramos completamente
+    if (!inAzul && !inRoja && usuarioActual && usuarioActual.rol === 'jugador') return; 
+
     const cuaRaw=(r.cuadrillaName||'').trim();
     const normCua=_normStr(cuaRaw);
-    // Sort pair ids so Azul/Roja swap doesn't create two groups
     const pairKey=[az,ro].sort().join('||');
     const gkey=normCua?`n:${normCua}`:`p:${pairKey}`;
+    
     if(!groups[gkey])groups[gkey]={az,ro,names:[],refs:[],scores:[]};
     if(cuaRaw)groups[gkey].names.push(cuaRaw);
     groups[gkey].refs.push({r,idx});
     groups[gkey].scores.push(Number(r.score));
   });
+  
   const sk3=prefix+'_cua';
   const rawCua=Object.values(groups).map(g=>({...g,name:_bestName(g.names||[])||''}));
   const allCua=_applySort(rawCua,sk3,'score');
-  if(!allCua.length)return`<div class="empty">Sin cuadrillas registradas. Se necesitan rondas con al menos una pareja asignada.</div>`;
+  
+  if(!allCua.length) return `<div class="empty">Sin cuadrillas registradas para tu jugador.</div>`;
+  
   const bar3=_sortBar(sk3,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas'],['az','A–Z']],'score');
   return bar3+allCua.map(({az,ro,names,refs,scores},ci)=>{
     const ap=getPair(az);const rp=getPair(ro);
@@ -3207,10 +3861,11 @@ function _cuadrillasSection(subset,prefix){
   }).join('');
 }
 
-/* ── ENTRENAMIENTOS — solo runs de entrenamientos, sin sueltas ── */
+/* ── ENTRENAMIENTOS ── */
 function statsTrainings(){
-  const groups=trainings.map(t=>({t,sub:runs.filter(r=>r.trainingId===t.id)})).filter(x=>x.sub.length>0);
+  const groups=trainings.map(t=>({t,sub:runsFiltradas.filter(r=>r.trainingId===t.id)})).filter(x=>x.sub.length>0);
   if(!groups.length)return`<div class="empty">No hay rondas de entrenamiento guardadas.<br><span style="font-size:12px">Las rondas sueltas se ven en la pestaña "Rondas sueltas".</span></div>`;
+  
   return groups.map(({t,sub})=>{
     const sc=sub.map(r=>Number(r.score));
     const cur=statsTrainInner[t.id]||'rondas';
@@ -3220,7 +3875,8 @@ function statsTrainings(){
     else if(cur==='ranking')   innerBody=_rankingSection(sub,`ti_${t.id}`);
     else if(cur==='jugadores') innerBody=_playersSection(sub,`ti_${t.id}`);
     else if(cur==='parejas')   innerBody=_pairsSection(sub,`ti_${t.id}`);
-    else                        innerBody=_cuadrillasSection(sub,`ti_${t.id}`);
+    else                       innerBody=_cuadrillasSection(sub,`ti_${t.id}`);
+    
     return`<div class="card" style="margin-bottom:12px;padding:0;overflow:hidden">
       <div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface2);border-bottom:1px solid var(--border)" onclick="toggleOpen('${tKey}')">
         <div>
@@ -3237,16 +3893,14 @@ function statsTrainings(){
   }).join('');
 }
 
-/* ── POR RONDA (within a training) ── */
+/* ── POR RONDA (dentro de entrenamientos) ── */
 function _trainingRoundsSection(t,sub){
   if(!sub.length)return`<div class="empty">Sin lanzadas en este entrenamiento.</div>`;
-  // Build ordered list using training.rounds order, then append any extra runs
   const orderedRuns=[];
   t.rounds.forEach((r,i)=>{
     const run=sub.find(x=>x.trainingRoundId===r.id);
     if(run)orderedRuns.push({run,roundIdx:i,round:r});
   });
-  // Any runs not linked to a specific round
   sub.forEach(run=>{
     if(!orderedRuns.find(o=>o.run.id===run.id))orderedRuns.push({run,roundIdx:null,round:null});
   });
@@ -3300,7 +3954,7 @@ function _trainingRoundsSection(t,sub){
 }
 
 /* ═══════════════════════════════════════════
-   TAB: GRÁFICAS
+   TAB: GRÁFICAS (FILTRADO 100% POR JUGADOR/ADMIN)
 ═══════════════════════════════════════════ */
 function switchGraficasSub(t){graficasSubTab=t;render();}
 
@@ -3308,8 +3962,17 @@ function switchGraficasSub(t){graficasSubTab=t;render();}
 let grafOpen={};
 function toggleGraf(key){grafOpen[key]=!grafOpen[key];render();}
 
+/* ── VALIDADOR SEGURO ── */
+const checkEsUsuario = (id) => {
+  if (typeof _esElUsuarioActual === 'function') return _esElUsuarioActual(id);
+  if (!usuarioActual || usuarioActual.rol !== 'jugador') return true;
+  const p = getPlayer(id);
+  if (!p) return false;
+  return p.username === usuarioActual.username || p.name === usuarioActual.nombre || p.name === usuarioActual.username;
+};
+
 function renderGraficas(){
-  if(!runs.length)return`<div class="empty">Guarda lanzadas para ver gráficas.</div>`;
+  if(!runsFiltradas.length)return`<div class="empty">Guarda lanzadas para ver gráficas.</div>`;
   const nav=`<div class="sub-tabs">
     <button class="sub-tbtn ${graficasSubTab==='evolucion'?'active':''}" onclick="switchGraficasSub('evolucion')">Evolución</button>
     <button class="sub-tbtn ${graficasSubTab==='misiones'?'active':''}"  onclick="switchGraficasSub('misiones')">Por misión</button>
@@ -3319,6 +3982,7 @@ function renderGraficas(){
     <button class="sub-tbtn ${graficasSubTab==='cuadrillas'?'active':''}" onclick="switchGraficasSub('cuadrillas')">Por cuadrilla</button>
   </div>`;
   let html='';
+  
   if(graficasSubTab==='evolucion'){
     html=`
       <div class="card" style="margin-bottom:16px">
@@ -3327,12 +3991,10 @@ function renderGraficas(){
         <div style="position:relative;height:250px"><canvas id="gc_evol"></canvas></div>
       </div>`;
   } else if(graficasSubTab==='tendencia'){
-    const wd=runs.filter(r=>r.missions).sort((a,b)=>a.ts-b.ts);
+    const wd=runsFiltradas.filter(r=>r.missions).sort((a,b)=>a.ts-b.ts);
     if(!wd.length){
       html=`<div class="empty">Guarda rondas con datos de misiones para ver la tendencia.</div>`;
     } else {
-      // Build per-mission running average % over time
-      // Each mission gets a cumulative success rate line
       const mStats=MISSIONS.map((m,mi)=>{
         let acc=0,tot=0;
         const pts=wd.map(r=>{
@@ -3340,7 +4002,7 @@ function renderGraficas(){
           const s=mScoreFor(m,r.missions);
           const mx=mMaxScore(m);
           if(s>=mx) acc++;
-          else if(s>0) acc+=0.5; // partial counts half
+          else if(s>0) acc+=0.5;
           return Math.round((acc/tot)*100);
         });
         const lastPct=pts[pts.length-1]??0;
@@ -3350,7 +4012,6 @@ function renderGraficas(){
 
       const labels=wd.map(r=>fmtTs(r.ts));
 
-      // Mission selector checkboxes
       const selectorItems=mStats.map(({m,mi,lastPct,color})=>{
         const checked=!_tendenciaHidden.has(m.code);
         const pctCol=lastPct>=70?'var(--green-d)':lastPct>=40?'var(--amber)':'var(--red)';
@@ -3383,7 +4044,7 @@ function renderGraficas(){
         <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Verde = completa · Ámbar = parcial · Gris = falla · expande para ver evolución</div>
         <div style="position:relative;height:270px"><canvas id="gc_mis_bar"></canvas></div>
       </div>`;
-    const wd=runs.filter(r=>r.missions);
+    const wd=runsFiltradas.filter(r=>r.missions);
     MISSIONS.forEach((m,mi)=>{
       const key='gm_'+m.code;
       const isOpen=!!grafOpen[key];
@@ -3413,7 +4074,7 @@ function renderGraficas(){
     const tipo=graficasSubTab;
     const lbl=tipo==='jugadores'?'jugador':tipo==='parejas'?'pareja':'cuadrilla';
     const items=_buildItems(tipo);
-    if(!items.length){html=`<div class="empty">Sin datos de ${lbl}s.</div>`;}
+    if(!items.length){html=`<div class="empty">Sin datos de ${lbl}s para este usuario.</div>`;}
     else{
       html+=`
         <div class="card" style="margin-bottom:16px">
@@ -3466,6 +4127,17 @@ function renderGraficas(){
 /* ── Called after DOM is ready — draws all visible charts ── */
 let _activeCharts=[];
 let _tendenciaHidden=new Set(); // set of mission codes hidden in tendencia chart
+
+// Función dinámica para leer los colores CSS actuales vía JavaScript:
+function _getChartColors() {
+  const style = getComputedStyle(document.documentElement);
+  return {
+    txt: style.getPropertyValue('--text').trim() || '#1A2332',
+    tick: style.getPropertyValue('--text3').trim() || '#6B7E93',
+    grid: style.getPropertyValue('--border').trim() || 'rgba(14,31,53,0.06)'
+  };
+}
+
 function _tendenciaToggle(code){
   if(_tendenciaHidden.has(code)) _tendenciaHidden.delete(code);
   else _tendenciaHidden.add(code);
@@ -3479,15 +4151,17 @@ function _mkChart(id,cfg){
   cfg.options.maintainAspectRatio=false;
   const c=new Chart(el.getContext('2d'),cfg);_activeCharts.push(c);
 }
+
 const _PAL=['#0D6E8A','#F5A623','#00C2D4','#C0392B','#5A3A9A','#0D8A6A','#7A4800','#9A2878'];
-const _GRID='rgba(14,31,53,0.06)';const _TICK='#6B7E93';const _TXT='#1A2332';
+
 function _baseOpts(extra){
+  const colors = _getChartColors(); // Aplicando colores JS dinámicos
   return Object.assign({
     responsive:true,
     maintainAspectRatio:false,
     animation:{duration:500,easing:'easeInOutQuart'},
     plugins:{
-      legend:{labels:{color:_TXT,font:{size:12,family:'inherit'},padding:14},position:'bottom'},
+      legend:{labels:{color:colors.txt,font:{size:12,family:'inherit'},padding:14},position:'bottom'},
       tooltip:{backgroundColor:'rgba(22,33,26,0.92)',titleColor:'#fff',bodyColor:'rgba(255,255,255,0.78)',
         borderColor:'rgba(255,255,255,0.08)',borderWidth:1,cornerRadius:8,padding:10,
         titleFont:{size:13,weight:'bold'},bodyFont:{size:12}}
@@ -3498,19 +4172,23 @@ function _baseOpts(extra){
 function drawGraficas(){
   if(tab!=='graficas')return;
   _destroyCharts();
+  const colors = _getChartColors();
+
   if(graficasSubTab==='evolucion'){
-    const sorted=[...runs].sort((a,b)=>a.ts-b.ts);
+    const sorted=[...runsFiltradas].sort((a,b)=>a.ts-b.ts);
     const labels=sorted.map(r=>fmtTs(r.ts));
     const scores=sorted.map(r=>r.score);
     const avgs=scores.map((_,i)=>{const w=scores.slice(Math.max(0,i-9),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
+    
     _mkChart('gc_evol',{type:'line',data:{labels,datasets:[
-      {label:'Puntaje',data:scores,borderColor:'#0D6E8A',backgroundColor:'rgba(13,110,138,0.08)',tension:.4,pointRadius:5,pointBackgroundColor:'#fff',pointBorderColor:'#0D6E8A',pointBorderWidth:2.5,fill:true,borderWidth:2.5},
+      {label:'Puntaje',data:scores,borderColor:'#0D6E8A',backgroundColor:'rgba(13,110,138,0.15)',tension:.4,pointRadius:5,pointBackgroundColor:'#0D6E8A',pointBorderColor:'#fff',pointBorderWidth:2,fill:true,borderWidth:2.5},
       {label:'Promedio móvil (10)',data:avgs,borderColor:'#B85C00',borderDash:[6,4],tension:.4,pointRadius:0,fill:false,borderWidth:2}
     ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
-      scales:{y:{suggestedMin:0,max:545,ticks:{color:_TICK,font:{size:11}},grid:{color:_GRID},border:{display:false}},
-              x:{ticks:{color:_TICK,maxRotation:40,font:{size:10}},grid:{display:false},border:{display:false}}}})});
+      scales:{y:{suggestedMin:0,max:545,ticks:{color:colors.tick,font:{size:11}},grid:{color:colors.grid},border:{display:false}},
+              x:{ticks:{color:colors.tick,maxRotation:40,font:{size:10}},grid:{display:false},border:{display:false}}}})});
+  
   } else if(graficasSubTab==='tendencia'){
-    const wd=runs.filter(r=>r.missions).sort((a,b)=>a.ts-b.ts);
+    const wd=runsFiltradas.filter(r=>r.missions).sort((a,b)=>a.ts-b.ts);
     if(!wd.length) return;
     const labels=wd.map(r=>fmtTs(r.ts));
     const datasets=MISSIONS.map((m,mi)=>{
@@ -3530,25 +4208,26 @@ function drawGraficas(){
         data:pts,
         borderColor:col,
         backgroundColor:'transparent',
-        borderWidth:2.2,
-        pointRadius:wd.length<=15?4:2,
-        pointBackgroundColor:'#fff',
-        pointBorderColor:col,
+        borderWidth:2.5,
+        pointRadius:wd.length<=15?5:3,
+        pointBackgroundColor:col,
+        pointBorderColor:'#fff',
         pointBorderWidth:2,
         tension:0.35,
         fill:false
       };
     }).filter(Boolean);
+    
     if(!datasets.length) return;
     _mkChart('gc_tendencia',{type:'line',data:{labels,datasets},options:_baseOpts({
       interaction:{mode:'index',intersect:false},
       plugins:{
         legend:{
-          labels:{color:_TXT,font:{size:11,family:'inherit'},padding:10,
+          labels:{color:colors.txt,font:{size:11,family:'inherit'},padding:10,
             generateLabels(chart){
               return chart.data.datasets.map((ds,i)=>({
                 text:ds.label,fillStyle:ds.borderColor,strokeStyle:ds.borderColor,
-                lineWidth:2,hidden:false,datasetIndex:i,fontColor:_TXT
+                lineWidth:2,hidden:false,datasetIndex:i,fontColor:colors.txt
               }));
             }
           },
@@ -3563,31 +4242,33 @@ function drawGraficas(){
       },
       scales:{
         y:{min:0,max:100,
-          ticks:{color:_TICK,callback:v=>v+'%',font:{size:11}},
-          grid:{color:_GRID},border:{display:false},
-          title:{display:true,text:'% acierto acumulado',color:_TICK,font:{size:11}}
+          ticks:{color:colors.tick,callback:v=>v+'%',font:{size:11}},
+          grid:{color:colors.grid},border:{display:false},
+          title:{display:true,text:'% acierto acumulado',color:colors.tick,font:{size:11}}
         },
-        x:{ticks:{color:_TICK,maxRotation:40,font:{size:9}},grid:{display:false},border:{display:false}}
+        x:{ticks:{color:colors.tick,maxRotation:40,font:{size:9}},grid:{display:false},border:{display:false}}
       }
     })});
+  
   } else if(graficasSubTab==='misiones'){
-    const wd=runs.filter(r=>r.missions);if(!wd.length)return;
+    const wd=runsFiltradas.filter(r=>r.missions);if(!wd.length)return;
     const total=wd.length;
     const mData=MISSIONS.map(m=>{
       let su=0,pa=0;
       wd.forEach(r=>{const pts=mScoreFor(m,r.missions);const mx=mMaxScore(m);if(pts>=mx)su++;else if(pts>0)pa++;});
       return{code:m.code,s:Math.round(su/total*100),p:Math.round(pa/total*100),f:Math.round((total-su-pa)/total*100)};
     });
+    
     _mkChart('gc_mis_bar',{type:'bar',data:{labels:mData.map(x=>x.code),datasets:[
       {label:'✓ Completa',data:mData.map(x=>x.s),backgroundColor:'#2A6F38',stack:'s',borderRadius:0},
       {label:'◑ Parcial', data:mData.map(x=>x.p),backgroundColor:'#B85C00',stack:'s',borderRadius:0},
       {label:'✗ Falla',   data:mData.map(x=>x.f),backgroundColor:'#DEDAD2',stack:'s',borderRadius:{topLeft:4,topRight:4}}
     ]},options:_baseOpts({
-      scales:{x:{stacked:true,ticks:{color:_TICK,font:{size:10}},grid:{display:false},border:{display:false}},
-              y:{stacked:true,max:100,ticks:{color:_TICK,callback:v=>v+'%',font:{size:11}},grid:{color:_GRID},border:{display:false}}},
-      plugins:{legend:{labels:{color:_TXT,font:{size:11}},position:'bottom'},
+      scales:{x:{stacked:true,ticks:{color:colors.tick,font:{size:10}},grid:{display:false},border:{display:false}},
+              y:{stacked:true,max:100,ticks:{color:colors.tick,callback:v=>v+'%',font:{size:11}},grid:{color:colors.grid},border:{display:false}}},
+      plugins:{legend:{labels:{color:colors.txt,font:{size:11}},position:'bottom'},
                tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw+'%'}}}})});
-    // Draw open mission charts
+    
     MISSIONS.forEach((m,mi)=>{
       if(!grafOpen['gm_'+m.code])return;
       const wdS=wd.slice().sort((a,b)=>a.ts-b.ts);
@@ -3603,13 +4284,14 @@ function drawGraficas(){
         fpct.push(Math.round((tot2-suAcc-paAcc)/tot2*100));
       });
       _mkChart('gc_m_'+mi,{type:'line',data:{labels:lbs,datasets:[
-        {label:'Completa %',data:spct,borderColor:'#3B6D11',backgroundColor:'rgba(59,109,17,.08)',tension:.3,pointRadius:3,fill:true},
-        {label:'Parcial %', data:ppct,borderColor:'#854F0B',backgroundColor:'transparent',tension:.3,pointRadius:3,borderDash:[3,2],fill:false},
-        {label:'Falla %',   data:fpct,borderColor:'#A32D2D',backgroundColor:'transparent',tension:.3,pointRadius:3,borderDash:[5,3],fill:false}
+        {label:'Completa %',data:spct,borderColor:'#3B6D11',backgroundColor:'rgba(59,109,17,.15)',tension:.3,pointRadius:4,pointBackgroundColor:'#3B6D11',pointBorderColor:'#fff',fill:true},
+        {label:'Parcial %', data:ppct,borderColor:'#854F0B',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#854F0B',pointBorderColor:'#fff',borderDash:[3,2],fill:false},
+        {label:'Falla %',   data:fpct,borderColor:'#A32D2D',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#A32D2D',pointBorderColor:'#fff',borderDash:[5,3],fill:false}
       ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
-        scales:{y:{min:0,max:100,ticks:{color:_TICK,callback:v=>v+'%'},grid:{color:_GRID}},
-                x:{ticks:{color:_TICK,maxRotation:45,font:{size:9}},grid:{display:false}}}})});
+        scales:{y:{min:0,max:100,ticks:{color:colors.tick,callback:v=>v+'%'},grid:{color:colors.grid}},
+                x:{ticks:{color:colors.tick,maxRotation:45,font:{size:9}},grid:{display:false}}}})});
     });
+  
   } else {
     const tipo=graficasSubTab;
     const items=_buildItems(tipo);if(!items.length)return;
@@ -3618,13 +4300,14 @@ function drawGraficas(){
     const avgsV=items.map(x=>Math.round(x.scores.reduce((a,b)=>a+b,0)/x.scores.length));
     const cols=items.map((_,i)=>_PAL[i%_PAL.length]);
     const colsA=items.map((_,i)=>_PAL[i%_PAL.length]+'99');
+    
     _mkChart('gc_ent_bar',{type:'bar',data:{labels:lbls,datasets:[
       {label:'🏆 Mejor',   data:bests,backgroundColor:cols,borderRadius:6,borderSkipped:false},
       {label:'⊘ Promedio',data:avgsV,backgroundColor:colsA,borderRadius:6,borderSkipped:false}
     ]},options:_baseOpts({
-      scales:{y:{suggestedMin:0,max:545,ticks:{color:_TICK,font:{size:11}},grid:{color:_GRID},border:{display:false}},
-              x:{ticks:{color:_TICK,font:{size:11}},grid:{display:false},border:{display:false}}}})});
-    // Draw open entity charts
+      scales:{y:{suggestedMin:0,max:545,ticks:{color:colors.tick,font:{size:11}},grid:{color:colors.grid},border:{display:false}},
+              x:{ticks:{color:colors.tick,font:{size:11}},grid:{display:false},border:{display:false}}}})});
+    
     items.forEach((item,ei)=>{
       if(!grafOpen['ge_'+tipo+'_'+ei])return;
       const eRuns=_entityRuns(tipo,item).sort((a,b)=>a.ts-b.ts);
@@ -3633,22 +4316,25 @@ function drawGraficas(){
       const sc=eRuns.map(r=>r.score);
       const avgL=sc.map((_,i)=>{const w=sc.slice(Math.max(0,i-9),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
       const col=_PAL[ei%_PAL.length];
+      
       _mkChart('gc_ent_'+ei,{type:'line',data:{labels:lbs,datasets:[
-        {label:'Puntaje',data:sc,borderColor:col,backgroundColor:col+'22',tension:.3,pointRadius:4,fill:true},
+        {label:'Puntaje',data:sc,borderColor:col,backgroundColor:col+'22',tension:.3,pointRadius:5,pointBackgroundColor:col,pointBorderColor:'#fff',fill:true},
         {label:'Promedio móvil (10)',data:avgL,borderColor:'#854F0B',borderDash:[5,3],tension:.4,pointRadius:0,fill:false}
       ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
-        scales:{y:{beginAtZero:true,max:545,ticks:{color:_TICK},grid:{color:_GRID}},
-                x:{ticks:{color:_TICK,maxRotation:45,font:{size:9}},grid:{display:false}}}})});
+        scales:{y:{beginAtZero:true,max:545,ticks:{color:colors.tick},grid:{color:colors.grid}},
+                x:{ticks:{color:colors.tick,maxRotation:45,font:{size:9}},grid:{display:false}}}})});
     });
   }
 }
 
+/* ── BUILD ITEMS (CON FILTRADO ESTRICTO DE USUARIO) ── */
 function _buildItems(tipo){
   const items=[];
   if(tipo==='jugadores'){
     players.forEach(p=>{
+      if (!checkEsUsuario(p.id)) return; // <-- FILTRO ESTRICTO AL USUARIO
       const sc=[];
-      runs.forEach(r=>{
+      runsFiltradas.forEach(r=>{
         const add=pid=>{const pr=getPair(pid);if(pr&&(pr.p1===p.id||pr.p2===p.id))sc.push(r.score);};
         add(r.azulPairId);add(r.rojaPairId);
       });
@@ -3656,12 +4342,21 @@ function _buildItems(tipo){
     });
   } else if(tipo==='parejas'){
     pairs.forEach(pr=>{
-      const sc=runs.filter(r=>r.azulPairId===pr.id||r.rojaPairId===pr.id).map(r=>r.score);
+      if (!checkEsUsuario(pr.p1) && !checkEsUsuario(pr.p2)) return; // <-- FILTRO ESTRICTO A PAREJAS DEL USUARIO
+      const sc=runsFiltradas.filter(r=>r.azulPairId===pr.id||r.rojaPairId===pr.id).map(r=>r.score);
       if(sc.length)items.push({name:pr.name,id:pr.id,scores:sc});
     });
   } else {
     const groups={};
-    runs.forEach(r=>{
+    runsFiltradas.forEach(r=>{
+      const az = getPair(r.azulPairId);
+      const ro = getPair(r.rojaPairId);
+      
+      // Validar si el usuario actual está en esta cuadrilla (para jugadores)
+      const inAzul = az && (checkEsUsuario(az.p1) || checkEsUsuario(az.p2));
+      const inRoja = ro && (checkEsUsuario(ro.p1) || checkEsUsuario(ro.p2));
+      if (!inAzul && !inRoja && usuarioActual && usuarioActual.rol === 'jugador') return; // <-- FILTRO ESTRICTO
+
       const cuaRaw=(r.cuadrillaName||'').trim();
       const norm=_normStr(cuaRaw);
       const pk=[r.azulPairId||'',r.rojaPairId||''].sort().join('||');
@@ -3680,16 +4375,16 @@ function _entityRuns(tipo,item){
   if(tipo==='jugadores'){
     const p=players.find(x=>x.id===item.id||x.name===item.name);
     if(!p)return[];
-    return runs.filter(r=>{
+    return runsFiltradas.filter(r=>{
       const az=getPair(r.azulPairId);const ro=getPair(r.rojaPairId);
       return(az&&(az.p1===p.id||az.p2===p.id))||(ro&&(ro.p1===p.id||ro.p2===p.id));
     });
   } else if(tipo==='parejas'){
     const pr=pairs.find(x=>x.id===item.id||x.name===item.name);
     if(!pr)return[];
-    return runs.filter(r=>r.azulPairId===pr.id||r.rojaPairId===pr.id);
+    return runsFiltradas.filter(r=>r.azulPairId===pr.id||r.rojaPairId===pr.id);
   } else {
-    return runs.filter(r=>{
+    return runsFiltradas.filter(r=>{
       const cuaRaw=(r.cuadrillaName||'').trim();
       const norm=_normStr(cuaRaw);
       return norm===item.norm||(!cuaRaw&&[r.azulPairId||'',r.rojaPairId||''].sort().join('||')===item.pk);
@@ -3698,133 +4393,803 @@ function _entityRuns(tipo,item){
 }
 
 
-/* ═══════════════════════════════════════════
-   TAB: EFECTIVIDAD
-═══════════════════════════════════════════ */
-function renderEfectividad(){
-  const wd=runs.filter(r=>r.missions);
-  if(!wd.length)return`<div class="empty">Guarda rondas con datos de misiones para ver efectividad.</div>`;
-  const nav=`<div class="sub-tabs">
-    <button class="sub-tbtn ${effSubTab==='global'?'active':''}"           onclick="switchEffSub('global')">Global</button>
-    <button class="sub-tbtn ${effSubTab==='por-entrenamiento'?'active':''}" onclick="switchEffSub('por-entrenamiento')">Por entrenamiento</button>
-  </div>`;
-  return nav+(effSubTab==='global'?effTable(wd,'Resumen global'):effByTraining());
+/* ════════════════════════════════════════════════════════════
+   MODULO COMPLETO DE EFECTIVIDAD (ADAPTADO A JUGADOR/ADMIN Y TEMAS VISUALES)
+════════════════════════════════════════════════════════════ */
+
+// Variables de estado interno
+let misionesSubTab = 'global';
+let effSortBy = 'morder_asc'; // <-- Empezamos ordenando M01 -> M15 por defecto
+let lanzadaDetalleTab = 'estadisticas';
+
+let jugadorDetalle = null;
+let jugadorDetalleTab = 'base';
+
+let parejaDetalle = null;
+let parejaDetalleTab = 'base';
+
+let showLanzadaForm = false;
+let editandoLanzadaId = null;
+
+let lanzadasConfiguradas = JSON.parse(localStorage.getItem('stat_lanzadas') || '[]');
+function saveLanzadas() { localStorage.setItem('stat_lanzadas', JSON.stringify(lanzadasConfiguradas)); }
+
+// Paleta de colores Hexadecimales (Evita que las gráficas se pongan negras)
+const CHART_PALETTE = ['#10B981', '#F59E0B', '#3B82F6', '#EC4899', '#8B5CF6', '#F43F5E', '#14B8A6', '#EAB308'];
+
+// Validación segura de Administrador
+const esAdminActual = () => (typeof usuarioActual !== 'undefined' && usuarioActual && (usuarioActual.rol === 'admin' || usuarioActual.rol === 'superadmin'));
+
+// Función dinámica para leer colores seguros para la rejilla de gráficas
+function _getChartColors() {
+  const style = getComputedStyle(document.documentElement);
+  return {
+    txt: style.getPropertyValue('--text').trim() || '#1A2332',
+    tick: style.getPropertyValue('--text3').trim() || '#6B7E93',
+    grid: style.getPropertyValue('--border').trim() || 'rgba(14,31,53,0.06)'
+  };
 }
 
-/* Max possible score for a mission */
-function effTable(subset,label){
-  if(!subset.length)return`<div style="color:var(--text3);font-size:13px">Sin datos</div>`;
-  const total=subset.length;
+// Función genérica para dibujar gráficas (Chart.js)
+function dibujarGrafica(canvasId, type, labels, data, colorHex, labelText, customTooltips = null, customColorsHex = null) {
+  setTimeout(() => {
+    try {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      if (window['chart_' + canvasId]) window['chart_' + canvasId].destroy();
+      
+      const chartColors = _getChartColors();
+      let tooltipOptions = {
+        backgroundColor:'rgba(22,33,26,0.95)', titleColor:'#fff', bodyColor:'rgba(255,255,255,0.8)',
+        borderColor:'rgba(255,255,255,0.1)', borderWidth:1, cornerRadius:8, padding:10,
+        titleFont:{size:13, weight:'bold'}, bodyFont:{size:12}
+      };
 
-  const mStats=MISSIONS.map(m=>{
-    const maxPts=mMaxScore(m);
-    const hasCounter=m.params.some(p=>p.type==='counter'||p.type==='token');
-    let full=0,partial=0,fail=0;
-    const failRounds=[],partialRounds=[];
-    subset.forEach((r,i)=>{
-      const pts=mScoreFor(m,r.missions);
-      const lbl=runLabel(r,i);
-      if(pts<=0){fail++;failRounds.push(lbl);}
-      else if(hasCounter && pts<maxPts){partial++;partialRounds.push({lbl,pts,maxPts});}
-      else{full++;}
+      if (customTooltips) {
+        tooltipOptions.callbacks = {
+          label: function(ctx) { return labelText + ': ' + ctx.raw + (labelText.includes('%') ? '%' : ' pts'); },
+          afterBody: function(ctx) { return customTooltips[ctx[0].dataIndex] || []; }
+        };
+      } else {
+        tooltipOptions.callbacks = {
+          label: function(ctx) { return labelText + ': ' + ctx.raw + (labelText.includes('%') ? '%' : ''); }
+        };
+      }
+
+      window['chart_' + canvasId] = new Chart(ctx, {
+        type: type,
+        data: {
+          labels: labels,
+          datasets: [{
+            label: labelText,
+            data: data,
+            borderColor: type === 'line' ? colorHex : (customColorsHex || colorHex),
+            backgroundColor: type === 'line' ? colorHex + '33' : (customColorsHex || colorHex), 
+            borderWidth: type === 'line' ? 2.5 : 0,
+            pointRadius: type === 'line' ? 4 : 0,
+            pointBackgroundColor: colorHex,
+            pointBorderColor: '#fff',
+            pointBorderWidth: 1.5,
+            fill: type === 'line',
+            tension: 0.3,
+            borderRadius: type === 'bar' ? 4 : 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 500 },
+          plugins: { legend: { display: false }, tooltip: tooltipOptions },
+          scales: {
+            y: { beginAtZero: true, grid: { color: chartColors.grid }, ticks: { color: chartColors.tick, font:{size:11} }, border:{display:false} },
+            x: { grid: { display: false }, ticks: { color: chartColors.tick, font:{size:10} }, border:{display:false} }
+          }
+        }
+      });
+    } catch(e) { console.error('Error cargando gráfica:', e); }
+  }, 100);
+}
+
+/* ── 1. ENRUTADOR PRINCIPAL DE EFECTIVIDAD ── */
+function renderEfectividad() {
+  if (showLanzadaForm && esAdminActual()) return renderLanzadaForm();
+  if (lanzadaDetalle) return renderSubPaginaLanzada(runsFiltradas, lanzadaDetalle);
+  if (jugadorDetalle) return renderSubPaginaJugador(runsFiltradas, jugadorDetalle);
+  if (parejaDetalle) return renderSubPaginaPareja(runsFiltradas, parejaDetalle);
+  
+  if (!['misiones', 'estrategia', 'jugadores', 'parejas'].includes(effSubTab)) effSubTab = 'misiones';
+  
+  const bgActive = (t) => effSubTab === t ? 'var(--navy)' : 'var(--surface)';
+  const txtActive = (t) => effSubTab === t ? '#fff' : 'var(--text3)';
+  const brdActive = (t) => effSubTab === t ? 'var(--navy)' : 'var(--border2)';
+
+  return `
+    <div style="animation: fadeIn 0.3s ease;">
+      <div style="display:flex; gap:6px; margin-bottom:20px; overflow-x:auto; padding-bottom:5px;">
+        <button onclick="effSubTab='misiones'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${brdActive('misiones')}; font-weight:800; cursor:pointer; background:${bgActive('misiones')}; color:${txtActive('misiones')}; transition:var(--transition); box-shadow:var(--shadow-xs);">MISIONES</button>
+        <button onclick="effSubTab='estrategia'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${brdActive('estrategia')}; font-weight:800; cursor:pointer; background:${bgActive('estrategia')}; color:${txtActive('estrategia')}; transition:var(--transition); box-shadow:var(--shadow-xs);">ESTRATEGIA</button>
+        <button onclick="effSubTab='jugadores'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${brdActive('jugadores')}; font-weight:800; cursor:pointer; background:${bgActive('jugadores')}; color:${txtActive('jugadores')}; transition:var(--transition); box-shadow:var(--shadow-xs);">JUGADORES</button>
+        <button onclick="effSubTab='parejas'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${brdActive('parejas')}; font-weight:800; cursor:pointer; background:${bgActive('parejas')}; color:${txtActive('parejas')}; transition:var(--transition); box-shadow:var(--shadow-xs);">PAREJAS</button>
+      </div>
+      <div id="efectividad-content">
+        ${effSubTab === 'misiones' ? renderEfectividadMisiones() : 
+          effSubTab === 'estrategia' ? renderEfectividadEstrategia(runsFiltradas) : 
+          effSubTab === 'jugadores' ? renderEfectividadJugadores(runsFiltradas) : 
+          renderEfectividadParejas(runsFiltradas)}
+      </div>
+    </div>
+  `;
+}
+
+/* ── 2. PESTAÑA: MISIONES ── */
+function renderEfectividadMisiones() {
+  const bgActive = (t) => misionesSubTab === t ? 'var(--cyan)' : 'var(--surface2)';
+  const txtActive = (t) => misionesSubTab === t ? 'var(--navy)' : 'var(--text3)';
+  const brdActive = (t) => misionesSubTab === t ? 'var(--cyan)' : 'var(--border2)';
+
+  return `
+    <div style="animation: fadeIn 0.3s ease;">
+      <div style="display:flex; gap:5px; margin-bottom:15px; background:var(--surface); padding:8px; border-radius:var(--r); overflow-x:auto; border:2px solid var(--navy); box-shadow:var(--shadow-sm);">
+        <button onclick="misionesSubTab='global'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('global')}; font-weight:800; cursor:pointer; background:${bgActive('global')}; color:${txtActive('global')}; font-size:12px; transition:var(--transition);">GLOBAL</button>
+        <button onclick="misionesSubTab='sueltas'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('sueltas')}; font-weight:800; cursor:pointer; background:${bgActive('sueltas')}; color:${txtActive('sueltas')}; font-size:12px; transition:var(--transition);">SUELTAS</button>
+        <button onclick="misionesSubTab='entrenamientos'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('entrenamientos')}; font-weight:800; cursor:pointer; background:${bgActive('entrenamientos')}; color:${txtActive('entrenamientos')}; font-size:12px; transition:var(--transition);">ENTRENAMIENTOS</button>
+      </div>
+      <div>
+        ${misionesSubTab === 'global' ? effTable(runsFiltradas, 'Efectividad Global de Misiones') : ''}
+        ${misionesSubTab === 'sueltas' ? effBySueltas() : ''}
+        ${misionesSubTab === 'entrenamientos' ? effByTraining() : ''}
+      </div>
+    </div>
+  `;
+}
+
+function effBySueltas() { const loose = runsFiltradas.filter(r => !r.trainingId && r.missions); return loose.length ? effTable(loose, 'Lanzadas Sueltas') : `<div class="empty">No hay lanzadas sueltas registradas.</div>`; }
+function effByTraining(){
+  const groups=[]; trainings.forEach(t=>{ const sub=runsFiltradas.filter(r=>r.trainingId===t.id&&r.missions); if(sub.length)groups.push({label:t.name,sub}); });
+  if(!groups.length)return`<div class="empty">No hay datos suficientes de entrenamientos.</div>`;
+  return groups.map(({label,sub})=>`<div style="font-size:16px;font-weight:900; color:var(--navy); margin-bottom:8px;margin-top:20px;display:flex;align-items:center;gap:10px">${label}<span style="flex:1;height:2px;background:var(--border); display:inline-block"></span></div>${effTable(sub,label)}`).join('');
+}
+
+function effTable(subset, label, customTargets = null){
+  if(!subset.length) return `<div class="empty">Sin datos registrados.</div>`;
+  const total = subset.length;
+  const missionsToAnalyze = customTargets ? Object.keys(customTargets).map(code => MISSIONS.find(m => m.code === code)).filter(m => m) : MISSIONS;
+
+  let mStats = missionsToAnalyze.map(m => {
+    const maxPts = customTargets ? customTargets[m.code] : mMaxScore(m);
+    let full = 0, partial = 0, fail = 0; const fullRounds = [], partialRounds = [], failRounds = [];
+    
+    subset.forEach((r, i) => {
+      let pts = mScoreFor(m, r.missions);
+      if(customTargets) pts = Math.min(pts, maxPts); 
+      const lbl = runLabel(r, runs.indexOf(r)); 
+      
+      if(pts <= 0) { fail++; failRounds.push(lbl); }
+      else if(pts < maxPts) { partial++; partialRounds.push({lbl, pts, maxPts}); }
+      else { full++; fullRounds.push(lbl); }
     });
-    const pctFull=Math.round((full/total)*100);
-    const pctPartial=Math.round((partial/total)*100);
-    const pctAny=Math.round(((full+partial)/total)*100);
-    return{code:m.code,name:m.name,amber:m.amber||false,
-      full,partial,fail,total,maxPts,hasCounter,
-      pctFull,pctPartial,pctAny,
-      failRounds,partialRounds};
-  }).sort((a,b)=>{
-    const ec=_getSort('eff_missions','score_asc');
-    if(ec.by==='morder'){const mo=x=>x.code==='INS'?-1:x.code==='FP'?999:parseInt(x.code.replace('M',''))||0;return ec.dir==='asc'?mo(a)-mo(b):mo(b)-mo(a);}
-    if(ec.by==='score_asc'||(ec.by==='score'&&ec.dir==='asc'))return a.pctAny-b.pctAny;
-    return b.pctAny-a.pctAny; // score_desc / mayor→menor
+    
+    const pctFull = Math.round((full / total) * 100) || 0;
+    const pctPartial = Math.round((partial / total) * 100) || 0;
+    const pctFail = Math.round((fail / total) * 100) || 0;
+    const pctAny = pctFull + pctPartial;
+    
+    return { code: m.code, name: m.name, full, partial, fail, total, maxPts, pctFull, pctPartial, pctFail, pctAny, fullRounds, partialRounds, failRounds };
   });
 
-  if(!mStats.length)return`<div class="empty">Sin datos.</div>`;
-  const best2=mStats.reduce((a,x)=>a.pctFull>x.pctFull?a:x);
-  const worst=mStats.reduce((a,x)=>a.pctAny<x.pctAny?a:x);
+  // 🛑 LÓGICA DE ORDENAMIENTO REPARADA (M01->M15 y M15->M01)
+  mStats.sort((a, b) => {
+    if(effSortBy.startsWith('morder')) { 
+      const mo = x => x.code === 'INS' ? -1 : x.code === 'FP' ? 999 : parseInt(x.code.replace('M', '')) || 0; 
+      return effSortBy === 'morder_desc' ? mo(b) - mo(a) : mo(a) - mo(b); 
+    }
+    return effSortBy === 'score_asc' ? a.pctAny - b.pctAny : b.pctAny - a.pctAny;
+  });
 
-  const summary=`<div class="metric-grid" style="margin-bottom:14px">
-    <div class="metric-box"><div class="lbl">Rondas analizadas</div><div class="val">${total}</div></div>
-    <div class="metric-box"><div class="lbl">Más exitosa</div>
-      <div style="font-family:inherit;font-size:16px;font-weight:700;color:var(--green)">${best2.code}</div>
-      <div style="font-size:11px;color:var(--text3)">${best2.pctFull}% completa</div></div>
-    <div class="metric-box"><div class="lbl">Más fallida</div>
-      <div style="font-family:inherit;font-size:16px;font-weight:700;color:var(--red)">${worst.code}</div>
-      <div style="font-size:11px;color:var(--text3)">${worst.pctAny}% lograda</div></div>
+  if(!mStats.length) return `<div class="empty">Sin misiones para analizar.</div>`;
+  const best2 = mStats.reduce((a, x) => a.pctFull > x.pctFull ? a : x);
+  const worst = mStats.reduce((a, x) => a.pctAny < x.pctAny ? a : x);
+
+  const summary = `<div class="metric-grid" style="margin-bottom:14px; display:flex; gap:10px;">
+    <div class="metric-box" style="flex:1;"><div class="lbl">RONDAS</div><div class="val">${total}</div></div>
+    <div class="metric-box" style="flex:1;"><div class="lbl">MÁS EXITOSA</div><div class="val good" style="font-size:16px;">${best2.code}</div><div style="font-size:10px; color:var(--text3);">${best2.pctFull}% completa</div></div>
+    <div class="metric-box" style="flex:1;"><div class="lbl">MÁS FALLIDA</div><div class="val" style="font-size:16px; color:var(--red);">${worst.code}</div><div style="font-size:10px; color:var(--text3);">${worst.pctAny}% lograda</div></div>
   </div>`;
 
-  const cards=mStats.map(ms=>{
-    // Color based on full completion rate
-    const col=ms.pctFull>=80?'#2A6F38':ms.pctFull>=50?'#B85C00':'#B83030';
-    const pCol=ms.pctFull>=80?'var(--green-d)':ms.pctFull>=50?'var(--amber)':'var(--red)';
-    // Dual bar: green=full, amber=partial
-    const barFull=ms.pctFull;
-    const barPartial=Math.min(ms.pctPartial, 100-barFull);
-    return`<div class="eff-card">
-      <div class="eff-hdr">
-        <span class="mcode${ms.amber?' am':''}" style="font-size:12px">${ms.code}</span>
-        <span class="eff-title">${ms.name}</span>
-        <div style="text-align:right;flex-shrink:0">
-          <span class="eff-pct" style="color:${pCol}">${ms.pctFull}%</span>
-          ${ms.hasCounter&&ms.pctPartial>0?`<div style="font-size:10px;color:var(--amber);font-weight:700">+${ms.pctPartial}% parcial</div>`:''}
+  const cards = mStats.map(ms => {
+    const col = ms.pctFull >= 80 ? 'var(--green)' : ms.pctFull >= 50 ? 'var(--amber)' : 'var(--red)';
+    return `
+    <div class="card" style="padding:12px; margin-bottom:10px; display:block;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+           <span class="mcode${ms.amber?' am':''}">${ms.code}</span>
+           <span class="mtitle">${ms.name}</span>
+        </div>
+        <div style="text-align:right;">
+          <span class="mpts" style="color:${col}; font-size:16px;">${ms.pctFull}%</span>
+          ${ms.pctPartial > 0 ? `<div style="font-size:10px; color:var(--amber); font-weight:900;">+${ms.pctPartial}% parcial</div>` : ''}
         </div>
       </div>
-      <div class="eff-bar-bg" style="position:relative">
-        <div class="eff-bar" style="width:${barFull}%;background:${col};position:absolute;left:0;top:0;height:100%;border-radius:4px;z-index:2"></div>
-        ${barPartial>0?`<div style="width:${barFull+barPartial}%;background:var(--amber);position:absolute;left:0;top:0;height:100%;border-radius:4px;z-index:1"></div>`:''}
+      
+      <div style="display:flex; height:10px; border-radius:var(--rss); overflow:hidden; background:var(--surface3); border:1.5px solid var(--border); margin-bottom:8px;">
+        ${ms.pctFull > 0 ? `<div style="width:${ms.pctFull}%; background:var(--green);"></div>` : ''}
+        ${ms.pctPartial > 0 ? `<div style="width:${ms.pctPartial}%; background:var(--amber);"></div>` : ''}
+        ${ms.pctFail > 0 ? `<div style="width:${ms.pctFail}%; background:var(--red);"></div>` : ''}
       </div>
-      <div class="eff-stats" style="margin-top:6px">
-        <div><span style="color:var(--green);font-weight:700">${ms.full}</span> completa${ms.full!==1?'s':''}</div>
-        ${ms.hasCounter&&ms.partial>0?`<div><span style="color:var(--amber);font-weight:700">${ms.partial}</span> parcial${ms.partial!==1?'es':''}</div>`:''}
-        <div><span style="color:var(--red);font-weight:700">${ms.fail}</span> fallida${ms.fail!==1?'s':''}</div>
-        <div>de <span style="font-weight:700">${total}</span> ronda${total!==1?'s':''}</div>
+      
+      <div style="display:flex; gap:10px; font-size:11px; color:var(--text3); margin-bottom:8px; font-weight:600;">
+        <div><span style="color:var(--green); font-weight:800;">${ms.full}</span> completas</div>
+        ${ms.partial > 0 ? `<div><span style="color:var(--amber); font-weight:800;">${ms.partial}</span> parciales</div>` : ''}
+        <div><span style="color:var(--red); font-weight:800;">${ms.fail}</span> fallidas</div>
       </div>
-      ${ms.partialRounds.length>0?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-        <div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:4px">COMPLETADAS PARCIALMENTE:</div>
-        <div>${ms.partialRounds.map(x=>`<span class="fail-chip" style="background:var(--amber-l);color:var(--amber);border-color:#F5C4A3">${x.lbl} (${x.pts}/${x.maxPts} pts)</span>`).join('')}</div>
-      </div>`:''}
-      ${ms.failRounds.length>0?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px">FALLÓ COMPLETAMENTE EN:</div>
-        <div>${ms.failRounds.map(rl=>`<span class="fail-chip">${rl}</span>`).join('')}</div>
-      </div>`:''}
+      
+      ${ms.fullRounds.length > 0 ? `
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
+        <div style="font-size:10px; font-weight:800; color:var(--green); margin-bottom:4px;">COMPLETADAS AL 100% EN:</div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.fullRounds.map(rl => `<span class="tag tag-green">${rl}</span>`).join('')}</div>
+      </div>` : ''}
+      
+      ${ms.partialRounds.length > 0 ? `
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
+        <div style="font-size:10px; font-weight:800; color:var(--amber); margin-bottom:4px;">COMPLETADAS PARCIALMENTE:</div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.partialRounds.map(x => `<span style="background:var(--amber-l); color:var(--amber); border:1.5px solid var(--amber-b); padding:2px 7px; border-radius:var(--rss); font-size:0.7rem; font-weight:700;">${x.lbl} (${x.pts}/${x.maxPts})</span>`).join('')}</div>
+      </div>` : ''}
+      
+      ${ms.failRounds.length > 0 ? `
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
+        <div style="font-size:10px; font-weight:800; color:var(--red); margin-bottom:4px;">FALLÓ COMPLETAMENTE EN:</div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.failRounds.map(rl => `<span class="fail-chip">${rl}</span>`).join('')}</div>
+      </div>` : ''}
     </div>`;
   }).join('');
-  // Unified eff sort: one toggle for efectividad (asc↔desc), one for mission order
-  const _ec=_getSort('eff_missions','score_asc');
-  const _nextEff=_ec.by==='score_asc'?'score_desc':_ec.by==='score_desc'?'score_asc':'score_asc';
-  const _effBtnLabel=_ec.by==='morder'?'Efectividad':(_ec.by==='score_asc'?'Efect. ↑ menor':'Efect. ↓ mayor');
-  const _mBtnLabel=_ec.by==='morder'?'M01→M15 ↓':'M01→M15';
-  const effBar='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;align-items:center">'+
-    '<span style="font-size:11px;color:var(--text3);font-weight:600;margin-right:2px">Ordenar:</span>'+
-    '<button onclick="_statSort[\'eff_missions\']={by:\''+(_ec.by==='score_asc'?'score_desc':'score_asc')+'\',dir:\'asc\'};render()" '+
-      'style="padding:3px 10px;font-size:11px;font-weight:700;border:1.5px solid '+(_ec.by!=='morder'?'var(--teal)':'var(--border2)')+';border-radius:12px;background:'+(_ec.by!=='morder'?'var(--teal)':'var(--surface2)')+';color:'+(_ec.by!=='morder'?'#fff':'var(--text2)')+';cursor:pointer">'+_effBtnLabel+'</button>'+
-    '<button onclick="_statSort[\'eff_missions\']={by:\''+(_ec.by==='morder'?'score_asc':'morder')+'\',dir:\'asc\'};render()" '+
-      'style="padding:3px 10px;font-size:11px;font-weight:700;border:1.5px solid '+(_ec.by==='morder'?'var(--teal)':'var(--border2)')+';border-radius:12px;background:'+(_ec.by==='morder'?'var(--teal)':'var(--surface2)')+';color:'+(_ec.by==='morder'?'#fff':'var(--text2)')+';cursor:pointer">'+_mBtnLabel+'</button>'+
-  '</div>';
-  return`<div class="card" style="margin-bottom:14px"><div class="sec-lbl">${label}</div>${summary}</div>
-  ${effBar}
-  <div style="font-size:12px;color:var(--text3);margin-bottom:10px"><span style="color:var(--green);font-weight:700">■</span> completa &nbsp;<span style="color:var(--amber);font-weight:700">■</span> parcial &nbsp;<span style="color:var(--red);font-weight:700">■</span> fallida</div>${cards}`;
+  
+  // 🛑 BOTONES DE ORDENAMIENTO CORREGIDOS
+  const isMorder = effSortBy.startsWith('morder');
+  const _effBtnLabel = effSortBy === 'score_asc' ? 'Efect. ↑ menor' : 'Efect. ↓ mayor';
+  const _ordBtnLabel = effSortBy === 'morder_desc' ? 'M15 → M01' : 'M01 → M15';
+  
+  const effBar = `
+  <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:15px; align-items:center;">
+    <span style="font-size:11px; color:var(--text3); font-weight:800;">ORDENAR POR:</span>
+    <button onclick="effSortBy='${effSortBy==='score_asc'?'score_desc':'score_asc'}'; render();" style="padding:4px 12px; font-size:11px; font-weight:800; border:2px solid ${!isMorder?'var(--teal)':'var(--border2)'}; border-radius:12px; background:${!isMorder?'var(--teal)':'var(--surface2)'}; color:${!isMorder?'#fff':'var(--text2)'}; cursor:pointer; transition:var(--transition);">${_effBtnLabel}</button>
+    <button onclick="effSortBy='${effSortBy==='morder_asc'?'morder_desc':'morder_asc'}'; render();" style="padding:4px 12px; font-size:11px; font-weight:800; border:2px solid ${isMorder?'var(--teal)':'var(--border2)'}; border-radius:12px; background:${isMorder?'var(--teal)':'var(--surface2)'}; color:${isMorder?'#fff':'var(--text2)'}; cursor:pointer; transition:var(--transition);">${_ordBtnLabel}</button>
+  </div>`;
+  
+  return `<div class="card" style="margin-bottom:15px;"><div class="sec-lbl">${label}</div>${summary}</div>${effBar}${cards}`;
 }
 
-function effByTraining(){
-  const groups=[];
-  trainings.forEach(t=>{
-    const sub=runs.filter(r=>r.trainingId===t.id&&r.missions);
-    if(sub.length)groups.push({label:t.name,sub});
+/* ── 3. FORMULARIO DE LANZADAS ── */
+const MISSION_PARTS = {
+  'M01': [ { id: 'p1', label: 'Sedimentos retirados (10 c/u)', opts: [0, 10, 20, 30] }, { id: 'p2', label: 'Cepillo no toca', val: 10 } ],
+  'M02': [ { id: 'p1', label: 'Secciones retiradas (10 c/u)', opts: [0, 10, 20, 30, 40] } ],
+  'M03': [ { id: 'p1', label: 'Carro en lado opuesto', val: 30 }, { id: 'p2', label: 'Bono: Carro extra', val: 10 } ],
+  'M04': [ { id: 'p1', label: 'Artefacto libre', val: 30 }, { id: 'p2', label: 'Soportes en pie', val: 10 } ],
+  'M05': [ { id: 'p1', label: 'Suelo horizontal', val: 30 } ],
+  'M06': [ { id: 'p1', label: 'Minerales movidos (10 c/u)', opts: [0, 10, 20, 30] } ],
+  'M07': [ { id: 'p1', label: 'Piedra movida', val: 30 } ],
+  'M08': [ { id: 'p1', label: 'Piezas preservadas (10 c/u)', opts: [0, 10, 20, 30] } ],
+  'M09': [ { id: 'p1', label: 'Techo levantado', val: 20 }, { id: 'p2', label: 'Artículos levantados', val: 10 } ],
+  'M10': [ { id: 'p1', label: 'Balanza inclinada', val: 20 }, { id: 'p2', label: 'Platillo retirado', val: 10 } ],
+  'M11': [ { id: 'p1', label: 'Artefactos sobre cúmulo', val: 20 }, { id: 'p2', label: 'Banderín azul abajo', val: 10 } ],
+  'M12': [ { id: 'p1', label: 'Arena removida', val: 20 }, { id: 'p2', label: 'Balsa levantada', val: 10 } ],
+  'M13': [ { id: 'p1', label: 'Estatua levantada', val: 30 } ],
+  'M14': [ { id: 'p1', label: 'Artefactos en foro (5 c/u)', opts: [0, 5, 10, 15, 20, 25, 30, 35] } ],
+  'M15': [ { id: 'p1', label: 'Banderines en sitios (10 c/u)', opts: [0, 10, 20, 30] } ]
+};
+
+window.toggleMissionSelection = function(mCode) {
+    const chk = document.getElementById('chk_lz_' + mCode);
+    const container = document.getElementById('subs_lz_' + mCode);
+    if (chk.checked) {
+        container.style.display = 'block';
+        container.querySelectorAll('input[type="checkbox"].sub-val').forEach(c => c.checked = true);
+        container.querySelectorAll('select.sub-val').forEach(s => s.value = Math.max(...Array.from(s.options).map(o => parseInt(o.value))));
+    } else {
+        container.style.display = 'none';
+        container.querySelectorAll('input[type="checkbox"].sub-val').forEach(c => c.checked = false);
+        container.querySelectorAll('select.sub-val').forEach(s => s.value = "0");
+    }
+    updateMissionPoints(mCode);
+};
+
+window.updateMissionPoints = function(mCode) {
+     const chk = document.getElementById('chk_lz_' + mCode);
+     const container = document.getElementById('subs_lz_' + mCode);
+     let total = 0;
+     if (chk.checked) {
+         container.querySelectorAll('select.sub-val').forEach(s => total += parseInt(s.value) || 0);
+         container.querySelectorAll('input[type="checkbox"].sub-val').forEach(c => { if(c.checked) total += parseInt(c.value) || 0; });
+     }
+     const disp = document.getElementById('pts_display_' + mCode);
+     disp.innerText = total + ' pts'; disp.style.color = chk.checked ? 'var(--green)' : 'var(--text3)';
+};
+
+function renderLanzadaForm() {
+  const isEdit = editandoLanzadaId !== null;
+  const lz = isEdit ? lanzadasConfiguradas.find(l => l.id === editandoLanzadaId) : null;
+  const lzName = lz ? lz.name : ''; const lzBase = lz ? lz.base : 'Roja';
+  const selMissions = lz ? lz.missions : []; const targetParts = lz ? (lz.targetParts || {}) : {};
+  const validMissions = MISSIONS.filter(m => !['fp_tok', 'ins_ok', 'M00', 'INS', 'FP'].includes(m.code));
+
+  const missionChecks = validMissions.map(m => {
+    const isSelected = selMissions.includes(m.code);
+    const parts = MISSION_PARTS[m.code] || [];
+    const pts = lz && lz.targetPts && lz.targetPts[m.code] !== undefined ? lz.targetPts[m.code] : 0;
+    
+    const partsHTML = parts.map(p => {
+        const pid = `${m.code}_${p.id}`;
+        const savedVal = targetParts[pid] !== undefined ? targetParts[pid] : (isSelected ? (p.val || Math.max(...p.opts)) : 0);
+        
+        if (p.opts) {
+            return `<div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                      <span style="font-size:11px; color:var(--text2); font-weight:600;">${p.label}</span>
+                      <select class="sub-val" data-pid="${pid}" onchange="updateMissionPoints('${m.code}')" style="width:auto; min-width:70px; padding:4px 8px; font-size:11px;">${p.opts.map(o => `<option value="${o}" ${savedVal === o ? 'selected' : ''}>${o} pts</option>`).join('')}</select>
+                    </div>`;
+        } else {
+            return `<label style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; cursor:pointer;">
+                      <span style="font-size:11px; color:var(--text2); font-weight:600;">${p.label} (<b>${p.val} pts</b>)</span>
+                      <input type="checkbox" class="sub-val" data-pid="${pid}" value="${p.val}" ${savedVal > 0 ? 'checked' : ''} onchange="updateMissionPoints('${m.code}')" style="accent-color:var(--teal); width:18px; height:18px;">
+                    </label>`;
+        }
+    }).join('');
+
+    return `
+    <div style="background:var(--surface2); border-radius:var(--rs); border:1px solid var(--border); padding:10px;">
+       <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+         <input type="checkbox" id="chk_lz_${m.code}" value="${m.code}" ${isSelected?'checked':''} onchange="toggleMissionSelection('${m.code}')" style="width:20px; height:20px; accent-color:var(--teal);">
+         <div style="line-height:1.2; flex:1;"><div class="mcode${m.amber?' am':''}">${m.code}</div><div style="color:var(--text); font-size:12px; font-weight:700; margin-top:4px;">${m.name}</div></div>
+         <div style="text-align:right;"><span id="pts_display_${m.code}" style="font-size:16px; font-weight:900; color:${isSelected?'var(--green)':'var(--text3)'}; font-family:'JetBrains Mono',monospace;">${isSelected ? pts : 0} pts</span></div>
+       </label>
+       <div id="subs_lz_${m.code}" style="display:${isSelected?'block':'none'}; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border2);">${partsHTML}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="card" style="animation: fadeIn 0.2s;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2 style="color:var(--navy); margin:0; font-size:1.2rem; font-weight:800;">${isEdit ? 'Editar Lanzada' : 'Crear Nueva Lanzada'}</h2>
+        <button onclick="showLanzadaForm=false; editandoLanzadaId=null; render();" class="btn btn-sm">✕ CERRAR</button>
+      </div>
+      <div class="fg">
+        <label class="field-lbl">NOMBRE DE LA LANZADA</label>
+        <input type="text" id="lanzada_name_in" value="${lzName}" placeholder="Ej. Misiones Laterales">
+      </div>
+      <div class="fg">
+        <label class="field-lbl">BASE DE LANZAMIENTO</label>
+        <select id="lanzada_base_in" onchange="this.style.color = this.value === 'Roja' ? 'var(--red)' : 'var(--blue)'; this.style.fontWeight = 'bold';">
+          <option value="Roja" style="color:var(--red); font-weight:bold;" ${lzBase==='Roja'?'selected':''}>Base Roja</option>
+          <option value="Azul" style="color:var(--blue); font-weight:bold;" ${lzBase==='Azul'?'selected':''}>Base Azul</option>
+        </select>
+      </div>
+      <div class="fg" style="margin-top:20px;">
+        <label class="field-lbl" style="display:block; margin-bottom:10px;">MISIONES Y FASES OBJETIVO:</label>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px;">${missionChecks}</div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:20px; border-top:2px solid var(--border); padding-top:20px;">
+         ${isEdit ? `<button onclick="borrarLanzada('${lz.id}')" class="btn btn-red">Borrar Lanzada</button>` : '<div></div>'}
+         <button onclick="guardarLanzada()" class="btn btn-green">Guardar Lanzada</button>
+      </div>
+    </div>`;
+}
+
+window.guardarLanzada = function() {
+  const name = document.getElementById('lanzada_name_in').value.trim();
+  const base = document.getElementById('lanzada_base_in').value;
+  if (!name) return alert("Por favor, dale un nombre a esta lanzada.");
+
+  const selected = []; const targetPts = {}; const targetParts = {}; let maxScore = 0;
+  document.querySelectorAll('input[id^="chk_lz_"]:checked').forEach(c => {
+     const mCode = c.value; selected.push(mCode);
+     let totalM = 0; const container = document.getElementById('subs_lz_' + mCode);
+     container.querySelectorAll('select.sub-val').forEach(s => { const val = parseInt(s.value)||0; targetParts[s.dataset.pid] = val; totalM += val; });
+     container.querySelectorAll('input[type="checkbox"].sub-val').forEach(cb => { if(cb.checked) { const val = parseInt(cb.value)||0; targetParts[cb.dataset.pid] = val; totalM += val; } });
+     targetPts[mCode] = totalM; maxScore += totalM;
   });
-  const loose=runs.filter(r=>!r.trainingId&&r.missions);
-  if(loose.length)groups.push({label:'Lanzadas sueltas',sub:loose});
-  if(!groups.length)return`<div class="empty">Sin datos suficientes.</div>`;
-  return groups.map(({label,sub})=>`
-    <div style="font-family:inherit;font-size:16px;font-weight:700;margin-bottom:8px;margin-top:20px;display:flex;align-items:center;gap:10px">
-      ${label}<span style="flex:1;height:1px;background:var(--border);display:inline-block"></span>
-    </div>${effTable(sub,label)}`
-  ).join('');
+
+  if (selected.length === 0) return alert("Selecciona al menos 1 misión para esta lanzada.");
+  if (editandoLanzadaId) {
+     const lz = lanzadasConfiguradas.find(x => x.id === editandoLanzadaId);
+     if(lz) { lz.name = name; lz.base = base; lz.missions = selected; lz.max = maxScore; lz.targetPts = targetPts; lz.targetParts = targetParts; }
+  } else { lanzadasConfiguradas.push({ id: 'LZ_' + Date.now(), name, base, missions: selected, max: maxScore, targetPts, targetParts }); }
+  saveLanzadas(); showLanzadaForm = false; editandoLanzadaId = null; render();
+};
+
+window.borrarLanzada = function(id) {
+  if(!confirm("¿Borrar esta lanzada definitivamente?")) return;
+  lanzadasConfiguradas = lanzadasConfiguradas.filter(x => x.id !== id);
+  saveLanzadas(); showLanzadaForm = false; editandoLanzadaId = null; render();
+};
+
+/* ── 4. ESTRATEGIA (VISTA PREVIA DE LANZADAS CON FILTRO SEGURO) ── */
+function renderEfectividadEstrategia(wd) {
+  const ESTRATEGIA = [...lanzadasConfiguradas];
+  ESTRATEGIA.push({ id: 'M00', name: 'Fichas Precisión', base: 'Soporte', missions: ['fp_tok'], max: 50 });
+  ESTRATEGIA.push({ id: 'INS', name: 'Inspección', base: 'Soporte', missions: ['ins_ok'], max: 20 });
+
+  const renderGrupo = (baseNombre, colorCSS) => {
+    const lanzadasBase = ESTRATEGIA.filter(l => l.base === baseNombre);
+    if(lanzadasBase.length === 0 && baseNombre !== 'Soporte') return ''; 
+
+    let totalMaxBase = 0, totalPuntosBase = 0;
+    
+    const cards = lanzadasBase.map(l => {
+      let perfectasCount = 0, totalPtsAcumulados = 0;
+      
+      // 🛑 FILTRO ESTRICTO: Solo evaluar rondas donde el usuario jugó en la base correspondiente
+      let rondasValidas = wd;
+      if (l.base !== 'Soporte') {
+         rondasValidas = wd.filter(r => {
+            const p1 = l.base === 'Roja' ? r.rojaP1 : r.azulP1;
+            const p2 = l.base === 'Roja' ? r.rojaP2 : r.azulP2;
+            return checkEsUsuario(p1) || checkEsUsuario(p2);
+         });
+      }
+
+      rondasValidas.forEach(r => {
+        let ptsRonda = 0;
+        if (l.id === 'M00') { const n=parseInt(r.missions['fp_tok'])||0; ptsRonda={1:10,2:15,3:25,4:35,5:50,6:50}[n]||0; }
+        else if (l.id === 'INS') ptsRonda = (r.missions['ins_ok'] === true || r.missions['ins_ok'] === "true") ? 20 : 0;
+        else l.missions.forEach(mc => { const mo=MISSIONS.find(m=>m.code===mc); if(mo) ptsRonda+=Math.min(mScoreFor(mo, r.missions), (l.targetPts&&l.targetPts[mc]!==undefined)?l.targetPts[mc]:mMaxScore(mo)); });
+        totalPtsAcumulados += Math.min(ptsRonda, 545); if (ptsRonda >= l.max) perfectasCount++;
+      });
+      
+      const avg = Math.round(totalPtsAcumulados / (rondasValidas.length||1)) || 0;
+      
+      // Evitamos sumar si el jugador nunca participó en esta base
+      if (rondasValidas.length > 0) {
+        totalMaxBase += l.max; 
+        totalPuntosBase += avg;
+      }
+
+      return `
+      <div class="card" onclick="lanzadaDetalle='${l.id}'; lanzadaDetalleTab='estadisticas'; render();" style="padding:15px; cursor:pointer; display:block; margin-bottom:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div><span style="color:${colorCSS}; font-size:10px; font-weight:900;">${l.missions.length} MISIONES</span><span style="display:block; color:var(--text); font-size:14px; font-weight:800;">${l.name}</span></div>
+          <div style="text-align:right;"><span style="font-size:24px; font-weight:900; color:var(--navy); font-family:'JetBrains Mono',monospace;">${avg}</span><span style="font-size:12px; color:var(--text3); font-weight:600;">/${l.max}</span></div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const effBase = totalMaxBase > 0 ? Math.round((totalPuntosBase / totalMaxBase) * 100) : 0;
+    
+    return `
+    <div style="border: 2px solid ${colorCSS}; margin-bottom:20px; background:var(--surface2); border-radius:var(--r); overflow:hidden; box-shadow:var(--shadow-sm);">
+      <div style="padding:15px; display:flex; justify-content:space-between; align-items:center; background:${colorCSS}15; border-bottom: 2px solid ${colorCSS};">
+        <h2 style="margin:0; font-size:16px; font-weight:900; color:${colorCSS} !important;">BASE ${baseNombre.toUpperCase()}</h2><span style="color:${colorCSS} !important; font-weight:900; font-size:18px;">${effBase}%</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; padding:15px;">${cards}</div>
+    </div>`;
+  };
+
+  const noDataMsg = lanzadasConfiguradas.length === 0 ? `<div class="empty" style="margin-bottom:20px; border: 2px dashed var(--border2); padding:30px; border-radius:var(--r); background:var(--surface);"><div style="font-size:24px; margin-bottom:10px;">📋</div><div style="color:var(--navy); font-weight:800; margin-bottom:5px; font-size:1.1rem;">No hay estrategias configuradas</div><div style="font-size:13px; color:var(--text3);">${esAdminActual() ? 'Haz clic en "+ CREAR LANZADA" para empezar a medir la efectividad.' : 'Dile a tu coach o capitán que configure las lanzadas del equipo.'}</div></div>` : '';
+
+  return `
+    <div style="animation: fadeIn 0.3s ease;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+         <div class="sec-lbl" style="margin-bottom:0; flex:1;">ESTRATEGIA ACTUAL</div>
+         ${esAdminActual() ? `<button onclick="showLanzadaForm=true; render();" class="btn btn-cyan btn-sm" style="margin-left:10px;">+ CREAR LANZADA</button>` : ''}
+      </div>
+      ${noDataMsg}
+      ${renderGrupo('Roja', 'var(--red)')}
+      ${renderGrupo('Azul', 'var(--blue)')}
+      ${renderGrupo('Soporte', 'var(--amber)')}
+    </div>`;
 }
 
+/* ── 4.1 DETALLE LANZADA (DESPLEGABLES, TOOLTIPS Y GRÁFICAS HEX) ── */
+function renderSubPaginaLanzada(wd, id) {
+  const ESTRATEGIA = [...lanzadasConfiguradas];
+  ESTRATEGIA.push({ id: 'M00', name: 'Fichas Precisión', base: 'Soporte', missions: ['fp_tok'], max: 50 });
+  ESTRATEGIA.push({ id: 'INS', name: 'Inspección', base: 'Soporte', missions: ['ins_ok'], max: 20 });
+  const lan = ESTRATEGIA.find(x => x.id === id);
+  if(!lan) { lanzadaDetalle = null; return ''; }
+  
+  const colorTemaCSS = lan.base === 'Roja' ? 'var(--red)' : (lan.base === 'Azul' ? 'var(--blue)' : 'var(--amber)');
+  const colorTemaHex = lan.base === 'Roja' ? '#EF4444' : (lan.base === 'Azul' ? '#3B82F6' : '#F59E0B');
+
+  // 🛑 FILTRO ESTRICTO AL INTERIOR DE LA ESTRATEGIA
+  let rondasValidas = wd;
+  if (lan.base !== 'Soporte') {
+     rondasValidas = wd.filter(r => {
+        const p1 = lan.base === 'Roja' ? r.rojaP1 : r.azulP1;
+        const p2 = lan.base === 'Roja' ? r.rojaP2 : r.azulP2;
+        return checkEsUsuario(p1) || checkEsUsuario(p2);
+     });
+  }
+
+  let labels=[], ptsHist=[], tooltipsData=[];
+  
+  let htmlRegistros = rondasValidas.map((r, i) => {
+    let pts = 0; let mDetailsHTML = ''; let ttLines = [];
+    
+    if (lan.id === 'M00') { 
+        const n=parseInt(r.missions['fp_tok'])||0; pts={1:10,2:15,3:25,4:35,5:50,6:50}[n]||0; 
+        mDetailsHTML = `<div style="color:var(--green); font-size:11px; font-weight:700;">Fichas: ${pts}/50 pts</div>`; ttLines.push(`Fichas: ${pts} pts`);
+    } else if (lan.id === 'INS') { 
+        pts = (r.missions['ins_ok'] === true || r.missions['ins_ok'] === "true") ? 20 : 0; 
+        mDetailsHTML = `<div style="color:${pts>0?'var(--green)':'var(--red)'}; font-size:11px; font-weight:700;">Inspección: ${pts}/20 pts</div>`; ttLines.push(`Inspección: ${pts} pts`);
+    } else {
+        lan.missions.forEach(mc => { 
+           const mo=MISSIONS.find(m=>m.code===mc); 
+           if(mo) {
+               const target = lan.targetPts[mc]||0;
+               const mPts = Math.min(mScoreFor(mo, r.missions), target);
+               pts += mPts;
+               
+               const c = mPts >= target && target > 0 ? 'var(--green)' : (mPts > 0 ? 'var(--amber)' : 'var(--red)');
+               mDetailsHTML += `<div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; padding:6px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--rs);">
+                 <span style="color:var(--text2); font-weight:600;">${mc} - ${mo.name}</span><span style="color:${c}; font-weight:800;">${mPts}/${target} pts</span>
+               </div>`;
+               ttLines.push(`${mc}: ${mPts}/${target} pts`);
+           }
+        });
+    }
+    
+    pts = Math.min(pts, 545); labels.unshift(runLabel(r, runs.indexOf(r))); ptsHist.unshift(pts); tooltipsData.unshift(ttLines);
+    const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? p.name.split(' ')[0] : '---'; };
+    
+    let equipoHTML = '';
+    if(lan.base === 'Soporte') equipoHTML = `<span style="color:var(--text3); font-size:10px; font-weight:700;">${getP(r.rojaP1)} / ${getP(r.azulP1)}</span>`;
+    else equipoHTML = `<span style="color:${colorTemaCSS}; font-weight:900; font-size:11px;">${lan.base==='Roja'?getP(r.rojaP1)+' & '+getP(r.rojaP2):getP(r.azulP1)+' & '+getP(r.azulP2)}</span>`;
+
+    return `
+    <div class="card" style="padding:0; margin-bottom:12px; overflow:hidden;">
+      <div onclick="const d=document.getElementById('det_lz_${i}'); d.style.display=d.style.display==='none'?'block':'none';" style="padding:15px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+         <div><div style="font-weight:800; color:var(--text3); font-size:13px; margin-bottom:4px;">${runLabel(r, runs.indexOf(r))}</div>${equipoHTML}</div>
+         <div style="color:var(--text); font-size:20px; font-weight:900; font-family:'JetBrains Mono',monospace;">${pts}<span style="font-size:12px; color:var(--text3);">/${lan.max}</span> <span style="font-size:14px; color:var(--text3);">▾</span></div>
+      </div>
+      <div id="det_lz_${i}" style="display:none; padding:15px; border-top:2px solid var(--border); background:var(--surface2);">
+         <div style="font-size:10px; color:var(--text3); margin-bottom:8px; font-weight:800;">DESGLOSE DE MISIONES</div>
+         ${mDetailsHTML}
+      </div>
+    </div>`;
+  }).reverse().join('');
+
+  if (!rondasValidas.length) htmlRegistros = `<div class="empty">No has participado en ninguna ronda bajo esta estrategia.</div>`;
+
+  // Asegurar color Hex para Chart.js
+  if(lanzadaDetalleTab==='graficas' && rondasValidas.length > 0) dibujarGrafica('chartLanzada', 'line', labels, ptsHist, colorTemaHex, 'Puntos', tooltipsData);
+
+  return `
+    <div style="animation: fadeIn 0.3s ease;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+         <button onclick="lanzadaDetalle=null; render();" class="btn btn-sm">← VOLVER</button>
+         ${(esAdminActual() && !['M00','INS'].includes(lan.id)) ? `<button onclick="editandoLanzadaId='${lan.id}'; showLanzadaForm=true; render();" class="btn btn-cyan btn-sm">✎ EDITAR</button>` : ''}
+      </div>
+      <div style="margin-bottom:20px;">
+        <h1 style="color:var(--navy); margin:0; font-size:22px; font-weight:800;">${lan.name}</h1>
+        <div style="font-weight:800; font-size:11px; color:${colorTemaCSS} !important; margin-top:4px;">BASE ${lan.base.toUpperCase()} <span style="color:var(--text3);">· ${lan.missions.join(', ')}</span></div>
+      </div>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <button onclick="lanzadaDetalleTab='estadisticas'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${lanzadaDetalleTab==='estadisticas'?colorTemaCSS:'var(--border)'}; font-weight:800; cursor:pointer; background:${lanzadaDetalleTab==='estadisticas'?colorTemaCSS:'var(--surface)'}; color:${lanzadaDetalleTab==='estadisticas'?'#fff':'var(--text3)'}; transition:var(--transition);">ESTADÍSTICAS</button>
+        <button onclick="lanzadaDetalleTab='graficas'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${lanzadaDetalleTab==='graficas'?colorTemaCSS:'var(--border)'}; font-weight:800; cursor:pointer; background:${lanzadaDetalleTab==='graficas'?colorTemaCSS:'var(--surface)'}; color:${lanzadaDetalleTab==='graficas'?'#fff':'var(--text3)'}; transition:var(--transition);">GRÁFICAS</button>
+      </div>
+      ${lanzadaDetalleTab==='estadisticas' ? `<div>${htmlRegistros}</div>` : `<div style="background:var(--surface); padding:20px; border-radius:var(--r); height:300px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartLanzada"></canvas></div>`}
+    </div>`;
+}
+
+/* ── FUNCIÓN REUTILIZABLE: RENDERIZAR MISIONES AGRUPADAS Y CONTADORES ── */
+function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS) {
+  if(!rondasBase.length) return `<div class="empty">Sin rondas jugadas en Base ${baseNombre}.</div>`;
+  const lzBase = lanzadasConfiguradas.filter(lz => lz.base === baseNombre);
+  let maxBase = 0; lzBase.forEach(lz => maxBase += lz.max);
+  
+  let baseFull=0, basePartial=0, baseFail=0, totalPts=0;
+  rondasBase.forEach(r => {
+     let rPts=0;
+     lzBase.forEach(lz => lz.missions.forEach(mc => { const mo=MISSIONS.find(m=>m.code===mc); if(mo) rPts+=Math.min(mScoreFor(mo, r.missions), lz.targetPts[mc]||0); }));
+     totalPts += rPts;
+     if(rPts >= maxBase && maxBase > 0) baseFull++; else if(rPts > 0) basePartial++; else baseFail++;
+  });
+
+  const pctF = Math.round((baseFull / rondasBase.length) * 100) || 0;
+  const pctP = Math.round((basePartial / rondasBase.length) * 100) || 0;
+  const pctE = Math.round((baseFail / rondasBase.length) * 100) || 0;
+  const avg = Math.round(totalPts / rondasBase.length) || 0;
+
+  let html = `
+    <div class="card" style="padding:0; margin-bottom:20px; overflow:hidden; border-color:${colorCSS};">
+       <div style="background:${colorCSS}15; padding:15px; border-bottom:2px solid ${colorCSS}; display:flex; justify-content:space-between; align-items:center;">
+          <div><h3 style="margin:0; color:${colorCSS}; font-size:16px; font-weight:800;">BASE ${baseNombre.toUpperCase()}</h3><div style="font-size:11px; color:var(--text3); margin-top:4px; font-weight:600;">Promedio: <b style="color:var(--text);">${avg}</b> / ${maxBase} pts</div></div>
+          <div style="text-align:right;">
+             <div style="display:flex; gap:8px; align-items:center; justify-content:flex-end;">
+                <span style="color:var(--green); font-weight:900; font-size:14px;">${pctF}%</span>
+                <span style="color:var(--amber); font-weight:900; font-size:14px;">${pctP}%</span>
+                <span style="color:var(--red); font-weight:900; font-size:14px;">${pctE}%</span>
+             </div>
+             <div style="font-size:10px; color:var(--text3); margin-top:4px; font-weight:700;">
+                <span style="color:var(--green)">${baseFull}</span> Perf • <span style="color:var(--amber)">${basePartial}</span> Parc • <span style="color:var(--red)">${baseFail}</span> Fall
+             </div>
+          </div>
+       </div>
+       <div style="padding:15px; background:var(--surface2);">
+  `;
+  if(!lzBase.length) html += `<div class="empty">No hay lanzadas configuradas para esta base.</div>`;
+  else lzBase.forEach(lz => { html += effTable(rondasBase, `LANZADA: ${lz.name}`, lz.targetPts); });
+  html += `</div></div>`;
+  return html;
+}
+
+/* ── 5. EFECTIVIDAD JUGADORES ── */
+function renderEfectividadJugadores(wd) {
+  const stats = players.map(p => {
+    if (!checkEsUsuario(p.id)) return null; 
+    
+    let rojaR = 0, azulR = 0; wd.forEach(r => { if(r.rojaP1===p.id || r.rojaP2===p.id) rojaR++; if(r.azulP1===p.id || r.azulP2===p.id) azulR++; });
+    if(rojaR===0 && azulR===0) return null;
+    return `
+    <div class="card" onclick="jugadorDetalle='${p.id}'; jugadorDetalleTab='base'; render();" style="cursor:pointer;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="color:var(--navy); margin:0; font-size:18px; font-weight:800;">👤 ${p.name.split(' ')[0]}</h3>
+        <div style="font-size:10px; color:var(--text3); font-weight:800;">${rojaR+azulR} RONDAS</div>
+      </div>
+    </div>`;
+  }).filter(x=>x).join('');
+  return `<div style="animation: fadeIn 0.3s ease;">${stats || '<div class="empty">Sin datos suficientes.</div>'}</div>`;
+}
+
+/* ── 5.1 DETALLE JUGADOR (CON COLORES CHARTJS ARREGLADOS) ── */
+function renderSubPaginaJugador(wd, id) {
+  const p = players.find(x => x.id === id);
+  if (!p) { jugadorDetalle = null; return ''; }
+  const rRoja = wd.filter(r => r.rojaP1 === p.id || r.rojaP2 === p.id);
+  const rAzul = wd.filter(r => r.azulP1 === p.id || r.azulP2 === p.id);
+
+  let contentHTML = '';
+  if (jugadorDetalleTab === 'mision') {
+    contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)')}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)')}`;
+  } else if (jugadorDetalleTab === 'graficas') {
+    const buildChartData = (base) => {
+        const info=[], legend=[]; let cIdx=0;
+        lanzadasConfiguradas.filter(lz=>lz.base===base).forEach(lz => {
+           const col = CHART_PALETTE[cIdx%CHART_PALETTE.length]; cIdx++;
+           legend.push(`<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2); font-weight:600;"><div style="width:10px;height:10px;background:${col};border-radius:2px;"></div>${lz.name}</div>`);
+           lz.missions.forEach(mc => info.push({code:mc, target:lz.targetPts[mc], color:col}));
+        });
+        const labels = info.map(i=>i.code); const colors = info.map(i=>i.color);
+        const data = info.map(i => {
+           const mo=MISSIONS.find(m=>m.code===i.code); let f=0;
+           (base==='Roja'?rRoja:rAzul).forEach(r => { if(Math.min(mScoreFor(mo, r.missions), i.target)>=i.target && i.target>0) f++; });
+           return Math.round((f/((base==='Roja'?rRoja.length:rAzul.length)||1))*100);
+        });
+        return {labels, data, colors, legendHTML: legend.join('')};
+    };
+
+    const cRoja = buildChartData('Roja'); const cAzul = buildChartData('Azul');
+    dibujarGrafica('chartJMRoja', 'bar', cRoja.labels, cRoja.data, '#EF4444', '% Éxito', null, cRoja.colors);
+    dibujarGrafica('chartJMAzul', 'bar', cAzul.labels, cAzul.data, '#3B82F6', '% Éxito', null, cAzul.colors);
+    
+    contentHTML = `
+      <div style="margin-bottom:20px;">
+         <h3 style="color:var(--red); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD - BASE ROJA</h3>
+         <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartJMRoja"></canvas></div>
+         <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cRoja.legendHTML}</div>
+      </div>
+      <div>
+         <h3 style="color:var(--blue); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD - BASE AZUL</h3>
+         <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartJMAzul"></canvas></div>
+         <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cAzul.legendHTML}</div>
+      </div>`;
+  } else {
+    contentHTML = `
+      <div style="display:flex; gap:15px;">
+         <div style="flex:1; background:var(--red-l); padding:20px; border-radius:var(--r); border:2px solid var(--red-b); text-align:center;">
+           <h3 style="color:var(--red); margin:0; font-weight:800;">BASE ROJA</h3>
+           <div style="font-size:14px; color:var(--text2); margin-top:5px; font-weight:600;">${rRoja.length} Rondas Jugadas</div>
+         </div>
+         <div style="flex:1; background:var(--blue-l); padding:20px; border-radius:var(--r); border:2px solid var(--blue-b); text-align:center;">
+           <h3 style="color:var(--blue); margin:0; font-weight:800;">BASE AZUL</h3>
+           <div style="font-size:14px; color:var(--text2); margin-top:5px; font-weight:600;">${rAzul.length} Rondas Jugadas</div>
+         </div>
+      </div>`;
+  }
+
+  const btnStyle = (t) => `flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${jugadorDetalleTab===t?'var(--teal)':'var(--border2)'}; font-weight:800; cursor:pointer; background:${jugadorDetalleTab===t?'var(--teal)':'var(--surface)'}; color:${jugadorDetalleTab===t?'#fff':'var(--text3)'}; transition:var(--transition);`;
+  return `
+    <div style="animation: fadeIn 0.3s ease;">
+      <button onclick="jugadorDetalle=null; render();" class="btn btn-sm" style="margin-bottom:15px;">← VOLVER</button>
+      <h1 style="color:var(--navy); margin:0 0 20px 0; font-size:24px; font-weight:800;">👤 ${p.name}</h1>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <button onclick="jugadorDetalleTab='base'; render();" style="${btnStyle('base')}">RESUMEN</button>
+        <button onclick="jugadorDetalleTab='mision'; render();" style="${btnStyle('mision')}">ESTADÍSTICA POR MISIÓN</button>
+        <button onclick="jugadorDetalleTab='graficas'; render();" style="${btnStyle('graficas')}">GRÁFICAS DE MISIONES</button>
+      </div>${contentHTML}
+    </div>`;
+}
+
+/* ── 6. EFECTIVIDAD PAREJAS ── */
+function renderEfectividadParejas(wd) {
+  const parejasData = {};
+  wd.forEach(r => {
+    const addP = (p1, p2, isRoja) => {
+      if(!p1 || !p2) return; const id = [p1, p2].sort().join('-');
+      if(!parejasData[id]) parejasData[id] = { id, p1, p2, rR:0, aR:0 };
+      isRoja ? parejasData[id].rR++ : parejasData[id].aR++;
+    };
+    addP(r.rojaP1, r.rojaP2, true); addP(r.azulP1, r.azulP2, false);
+  });
+  const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? p.name.split(' ')[0] : '---'; };
+
+  const html = Object.values(parejasData).map(p => {
+    if (!checkEsUsuario(p.p1) && !checkEsUsuario(p.p2)) return '';
+    return `
+    <div class="card" onclick="parejaDetalle='${p.id}'; parejaDetalleTab='base'; render();" style="cursor:pointer;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+         <div class="bpill" style="background:var(--surface2); border-color:var(--border2); color:var(--text); font-size:13px; padding:6px 12px;">👥 ${getP(p.p1)} & ${getP(p.p2)}</div>
+         <div style="font-size:10px; color:var(--text3); font-weight:800;">${p.rR + p.aR} RONDAS JUNTOS</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="animation: fadeIn 0.3s ease;">${html || '<div class="empty">No tienes datos con ninguna pareja registrada.</div>'}</div>`;
+}
+
+/* ── 6.1 DETALLE PAREJAS ── */
+function renderSubPaginaPareja(wd, id) {
+  const pIds = id.split('-'); const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? p.name.split(' ')[0] : '---'; };
+  const rRoja = wd.filter(r => [r.rojaP1, r.rojaP2].sort().join('-') === id);
+  const rAzul = wd.filter(r => [r.azulP1, r.azulP2].sort().join('-') === id);
+
+  let contentHTML = '';
+  if (parejaDetalleTab === 'mision') {
+    contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)')}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)')}`;
+  } else if (parejaDetalleTab === 'graficas') {
+    const buildChartData = (base) => {
+        const info=[], legend=[]; let cIdx=0;
+        lanzadasConfiguradas.filter(lz=>lz.base===base).forEach(lz => {
+           const col = CHART_PALETTE[cIdx%CHART_PALETTE.length]; cIdx++;
+           legend.push(`<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2); font-weight:600;"><div style="width:10px;height:10px;background:${col};border-radius:2px;"></div>${lz.name}</div>`);
+           lz.missions.forEach(mc => info.push({code:mc, target:lz.targetPts[mc], color:col}));
+        });
+        const labels = info.map(i=>i.code); const colors = info.map(i=>i.color);
+        const data = info.map(i => {
+           const mo=MISSIONS.find(m=>m.code===i.code); let f=0;
+           (base==='Roja'?rRoja:rAzul).forEach(r => { if(Math.min(mScoreFor(mo, r.missions), i.target)>=i.target && i.target>0) f++; });
+           return Math.round((f/((base==='Roja'?rRoja.length:rAzul.length)||1))*100);
+        });
+        return {labels, data, colors, legendHTML: legend.join('')};
+    };
+
+    const cRoja = buildChartData('Roja'); const cAzul = buildChartData('Azul');
+    dibujarGrafica('chartPMRoja', 'bar', cRoja.labels, cRoja.data, '#EF4444', '% Éxito', null, cRoja.colors);
+    dibujarGrafica('chartPMAzul', 'bar', cAzul.labels, cAzul.data, '#3B82F6', '% Éxito', null, cAzul.colors);
+    
+    contentHTML = `
+      <div style="margin-bottom:20px;">
+         <h3 style="color:var(--red); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD COMO PAREJA - BASE ROJA</h3>
+         <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartPMRoja"></canvas></div>
+         <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cRoja.legendHTML}</div>
+      </div>
+      <div>
+         <h3 style="color:var(--blue); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD COMO PAREJA - BASE AZUL</h3>
+         <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartPMAzul"></canvas></div>
+         <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cAzul.legendHTML}</div>
+      </div>`;
+  } else {
+    contentHTML = `
+      <div style="display:flex; gap:15px;">
+         <div style="flex:1; background:var(--red-l); padding:20px; border-radius:var(--r); border:2px solid var(--red-b); text-align:center;">
+           <h3 style="color:var(--red); margin:0; font-weight:800;">BASE ROJA</h3>
+           <div style="font-size:14px; color:var(--text2); margin-top:5px; font-weight:600;">${rRoja.length} Rondas Jugadas Juntos</div>
+         </div>
+         <div style="flex:1; background:var(--blue-l); padding:20px; border-radius:var(--r); border:2px solid var(--blue-b); text-align:center;">
+           <h3 style="color:var(--blue); margin:0; font-weight:800;">BASE AZUL</h3>
+           <div style="font-size:14px; color:var(--text2); margin-top:5px; font-weight:600;">${rAzul.length} Rondas Jugadas Juntos</div>
+         </div>
+      </div>`;
+  }
+
+  const btnStyle = (t) => `flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${parejaDetalleTab===t?'var(--teal)':'var(--border2)'}; font-weight:800; cursor:pointer; background:${parejaDetalleTab===t?'var(--teal)':'var(--surface)'}; color:${parejaDetalleTab===t?'#fff':'var(--text3)'}; transition:var(--transition);`;
+  return `
+    <div style="animation: fadeIn 0.3s ease;">
+      <button onclick="parejaDetalle=null; render();" class="btn btn-sm" style="margin-bottom:15px;">← VOLVER</button>
+      <h1 style="color:var(--navy); margin:0 0 20px 0; font-size:24px; font-weight:800;">👥 ${getP(pIds[0])} & ${getP(pIds[1])}</h1>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <button onclick="parejaDetalleTab='base'; render();" style="${btnStyle('base')}">RESUMEN</button>
+        <button onclick="parejaDetalleTab='mision'; render();" style="${btnStyle('mision')}">ESTADÍSTICA POR MISIÓN</button>
+        <button onclick="parejaDetalleTab='graficas'; render();" style="${btnStyle('graficas')}">GRÁFICAS DE MISIONES</button>
+      </div>${contentHTML}
+    </div>`;
+}
 /* ═══════════════════════════════════════════
    ACTIONS
 ═══════════════════════════════════════════ */
@@ -4073,7 +5438,7 @@ function bqTouchEnd(e){
 }
 
 function renderBuscar(){
-  let filtered=[...runs];
+  let filtered=[...runsFiltradas];
   const txt=(_buscarFilter.text||'').trim().toLowerCase();
   if(txt) filtered=filtered.filter(r=>(r.roundName||'').toLowerCase().includes(txt)||(r.cuadrillaName||'').toLowerCase().includes(txt));
   if(_buscarFilter.jugadorId){
@@ -4111,7 +5476,7 @@ function renderBuscar(){
 
   // Build detected pairs from runs (same logic as renderParejas)
   const detectedPairsMap={};
-  runs.forEach(r=>{
+  runsFiltradas.forEach(r=>{
     [['azulP1','azulP2'],['rojaP1','rojaP2']].forEach(([k1,k2])=>{
       const a=r[k1]||'';const b=r[k2]||'';
       if(!a&&!b)return;
@@ -4146,7 +5511,7 @@ function renderBuscar(){
   let matchedPairInfo='';
   if(_buscarFilter.bqP1&&_buscarFilter.bqP2){
     const key=[_buscarFilter.bqP1,_buscarFilter.bqP2].sort().join('|');
-    const cnt=runs.filter(r=>{
+    const cnt=runsFiltradas.filter(r=>{
       const azp=r.azulP1&&r.azulP2?[r.azulP1,r.azulP2].sort().join('|'):'';
       const rop=r.rojaP1&&r.rojaP2?[r.rojaP1,r.rojaP2].sort().join('|'):'';
       const azpr=getPair(r.azulPairId);const ropr=getPair(r.rojaPairId);
@@ -4182,6 +5547,9 @@ function renderBuscar(){
     const key='bq_'+r.id;const isOpen=!!statsOpen[key];
     const isDel=confDel['run_'+r.id];
     const medalCls=pos===0?'gold':pos===1?'silver':pos===2?'bronze':'';
+
+    const esEntrenador = usuarioActual && usuarioActual.rol === 'entrenador';
+
     return`<div class="coll-card">
       <div class="coll-hdr" onclick="toggleOpen('${key}')">
         <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
@@ -4217,7 +5585,7 @@ function renderBuscar(){
             <div style="font-size:13px;color:${r.note?'var(--text)':'var(--text3)'};font-style:${r.note?'normal':'italic'}">${r.note||'Sin comentarios'}</div>
           </div>`:
           `<div style="font-size:12px;color:var(--text3)">Sin detalle de misiones</div>`}
-        ${!isDel?`<button class="btn btn-red btn-sm" style="margin-top:10px" onclick="askDel('run_${r.id}','run')">Borrar lanzada</button>`:''}
+        ${esEntrenador && !isDel?`<button class="btn btn-red btn-sm" style="margin-top:10px" onclick="askDel('run_${r.id}','run')">Borrar lanzada</button>`:''}
         ${isDel?`<div class="conf" style="margin-top:8px"><span>¿Borrar esta lanzada (${r.score} pts)?</span>
           <div style="display:flex;gap:6px"><button class="btn btn-red btn-sm" onclick="delRun('${r.id}')">Confirmar</button>
           <button class="btn btn-sm" onclick="cancelDel('run_${r.id}')">Cancelar</button></div></div>`:''}
@@ -4226,7 +5594,6 @@ function renderBuscar(){
   }).join(''):(hasFilter?`<div class="empty">No hay rondas con esos filtros.<br><span style="font-size:12px">Intenta ajustar los criterios</span></div>`:`<div class="empty">Guarda rondas para buscarlas aquí.</div>`);
 
   return`<div style="margin-bottom:16px">
-    <!-- Search bar + action buttons -->
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <div style="position:relative;flex:1">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none">🔍</span>
@@ -4239,7 +5606,6 @@ function renderBuscar(){
       ${hasFilter?`<button class="btn btn-sm" onclick="_limpiarBuscar()" style="border-radius:20px;padding:14px 18px;font-size:13px;font-weight:700;color:var(--red);border-color:rgba(224,82,82,0.4)">✕ Limpiar</button>`:''}
     </div>
 
-    <!-- Filters row: jugador + score range (single row, no duplication) -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
       <div style="position:relative">
         <select onchange="_buscarFilter.jugadorId=this.value;render()"
@@ -4261,7 +5627,6 @@ function renderBuscar(){
       ${chips.length?`<div style="display:flex;gap:4px;flex-wrap:wrap">${chips.join('')}</div>`:''}
     </div>
 
-    <!-- Pair DnD finder -->
     <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <div style="font-size:12px;font-weight:700;color:var(--text2)">🤝 Buscar por pareja — arrastra dos jugadores</div>
@@ -4292,6 +5657,19 @@ function renderBuscar(){
 }
 
 /* ═══════════════════════════════════════════
+   LOGOUT / CERRAR SESIÓN
+═══════════════════════════════════════════ */
+function doLogout() {
+  localStorage.removeItem('stat_saas_session');
+  localStorage.removeItem('fll_last_team');
+  usuarioActual = null;
+  const modal = document.getElementById('logout-modal');
+  if(modal) modal.style.display = 'none';
+  location.reload();
+}
+
+// Y aquí te dejo el código que enviabas de init, para que lo pegues también abajo de todo.
+/* ═══════════════════════════════════════════
    INIT — check for cached team, otherwise show login
 ═══════════════════════════════════════════ */
 async function init(){
@@ -4299,25 +5677,17 @@ async function init(){
   const loginWrap = document.getElementById('login-wrap');
   try{
     // Try auto-login from cached team
-    const cached = localStorage.getItem('fll_last_team');
+    const cached = localStorage.getItem('stat_saas_session');
     if(cached){
-      const {slug, name} = JSON.parse(cached);
-      const snap = await db.ref('teams/'+slug+'/pin').get();
+      const data = JSON.parse(cached);
+      // Validar si el usuario sigue en la base de datos (por si el admin lo borró)
+      const snap = await db.ref(`users/${data.username}`).once('value');
       if(snap.exists()){
         loading.style.display='none';
-        // Still need PIN — show pre-filled login
-        loginTeamName = name;
-        document.getElementById('inp-team').value = name;
-        document.getElementById('login-team-display').textContent = name;
-        document.getElementById('login-step-name').style.display='none';
-        document.getElementById('login-step-pin').style.display='block';
-        document.getElementById('pin-label').textContent = 'PIN del equipo';
-        document.getElementById('pin-hint').textContent = 'Ingresa tu PIN para continuar';
-        document.getElementById('login-btn-enter').textContent = 'Entrar al equipo';
-        loginIsNew = false;
-        loginWrap.style.display='flex';
-        document.getElementById('pin0').focus();
+        await accesoPermitido(data);
         return;
+      } else {
+         localStorage.removeItem('stat_saas_session'); // Limpiar si ya no existe
       }
     }
   } catch(e){}
@@ -4325,166 +5695,6 @@ async function init(){
   loginWrap.style.display='flex';
 }
 init();
-
-/* ═══════════════════════════════════════════
-   ADMIN PANEL
-═══════════════════════════════════════════ */
-// Secret PIN — change this to whatever you want
-const ADMIN_SECRET = '2026';
-let _adminLogoClicks = 0;
-let _adminLogoTimer = null;
-
-function adminLogoClick(){
-  _adminLogoClicks++;
-  clearTimeout(_adminLogoTimer);
-  _adminLogoTimer = setTimeout(()=>{ _adminLogoClicks=0; }, 1500);
-  if(_adminLogoClicks >= 5){
-    _adminLogoClicks = 0;
-    window.location.href = 'admin.html';
-  }
-}
-
-function apinInput(i){
-  const val = document.getElementById('apin'+i).value;
-  if(!/\d/.test(val)){ document.getElementById('apin'+i).value=''; return; }
-  if(val && i < 3) document.getElementById('apin'+(i+1)).focus();
-  if(val && i===3) checkAdminPin();
-}
-function apinKey(e,i){
-  if(e.key==='Backspace'&&!document.getElementById('apin'+i).value&&i>0)
-    document.getElementById('apin'+(i-1)).focus();
-}
-function getAdminPin(){
-  return [0,1,2,3].map(i=>document.getElementById('apin'+i).value).join('');
-}
-function checkAdminPin(){
-  const pin = getAdminPin();
-  if(pin !== ADMIN_SECRET){
-    document.getElementById('admin-gate-err').textContent = 'PIN incorrecto';
-    [0,1,2,3].forEach(i=>document.getElementById('apin'+i).value='');
-    document.getElementById('apin0').focus();
-    return;
-  }
-  document.getElementById('admin-gate').style.display = 'none';
-  openAdminPanel();
-}
-async function openAdminPanel(){
-  document.getElementById('admin-overlay').style.display = 'block';
-  await renderAdminContent();
-}
-function closeAdmin(){
-  document.getElementById('admin-overlay').style.display = 'none';
-}
-
-async function renderAdminContent(){
-  const cont = document.getElementById('admin-content');
-  cont.innerHTML = '<div style="color:rgba(255,255,255,0.5);font-size:13px;text-align:center;padding:20px;">Cargando equipos…</div>';
-  const snap = await db.ref('teams').get();
-  const teams = [];
-  if(snap.exists()) snap.forEach(t=>{ teams.push({key:t.key, name:t.child('name').val()||t.key, pin:t.child('pin').val()||'????', created:t.child('created').val()}); });
-
-  cont.innerHTML = `
-    <!-- Create team -->
-    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(0,194,212,0.2);border-radius:6px;padding:18px 20px;margin-bottom:20px;">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--cyan);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;">+ Crear nuevo equipo</div>
-      <div style="display:grid;grid-template-columns:1fr 100px;gap:8px;margin-bottom:8px;">
-        <input type="text" id="adm-team-name" placeholder="Nombre del equipo" style="background:rgba(255,255,255,0.06);border:1.5px solid rgba(0,194,212,0.25);border-radius:4px;color:#fff;padding:8px 12px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;">
-        <input type="text" id="adm-team-pin" maxlength="4" placeholder="PIN" style="background:rgba(255,255,255,0.06);border:1.5px solid rgba(0,194,212,0.25);border-radius:4px;color:#fff;padding:8px 12px;font-size:13px;font-family:'JetBrains Mono',monospace;text-align:center;letter-spacing:4px;">
-      </div>
-      <button onclick="adminCreateTeam()" style="background:var(--cyan);color:var(--navy);border:none;border-radius:4px;padding:9px 20px;font-size:12px;font-weight:800;cursor:pointer;width:100%;">Crear equipo</button>
-    </div>
-
-    <!-- Teams list -->
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">${teams.length} equipo${teams.length!==1?'s':''} registrados</div>
-    ${teams.length===0?'<div style="color:rgba(255,255,255,0.35);font-size:13px;text-align:center;padding:20px;">No hay equipos aún</div>':
-    teams.map(t=>`
-      <div id="adm-card-${t.key}" style="background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.1);border-radius:6px;padding:14px 16px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-          <div>
-            <div style="font-size:14px;font-weight:700;color:#fff;">${t.name}</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(0,194,212,0.8);margin-top:2px;">/${t.key}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <div style="background:rgba(0,194,212,0.1);border:1px solid rgba(0,194,212,0.25);border-radius:4px;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--cyan);letter-spacing:3px;">${t.pin}</div>
-            <button onclick="adminEditTeam('${t.key}','${t.name}','${t.pin}')" style="background:rgba(245,166,35,0.15);color:var(--gold);border:1px solid rgba(245,166,35,0.3);border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">✏ Editar</button>
-            <button onclick="adminDeleteTeam('${t.key}','${t.name}')" style="background:rgba(192,57,43,0.15);color:var(--red);border:1px solid rgba(192,57,43,0.3);border-radius:4px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">🗑 Eliminar</button>
-          </div>
-        </div>
-        <div id="adm-edit-${t.key}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">
-          <div style="display:grid;grid-template-columns:1fr 120px;gap:8px;margin-bottom:8px;">
-            <input type="text" id="adm-edit-name-${t.key}" value="${t.name}" style="background:rgba(255,255,255,0.06);border:1.5px solid rgba(245,166,35,0.3);border-radius:4px;color:#fff;padding:7px 12px;font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;">
-            <div style="position:relative;">
-              <input type="text" id="adm-edit-pin-${t.key}" value="${t.pin}" maxlength="4" placeholder="Nuevo PIN" style="background:rgba(255,255,255,0.06);border:1.5px solid rgba(245,166,35,0.3);border-radius:4px;color:var(--gold);padding:7px 12px;font-size:13px;font-family:'JetBrains Mono',monospace;text-align:center;letter-spacing:4px;width:100%;">
-            </div>
-          </div>
-          <div style="display:flex;gap:6px;">
-            <button onclick="adminSaveEdit('${t.key}')" style="background:var(--cyan);color:var(--navy);border:none;border-radius:4px;padding:7px 18px;font-size:12px;font-weight:800;cursor:pointer;flex:1;">Guardar</button>
-            <button onclick="document.getElementById('adm-edit-${t.key}').style.display='none'" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.15);border-radius:4px;padding:7px 14px;font-size:12px;cursor:pointer;">Cancelar</button>
-          </div>
-        </div>
-      </div>`).join('')}
-  `;
-}
-
-async function adminCreateTeam(){
-  const name = document.getElementById('adm-team-name').value.trim();
-  const pin = document.getElementById('adm-team-pin').value.trim();
-  if(!name){ adminToast('Escribe el nombre del equipo'); return; }
-  if(!pin||pin.length!==4||!/^\d{4}$/.test(pin)){ adminToast('El PIN debe ser 4 dígitos numéricos'); return; }
-  const slug = teamSlug(name);
-  const snap = await db.ref('teams/'+slug).get();
-  if(snap.exists()){ adminToast('Ya existe un equipo con ese nombre'); return; }
-  await db.ref('teams/'+slug).set({name, pin, created:Date.now()});
-  document.getElementById('adm-team-name').value = '';
-  document.getElementById('adm-team-pin').value = '';
-  adminToast('Equipo "'+name+'" creado ✓');
-  await renderAdminContent();
-}
-
-function adminEditTeam(key,name,pin){
-  document.getElementById('adm-edit-'+key).style.display='block';
-  document.getElementById('adm-edit-name-'+key).focus();
-}
-
-async function adminSaveEdit(key){
-  const name = document.getElementById('adm-edit-name-'+key).value.trim();
-  const pin = document.getElementById('adm-edit-pin-'+key).value.trim();
-  if(!name){ adminToast('El nombre no puede estar vacío'); return; }
-  if(!pin||pin.length!==4||!/^\d{4}$/.test(pin)){ adminToast('El PIN debe ser 4 dígitos numéricos'); return; }
-  await db.ref('teams/'+key+'/name').set(name);
-  await db.ref('teams/'+key+'/pin').set(pin);
-  adminToast('Equipo actualizado ✓');
-  await renderAdminContent();
-}
-
-async function adminDeleteTeam(key,name){
-  // Inline confirm within admin panel
-  const card = document.getElementById('adm-card-'+key);
-  if(!card) return;
-  const prev = card.innerHTML;
-  card.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:4px 0;">
-    <div style="font-size:13px;color:var(--red);font-weight:700;">¿Eliminar "${name}" y todos sus datos?</div>
-    <div style="display:flex;gap:6px;">
-      <button onclick="adminConfirmDelete('${key}')" style="background:var(--red);color:#fff;border:none;border-radius:4px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;">Sí, eliminar</button>
-      <button onclick="renderAdminContent()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:7px 14px;font-size:12px;cursor:pointer;">Cancelar</button>
-    </div>
-  </div>`;
-}
-
-async function adminConfirmDelete(key){
-  await db.ref('teams/'+key).remove();
-  adminToast('Equipo eliminado');
-  await renderAdminContent();
-}
-
-function adminToast(msg){
-  const t = document.getElementById('toast');
-  if(!t) return;
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2800);
-}
-
 </script>
 </body>
 </html>
