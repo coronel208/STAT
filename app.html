@@ -851,18 +851,27 @@ function teamSlug(name){
     .slice(0,40) || 'equipo';
 }
 
-/* ── Firebase save (debounced 800ms) ── */
-function save(){
-  if(!currentTeamId) return;
+/* ── Firebase save (debounced 800ms) + BLINDAJE OFFLINE ── */
+function save() {
+  if (!currentTeamId) return;
   clearTimeout(syncTimeout);
   
   const dot = document.getElementById('hdr-sync');
-  if(dot) dot.textContent = '↑ Guardando…';
+  if (dot) dot.textContent = '↑ Procesando…';
 
-  syncTimeout = setTimeout(async ()=>{
+  syncTimeout = setTimeout(async () => {
+    // 1. SI NO HAY INTERNET (Guardado en Caja Fuerte Local)
+    if (!navigator.onLine) {
+      if (dot) dot.textContent = '⚠ Guardado local';
+      const backup = { players, pairs, trainings, runs };
+      localStorage.setItem('stat_respaldo_offline', JSON.stringify(backup));
+      return; // Detenemos aquí para no hacer chocar a Firebase
+    }
+
+    // 2. SI HAY INTERNET (Intento normal de subida)
     try {
-      // Definimos exactamente qué ramas actualizar dentro de /data/
-      // Esto es mucho más seguro que hacer un .set() de todo el objeto
+      if (dot) dot.textContent = '↑ Subiendo a nube…';
+      
       const updates = {
         [`teams/${currentTeamId}/data/players`]: players,
         [`teams/${currentTeamId}/data/pairs`]: pairs,
@@ -872,13 +881,46 @@ function save(){
 
       await db.ref().update(updates);
       
-      if(dot) dot.textContent = '● En línea';
-    } catch(e) {
+      // Si subió perfecto, borramos el respaldo local porque ya está en la nube
+      localStorage.removeItem('stat_respaldo_offline');
+      if (dot) dot.textContent = '● En línea';
+      
+    } catch (e) {
       console.error('Firebase save error', e);
-      if(dot) dot.textContent = '⚠ Sin conexión';
+      // Si Firebase falla porque el WiFi parpadeó (aunque navigator.onLine diga que hay)
+      if (dot) dot.textContent = '⚠ Guardado local (Red Inestable)';
+      const backup = { players, pairs, trainings, runs };
+      localStorage.setItem('stat_respaldo_offline', JSON.stringify(backup));
     }
   }, 800);
 }
+
+/* ═══════════════════════════════════════════
+   EL RESCATISTA: AUTO-SINCRONIZACIÓN OFFLINE
+═══════════════════════════════════════════ */
+window.addEventListener('online', async () => {
+  const hayRespaldo = localStorage.getItem('stat_respaldo_offline');
+  if (hayRespaldo) {
+    if (typeof showToast === 'function') showToast('🔄 Internet recuperado. Sincronizando datos a la nube...');
+    
+    // Forzamos un guardado al detectar internet
+    save(); 
+    
+    setTimeout(() => {
+      if (typeof showToast === 'function') showToast('✅ ¡Datos sincronizados con éxito!');
+    }, 1500);
+  } else {
+    if (typeof showToast === 'function') showToast('🌐 Conexión restablecida');
+    const dot = document.getElementById('hdr-sync');
+    if (dot) dot.textContent = '● En línea';
+  }
+});
+
+window.addEventListener('offline', () => {
+  if (typeof showToast === 'function') showToast('📡 Sin WiFi. STAT guardará todo en tu dispositivo.');
+  const dot = document.getElementById('hdr-sync');
+  if (dot) dot.textContent = '⚠ Offline';
+});
 
 /* ── Load team data from Firebase ── */
 async function loadTeamData(){
@@ -1404,9 +1446,11 @@ async function renderHeaderBadge() {
   const btnHeader = document.getElementById('btn-admin-panel');
   const tabAdmin = document.getElementById('tb-admin');
 
-  // Mostrar/ocultar botones base de administrador
+  // Mostrar el botón en el Header superior SOLO a los admin
   if (btnHeader) btnHeader.style.display = esAdmin ? '' : 'none';
-  if (tabAdmin) tabAdmin.style.display = esAdmin ? '' : 'none';
+  
+  // 🔥 CORRECCIÓN AQUÍ: Ocultar la pestaña inferior SIEMPRE 🔥
+  if (tabAdmin) tabAdmin.style.display = 'none';
 
   // Solo buscamos el código si el usuario tiene permisos
   if (esAdmin && badgeContainer) {
@@ -1419,7 +1463,7 @@ async function renderHeaderBadge() {
       let codigo = "SIN-CÓDIGO";
       
       if (teamId) {
-        // 🔥 AQUÍ VAMOS A LA RUTA EXACTA QUE ME INDICASTE 🔥
+        // AQUÍ VAMOS A LA RUTA EXACTA QUE ME INDICASTE
         const snapCode = await db.ref(`teams/${teamId}/inviteCode`).once('value');
         if (snapCode.exists()) {
           codigo = snapCode.val();
@@ -1531,7 +1575,7 @@ function aplicarTemaGlobal() {
           color: #F5A623 !important;
         }
 
-        /* 4. Contenedor Principal (Lujo sutil y arreglo de scroll) */
+        /* 4. Contenedor Principal */
         body.modo-vip #main, body.modo-vip .main {
           box-shadow: 0 0 50px rgba(245, 166, 35, 0.1) !important;
           border: 1px solid rgba(255, 215, 0, 0.15) !important;
@@ -1595,6 +1639,67 @@ function aplicarTemaGlobal() {
           color: #ffffff !important;
           border: 1px solid #ef4444 !important;
         }
+
+        /* --- NUEVO: BOTONES Y ALERTAS VIP PRO --- */
+        body.modo-vip .btn-gold, body.modo-vip .btn-cyan {
+          border: 2px solid #FFC107 !important;
+          box-shadow: 0 4px 0 rgba(255, 193, 7, 0.4) !important;
+          transition: all 0.2s ease !important;
+        }
+        body.modo-vip .btn-gold:active, body.modo-vip .btn-cyan:active {
+          transform: translateY(2px) !important;
+          box-shadow: 0 2px 0 rgba(255, 193, 7, 0.4) !important;
+        }
+        
+        body.modo-vip .alert-msg {
+          background: rgba(255, 71, 87, 0.15) !important; 
+          color: #ff4757 !important; 
+          border: 1px solid #ff4757 !important;
+          padding: 12px !important;
+          border-radius: 6px !important;
+          margin: 10px 0 !important;
+          font-weight: 800 !important;
+          animation: shake 0.4s ease-in-out !important;
+        }
+        
+        body.modo-vip .no-data-card {
+          background: rgba(22, 49, 84, 0.8) !important;
+          border: 2px dashed #FFC107 !important;
+          color: #FFFFFF !important;
+          padding: 30px !important;
+          text-align: center !important;
+          border-radius: 8px !important;
+          margin: 20px 0 !important;
+        }
+
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+
+        /* --- BOTÓN DE INICIAR SÚPER RESALTADO --- */
+        body.modo-vip .btn-iniciar-pro {
+          background: linear-gradient(45deg, #FFC107, #F5A623) !important;
+          color: #071324 !important;
+          font-size: 1.1rem !important;
+          font-weight: 900 !important;
+          text-transform: uppercase !important;
+          border: 2px solid #FFFFFF !important;
+          padding: 12px 24px !important;
+          box-shadow: 0 0 15px rgba(255, 193, 7, 0.6) !important;
+          animation: pulse-gold 1.5s infinite !important;
+          transition: transform 0.2s !important;
+        }
+        body.modo-vip .btn-iniciar-pro:active {
+          transform: scale(0.95) !important;
+        }
+
+        @keyframes pulse-gold {
+          0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+          70% { box-shadow: 0 0 0 15px rgba(255, 193, 7, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+        }
       `;
       document.head.appendChild(styleEl);
     }
@@ -1626,7 +1731,6 @@ async function renderAdminPanel() {
 
     let html = '<div style="max-width:900px; margin:0 auto; padding:20px; min-height:100vh; background:#0e1f35; color:#ffffff;">';
     
-    // Título idéntico, solo cambia color y texto
     const colorTema = esSuper ? '#FFD700' : '#00c2d4';
     const titulo = esSuper ? '👑 PANEL SUPERADMIN' : '📋 PANEL ADMINISTRADOR';
 
@@ -1636,7 +1740,6 @@ async function renderAdminPanel() {
       </div>`;
 
     if(esSuper) {
-      // --- BUCLE PARA SUPERADMIN (TODOS LOS EQUIPOS) ---
       for (let teamKey in allTeams) {
         html += `
           <div style="margin-top:30px; background: rgba(255,193,7,0.1); padding: 12px 20px; border-radius: 8px; color:#FFC107; font-weight:800; border-left: 5px solid #FFC107; display:flex; justify-content:space-between; align-items:center;">
@@ -1653,7 +1756,6 @@ async function renderAdminPanel() {
       }
     } 
     else {
-      // --- BUCLE PARA ADMIN (MISMA ESTRUCTURA, SOLO SU EQUIPO) ---
       const miEquipoData = allTeams[miTeamId] || { name: usuarioActual.teamName || "Mi Equipo" };
       
       html += `
@@ -1666,7 +1768,6 @@ async function renderAdminPanel() {
       for (let uId in allUsers) {
         if(allUsers[uId].teamId === miTeamId) {
           hayGente = true;
-          // USA TU FUNCIÓN ORIGINAL QUE YA TIENE LOS INPUTS Y ESTADÍSTICAS
           html += generarTarjetaUsuario(allUsers[uId], uId); 
         }
       }
@@ -1686,6 +1787,9 @@ async function renderAdminPanel() {
   }
 }
 
+/* ═══════════════════════════════════════════
+   NUEVA TARJETA CON DOS BOTONES
+═══════════════════════════════════════════ */
 function generarTarjetaUsuario(u, uKey) {
   const rol = (u.rol || "").toLowerCase();
   
@@ -1721,27 +1825,65 @@ function generarTarjetaUsuario(u, uKey) {
           <div style="font-family:'JetBrains Mono'; color:${color}; font-weight:900; font-size:1.3rem;">${u.password}</div>
         </div>
         <br>
-        <button onclick="cambiarPasswordUsuario('${uKey}', '${u.username}')" 
-                style="background:${color}15; border:1px solid ${color}; color:${color}; padding:6px 15px; border-radius:5px; font-size:10px; font-weight:900; cursor:pointer; text-transform:uppercase; transition:0.3s;">
-          ✏️ Cambiar Clave
-        </button>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button onclick="editarNombreUsuario('${uKey}')" 
+                  style="background:${color}15; border:1px solid ${color}; color:${color}; padding:6px 12px; border-radius:5px; font-size:10px; font-weight:900; cursor:pointer; text-transform:uppercase; transition:0.3s;">
+            ✏️ Usuario
+          </button>
+          <button onclick="editarPasswordUsuario('${uKey}')" 
+                  style="background:${color}15; border:1px solid ${color}; color:${color}; padding:6px 12px; border-radius:5px; font-size:10px; font-weight:900; cursor:pointer; text-transform:uppercase; transition:0.3s;">
+            🔑 Clave
+          </button>
+        </div>
       </div>
     </div>`;
 }
 
-async function cambiarPasswordUsuario(userKey, username) {
-  const nueva = prompt(`SISTEMA DE SEGURIDAD\n\nNueva contraseña para [${username}]:`);
-  if (!nueva || nueva.trim().length < 4) {
-    if(nueva !== null) alert("La contraseña es demasiado corta.");
+/* ═══════════════════════════════════════════
+   FUNCIONES PARA EDITAR CREDENCIALES
+═══════════════════════════════════════════ */
+async function editarPasswordUsuario(userKey) {
+  const nuevaPass = prompt(`SISTEMA DE SEGURIDAD\n\nNueva contraseña para [${userKey}]:`);
+  if (!nuevaPass || nuevaPass.trim().length < 4) {
+    if(nuevaPass !== null) alert("⚠️ La contraseña debe tener al menos 4 caracteres.");
     return;
   }
   try {
-    await db.ref('users/' + userKey + '/password').set(nueva.trim());
-    showToast('¡Base de datos actualizada con éxito! ✓');
+    await db.ref(`users/${userKey}`).update({ password: nuevaPass.trim() });
+    if(typeof showToast === 'function') showToast('¡Contraseña actualizada con éxito! ✓');
     renderAdminPanel();
   } catch(e) { alert("Error al escribir en Firebase: " + e.message); }
 }
 
+async function editarNombreUsuario(viejoUsuario) {
+  const nuevoUser = prompt(`SISTEMA DE SEGURIDAD\n\nEscribe el NUEVO nombre de usuario para reemplazar a [${viejoUsuario}]:`, viejoUsuario);
+  if (!nuevoUser || nuevoUser.trim() === '' || nuevoUser.trim() === viejoUsuario) return; 
+
+  const userStr = nuevoUser.trim();
+  try {
+    const check = await db.ref(`users/${userStr}`).once('value');
+    if (check.exists()) {
+      alert("❌ Ese nombre de usuario ya está en uso. Elige otro.");
+      return;
+    }
+    const snap = await db.ref(`users/${viejoUsuario}`).once('value');
+    let datos = snap.val();
+    datos.usuario = userStr;
+    datos.username = userStr;
+
+    await db.ref(`users/${userStr}`).set(datos);
+    await db.ref(`users/${viejoUsuario}`).remove();
+    
+    if(typeof showToast === 'function') showToast('¡Nombre de usuario actualizado! ✓');
+    renderAdminPanel();
+  } catch (e) {
+    alert("❌ Error al cambiar el nombre: " + e.message);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   FUNCIONES DE NAVEGACIÓN (ORIGINALES)
+═══════════════════════════════════════════ */
 function _irBuscarJugador(pid, pname){
   _buscarFilter = {..._emptyBuscarFilter(),jugadorId:pid};
   _buscarPending = {text:'', minScore:'', maxScore:''};
@@ -1757,20 +1899,17 @@ function _irBuscarPareja(prid, prname){
   render();
 }
 function switchTab(t){
-  if((timerRunning||roundMode==='countdown')&&t!=='ronda'){showToast('⏱ Hay un contador activo');return;}
+  if((timerRunning||roundMode==='countdown')&&t!=='ronda'){if(typeof showToast === 'function') showToast('⏱ Hay un contador activo');return;}
   if(tab==='buscar'&&t!=='buscar') _aplicarBuscar();
   
-  // Reset wizard if navigating away mid-creation
   if(tab==='entrenamientos'&&t!=='entrenamientos'&&trainWizStep!=='setup'){
     trainWizStep='setup';trainWizCurrentRound=0;trainWizSlots=[];
   }
   
   tab = t;
   
-  // Actualizar las pestañas de abajo (deselecciona todas si estamos en admin)
   document.querySelectorAll('.tbtn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
   
-  // Actualizar el botón de Admin del Header
   const btnHeader = document.getElementById('btn-admin-panel');
   if(btnHeader) {
     btnHeader.style.background = (t === 'admin') ? 'var(--gold)' : 'none';
@@ -1826,6 +1965,13 @@ function renderHub(){
       ${[...looseRuns].reverse().map(r=>{
         const idx=runs.indexOf(r);
         const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
+        
+        // --- MAGIA AQUÍ: Nombres individuales en el Hub ---
+        const azP1=players.find(x=>x.id===r.azulP1); const azP2=players.find(x=>x.id===r.azulP2);
+        const roP1=players.find(x=>x.id===r.rojaP1); const roP2=players.find(x=>x.id===r.rojaP2);
+        const nAz = ap ? ap.name : [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
+        const nRo = rp ? rp.name : [roP1?.name, roP2?.name].filter(Boolean).join(' & ');
+
         const isDel=confDel['run_'+r.id];
         return`<div class="card" style="padding:10px 14px;margin-bottom:6px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -1834,8 +1980,8 @@ function renderHub(){
               ${r.cuadrillaName?`<div style="font-size:11px;color:var(--text3);margin-top:1px">${r.cuadrillaName}</div>`:''}
               ${r.ts?`<div style="font-size:10px;color:var(--text3);margin-top:1px">📅 ${fmtTs(r.ts)}</div>`:''}
               <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">
-                ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
-                ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+                ${nAz?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${nAz}</span>`:''}
+                ${nRo?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${nRo}</span>`:''}
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
@@ -1882,16 +2028,9 @@ function startLoose(){
 let looseModalOpen = false;
 
 function _looseWarnings(){
-  const az=autoGetOrCreatePair(pendingRound.azulP1,pendingRound.azulP2)||pendingRound.azulPairId;
-  const ro=autoGetOrCreatePair(pendingRound.rojaP1,pendingRound.rojaP2)||pendingRound.rojaPairId;
-  const w=[];
-  if(pairs.length && !pendingRound.cuadrillaName.trim())
-    w.push({title:'Sin nombre de cuadrilla',body:'No pusiste un nombre de cuadrilla. Esta lanzada quedará sin cuadrilla asignada y no aparecerá en las estadísticas por cuadrilla.'});
-  if(!az && !ro)
-    w.push({title:'Sin parejas asignadas',body:'Arrastra dos jugadores a una base para formar una pareja automática. Sin pareja, esta lanzada no aparecerá en estadísticas de parejas.'});
-  if(az && ro && az===ro)
-    w.push({title:'Misma pareja en las dos bases',body:`La pareja <strong>${getPair(az)?.name||''}</strong> está asignada en Base Azul y Base Roja al mismo tiempo.`});
-  return w;
+  // Retornamos un arreglo vacío para apagar todas las restricciones.
+  // Ahora el sistema te dejará iniciar inmediatamente como tú quieras configurar las bases.
+  return [];
 }
 
 function renderLooseConfig(){
@@ -2008,23 +2147,26 @@ function hubDragLeave(zoneId){const el=document.getElementById(zoneId);if(el)el.
 function hubDropToPool(e){e.preventDefault();}
 function hubDropTo(e,slot){
   e.preventDefault();
+  // Obtenemos el ID del jugador
   const pid=e.dataTransfer.getData('text/plain')||_hubDragPid;
   if(!pid)return;
-  const zone=e.currentTarget;if(zone)zone.classList.remove('over');
-  // Count how many times this player appears across all slots
-  const all=['azulP1','azulP2','rojaP1','rojaP2'];
-  const curSlotHasPid=pendingRound[slot]===pid;
-  const countElsewhere=all.filter(s=>s!==slot&&pendingRound[s]===pid).length;
-  // Allow up to 2 total uses (both bases) — but clear from current slot if already there
-  if(pendingRound[slot]===pid){_hubDragPid=null;return;} // already in this slot
-  if(countElsewhere>=2){showToast('Este jugador ya está en dos slots');_hubDragPid=null;return;}
+
+  const zone=e.currentTarget;
+  if(zone)zone.classList.remove('over');
+  
+  // Si el jugador ya está en este mismo hueco, no hacemos nada
+  if(pendingRound[slot]===pid){
+    _hubDragPid=null;
+    return;
+  } 
+  
+  // ASIGNACIÓN DIRECTA:
+  // Aquí es donde permitimos que el jugador entre al slot 
+  // sin importar si ya está en otro lado o en la otra base.
   pendingRound[slot]=pid;
-  // Warn if same player appears in both bases
-  const azSlots=['azulP1','azulP2'];const roSlots=['rojaP1','rojaP2'];
-  const inAzul=azSlots.some(s=>pendingRound[s]===pid);
-  const inRoja=roSlots.some(s=>pendingRound[s]===pid);
-  if(inAzul&&inRoja)showToast('⚠ Este jugador está en las dos bases');
-  _hubDragPid=null;render();
+  
+  _hubDragPid=null;
+  render(); // Actualiza la pantalla para mostrar al jugador en su sitio
 }
 /* Touch for hub */
 let _hubTouchPid=null,_hubTouchClone=null,_hubTouchEl=null;
@@ -2056,28 +2198,27 @@ function hubTouchEnd(e){
   _hubTouchClone.style.display='none';
   const target=document.elementFromPoint(t.clientX,t.clientY);
   _hubTouchClone.style.display='';
+  
   if(target){
     const zone=target.closest('.drop-zone');
     if(zone){
       const slotMap={'hub-az1':'azulP1','hub-az2':'azulP2','hub-ro1':'rojaP1','hub-ro2':'rojaP2'};
       const slot=slotMap[zone.id];
       if(slot){
-        const all=['azulP1','azulP2','rojaP1','rojaP2'];
-        const countElsewhere=all.filter(s=>s!==slot&&pendingRound[s]===_hubTouchPid).length;
-        if(countElsewhere>=2)showToast('Este jugador ya está en dos slots');
-        else {
-          pendingRound[slot]=_hubTouchPid;
-          const azSlots=['azulP1','azulP2'];const roSlots=['rojaP1','rojaP2'];
-          const inAzul=azSlots.some(s=>pendingRound[s]===_hubTouchPid);
-          const inRoja=roSlots.some(s=>pendingRound[s]===_hubTouchPid);
-          if(inAzul&&inRoja)showToast('⚠ Este jugador está en las dos bases');
-        }
+        // ASIGNACIÓN DIRECTA SIN RESTRICCIONES
+        // Aquí es donde quitamos los bloqueos de "ya está en dos slots"
+        pendingRound[slot]=_hubTouchPid;
       }
     }
   }
-  _hubTouchClone.remove();_hubTouchClone=null;
+  
+  // Limpieza del arrastre
+  _hubTouchClone.remove();
+  _hubTouchClone=null;
   if(_hubTouchEl)_hubTouchEl.classList.remove('dragging');
-  _hubTouchEl=null;_hubTouchPid=null;_hubDragPid=null;
+  _hubTouchEl=null;
+  _hubTouchPid=null;
+  _hubDragPid=null;
   document.querySelectorAll('.drop-zone.over').forEach(z=>z.classList.remove('over'));
   render();
 }
@@ -2131,9 +2272,13 @@ function _ensureRunPairs(){
 
 /* Auto find or create a pair from two player IDs. */
 function autoGetOrCreatePair(p1id,p2id){
-  if(!p1id||!p2id||p1id===p2id)return null;
+  // Si falta uno o son el mismo, retornamos null pero NO bloqueamos el flujo.
+  // Esto permitirá que el jugador sea registrado individualmente pero no como pareja.
+  if(!p1id || !p2id || p1id === p2id) return null;
+
   const wanted=_pairKey(p1id,p2id);
   let pr=pairs.find(pr=>_pairKey(pr.p1,pr.p2)===wanted);
+  
   if(!pr){
     pr={id:uid(),name:autoPairName(p1id,p2id),p1:p1id,p2:p2id};
     pairs.push(pr);
@@ -2146,16 +2291,22 @@ function autoGetOrCreatePair(p1id,p2id){
 
 function _syncPendingPairs(){
   ['azul','roja'].forEach(base=>{
-    const pairKey=base+'PairId';const p1Key=base+'P1';const p2Key=base+'P2';
-    if((!pendingRound[p1Key]||!pendingRound[p2Key])&&pendingRound[pairKey]){
-      const pr=getPair(pendingRound[pairKey]);
-      if(pr){pendingRound[p1Key]=pendingRound[p1Key]||pr.p1||'';pendingRound[p2Key]=pendingRound[p2Key]||pr.p2||'';}
-    }
-    const id=autoGetOrCreatePair(pendingRound[p1Key],pendingRound[p2Key]);
-    pendingRound[pairKey]=id||'';
+    const pairKey=base+'PairId';
+    const p1Key=base+'P1';
+    const p2Key=base+'P2';
+    
+    // 1. Intentamos obtener una pareja si hay dos jugadores
+    const id = autoGetOrCreatePair(pendingRound[p1Key], pendingRound[p2Key]);
+    
+    // 2. Si hay pareja, la asignamos. 
+    // Si NO hay (porque es un solo jugador), ponemos vacío pero NO borramos los jugadores (p1/p2)
+    pendingRound[pairKey] = id || '';
+    
+    // 3. Verificación de seguridad: 
+    // Si no hay pareja pero sí hay un jugador en p1 o p2, 
+    // nos aseguramos de que el sistema sepa que hay "algo" que guardar.
   });
 }
-
 function goToReady(){
   _syncPendingPairs();
   const warnings = _looseWarnings();
@@ -2180,13 +2331,21 @@ function _proceedToReady(){
 function renderReady(){
   const ap=getPair(pendingRound.azulPairId);
   const rp=getPair(pendingRound.rojaPairId);
+  
+  // --- MAGIA AQUÍ: Buscar nombres individuales si no hay pareja ---
+  const azP1=getPlayer(pendingRound.azulP1); const azP2=getPlayer(pendingRound.azulP2);
+  const roP1=getPlayer(pendingRound.rojaP1); const roP2=getPlayer(pendingRound.rojaP2);
+  
+  const nAz = ap ? ap.name : [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
+  const nRo = rp ? rp.name : [roP1?.name, roP2?.name].filter(Boolean).join(' & ');
+
   return`<div class="timer-screen">
     <div class="timer-info">
       <div style="font-family:inherit;font-size:15px;font-weight:700;margin-bottom:6px">${pendingRound.roundName||'Ronda'}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${ap?`<span class="bpill azul"><span class="dot azul"></span>${ap.name}</span>`:''}
-        ${rp?`<span class="bpill roja"><span class="dot roja"></span>${rp.name}</span>`:''}
-        ${!ap&&!rp?`<span style="font-size:12px;color:var(--text3)">Sin parejas asignadas</span>`:''}
+        ${nAz?`<span class="bpill azul"><span class="dot azul"></span>${nAz}</span>`:''}
+        ${nRo?`<span class="bpill roja"><span class="dot roja"></span>${nRo}</span>`:''}
+        ${!nAz&&!nRo?`<span style="font-size:12px;color:var(--text3)">Sin jugadores asignados</span>`:''}
       </div>
     </div>
     <div class="timer-wrap">
@@ -2223,17 +2382,26 @@ function renderCountdown(){
 function renderTimerRunning(){
   const ap=getPair(pendingRound.azulPairId);
   const rp=getPair(pendingRound.rojaPairId);
+  
+  // --- MAGIA AQUÍ TAMBIÉN ---
+  const azP1=players.find(x=>x.id===pendingRound.azulP1); const azP2=players.find(x=>x.id===pendingRound.azulP2);
+  const roP1=players.find(x=>x.id===pendingRound.rojaP1); const roP2=players.find(x=>x.id===pendingRound.rojaP2);
+  
+  const nAz = ap ? ap.name : [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
+  const nRo = rp ? rp.name : [roP1?.name, roP2?.name].filter(Boolean).join(' & ');
+
   const m=Math.floor(timerRemaining/60),s=timerRemaining%60;
   const disp=`${m}:${s.toString().padStart(2,'0')}`;
   const off=+(CIRC*(1-timerRemaining/TIMER_TOTAL)).toFixed(2);
   const col=timerRemaining>60?'#3B6D11':timerRemaining>30?'#854F0B':'#A32D2D';
+  
   return`<div class="timer-screen">
     <div class="timer-info">
       <div style="font-family:inherit;font-size:15px;font-weight:700;margin-bottom:6px">${pendingRound.roundName||'Ronda'}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${ap?`<span class="bpill azul"><span class="dot azul"></span>${ap.name}</span>`:''}
-        ${rp?`<span class="bpill roja"><span class="dot roja"></span>${rp.name}</span>`:''}
-        ${!ap&&!rp?`<span style="font-size:12px;color:var(--text3)">Sin parejas</span>`:''}
+        ${nAz?`<span class="bpill azul"><span class="dot azul"></span>${nAz}</span>`:''}
+        ${nRo?`<span class="bpill roja"><span class="dot roja"></span>${nRo}</span>`:''}
+        ${!nAz&&!nRo?`<span style="font-size:12px;color:var(--text3)">Sin jugadores asignados</span>`:''}
       </div>
     </div>
     <div class="timer-wrap" id="twrap">
@@ -2307,6 +2475,13 @@ function renderMissions(){
   const ap=getPair(pendingRound.azulPairId);
   const rp=getPair(pendingRound.rojaPairId);
 
+  // --- MAGIA AQUÍ: Buscar nombres individuales ---
+  const azP1=players.find(x=>x.id===pendingRound.azulP1); const azP2=players.find(x=>x.id===pendingRound.azulP2);
+  const roP1=players.find(x=>x.id===pendingRound.rojaP1); const roP2=players.find(x=>x.id===pendingRound.rojaP2);
+  
+  const nAz = ap ? ap.name : [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
+  const nRo = rp ? rp.name : [roP1?.name, roP2?.name].filter(Boolean).join(' & ');
+
   const items=MISSIONS.map((m,mi)=>{
     const ms=mScoreFor(m,mState);
     const params=m.params.map(p=>{
@@ -2368,8 +2543,9 @@ function renderMissions(){
       <div style="font-size:12px;opacity:.7">${pendingRound.roundName||'Ronda'}${pendingRound.cuadrillaName?' · '+pendingRound.cuadrillaName:''}</div>
       <div><span class="score-big" id="mscore">${score}</span><span style="font-size:14px;opacity:.5"> / ${MAX_SCORE}</span></div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">
-        ${ap?`<span class="bpill azul"><span class="dot azul"></span>${ap.name}</span>`:''}
-        ${rp?`<span class="bpill roja"><span class="dot roja"></span>${rp.name}</span>`:''}
+        ${nAz?`<span class="bpill azul"><span class="dot azul"></span>${nAz}</span>`:''}
+        ${nRo?`<span class="bpill roja"><span class="dot roja"></span>${nRo}</span>`:''}
+        ${!nAz&&!nRo?`<span style="font-size:12px;color:var(--text3)">Sin jugadores asignados</span>`:''}
       </div>
     </div>
     <button class="btn btn-green btn-lg" type="button" onclick="saveRun()">Guardar ronda</button>
@@ -2384,7 +2560,7 @@ function renderMissions(){
     <textarea id="run-note" oninput="pendingRound.note=this.value"
       placeholder="Sin comentarios"
       style="width:100%;min-height:76px;padding:10px 13px;font-size:13px;font-family:inherit;border:1.5px solid var(--amber-b);border-radius:var(--rs);background:rgba(255,248,235,0.9);color:var(--text);resize:vertical">${pendingRound.note}</textarea>
-  </div>>
+  </div>
   <div style="padding-bottom:20px"></div>`;
 }
 
@@ -2437,7 +2613,7 @@ function mCounter(id,d,max){
 function mToken(n){mState['fp_tok']=n;_refreshMissions();}
 
 function saveRun(){
-  // Auto-name if blank
+  // Nombre automático si está vacío
   if(!pendingRound.roundName.trim()){
     if(pendingRound.trainingId){
       const t=getTraining(pendingRound.trainingId);
@@ -2449,19 +2625,21 @@ function saveRun(){
       pendingRound.roundName=`Ronda ${n}`;
     }
   }
+
   const score=calcScore(mState);
   const snap=JSON.parse(JSON.stringify(mState));
   
-  // Auto-create pairs from individual player slots
-  _syncPendingPairs();
+  // Sincronizamos parejas pero SIN que bloquee si no hay (para permitir 1 solo jugador)
+  const azP = autoGetOrCreatePair(pendingRound.azulP1, pendingRound.azulP2);
+  const roP = autoGetOrCreatePair(pendingRound.rojaP1, pendingRound.rojaP2);
 
-  // --- EL CAMBIO PROFESIONAL AQUÍ ---
   const run = {
     id: uid(),
     roundName: pendingRound.roundName.trim(),
     note: pendingRound.note.trim(),
-    azulPairId: pendingRound.azulPairId,
-    rojaPairId: pendingRound.rojaPairId,
+    // Si no hay pareja (1 solo jugador), se guarda vacío, pero el registro sigue
+    azulPairId: azP || '', 
+    rojaPairId: roP || '',
     azulP1: pendingRound.azulP1 || '',
     azulP2: pendingRound.azulP2 || '',
     rojaP1: pendingRound.rojaP1 || '',
@@ -2472,11 +2650,9 @@ function saveRun(){
     ts: Date.now(),
     trainingId: pendingRound.trainingId || null,
     trainingRoundId: pendingRound.trainingRoundId || null,
-    // --- FIRMA PROFESIONAL ---
     savedBy: (typeof usuarioActual !== 'undefined' && usuarioActual) ? usuarioActual.username : 'invitado',
     savedByRole: (typeof usuarioActual !== 'undefined' && usuarioActual) ? usuarioActual.rol : 'jugador'
-};
-  // ----------------------------------
+  };
 
   runs.push(run);
   
@@ -2495,6 +2671,7 @@ function saveRun(){
   const wasT=!!pendingRound.trainingId;
   const tid=pendingRound.trainingId;
   
+  // Reset completo para la siguiente
   pendingRound={roundName:'',note:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',trainingId:null,trainingRoundId:null,azulP1:'',azulP2:'',rojaP1:'',rojaP2:''};
   mState={};
   
@@ -2649,21 +2826,31 @@ function editTR(tid,rid,az,rj,cua){editingTR={trainingId:tid,roundId:rid};editTR
 function saveTREdit(tid,rid){
   const t=getTraining(tid);if(!t)return;
   const r=t.rounds.find(x=>x.id===rid);if(!r)return;
+  
+  // Ya no es obligatorio el nombre de la cuadrilla
   const cua=(document.getElementById('ec_'+rid)?.value||'').trim();
-  if(!cua){showToast('Ponle un nombre a la cuadrilla');return;}
+  
   const aP1=document.getElementById('ea1_'+rid)?.value||'';
   const aP2=document.getElementById('ea2_'+rid)?.value||'';
   const rP1=document.getElementById('er1_'+rid)?.value||'';
   const rP2=document.getElementById('er2_'+rid)?.value||'';
-  if(aP1&&aP2&&aP1===aP2){showToast('Base Azul: el mismo jugador no puede ir dos veces');return;}
-  if(rP1&&rP2&&rP1===rP2){showToast('Base Roja: el mismo jugador no puede ir dos veces');return;}
+  
+  // Eliminamos las validaciones de "mismo jugador" y "misma pareja"
+  
+  // autoGetOrCreatePair devolverá null si p1 y p2 son el mismo o si falta uno,
+  // cumpliendo con tu requisito de que se cuente individualmente.
   const azPair=autoGetOrCreatePair(aP1,aP2)||'';
   const roPair=autoGetOrCreatePair(rP1,rP2)||'';
-  if(azPair&&azPair===roPair){showToast('La misma pareja no puede estar en las dos bases');return;}
+  
   r.cuadrillaName=cua;
-  r.azulP1=aP1;r.azulP2=aP2;r.azulPairId=azPair;
-  r.rojaP1=rP1;r.rojaP2=rP2;r.rojaPairId=roPair;
-  editingTR=null;editTRData={};save();showToast('Ronda actualizada');render();
+  r.azulP1=aP1; r.azulP2=aP2; r.azulPairId=azPair;
+  r.rojaP1=rP1; r.rojaP2=rP2; r.rojaPairId=roPair;
+  
+  editingTR=null;
+  editTRData={};
+  save();
+  showToast('Ronda actualizada');
+  render();
 }
 function startTR(tid,rid){
   const t=getTraining(tid);if(!t)return;
@@ -2745,32 +2932,38 @@ function doReuseTraining(id){
 
 function confirmAddRound(tid){
   const t=getTraining(tid);if(!t)return;
-  if(!(newRoundData.cuadrillaName||'').trim()){showToast('Ponle un nombre a la cuadrilla');return;}
-  const aP1=newRoundData.azulP1||'';const aP2=newRoundData.azulP2||'';
-  const rP1=newRoundData.rojaP1||'';const rP2=newRoundData.rojaP2||'';
-  if(aP1&&aP2&&aP1===aP2){showToast('Base Azul: el mismo jugador no puede ir dos veces');return;}
-  if(rP1&&rP2&&rP1===rP2){showToast('Base Roja: el mismo jugador no puede ir dos veces');return;}
+  
+  // Quitamos el bloqueo del nombre de cuadrilla
+  const cuaName = (newRoundData.cuadrillaName||'').trim();
+  
+  const aP1=newRoundData.azulP1||''; const aP2=newRoundData.azulP2||'';
+  const rP1=newRoundData.rojaP1||''; const rP2=newRoundData.rojaP2||'';
+  
+  // Si pones al mismo jugador en P1 y P2, azPair será vacío/null
+  // Esto hace que el sistema lo cuente como individual automáticamente
   const azPair=autoGetOrCreatePair(aP1,aP2)||'';
   const roPair=autoGetOrCreatePair(rP1,rP2)||'';
-  if(azPair && azPair===roPair){
-    showToast('La misma pareja no puede estar en las dos bases');return;
-  }
+  
   const newRound={
     id:uid(),
     order:t.rounds.length,
     label:newRoundData.label.trim(),
-    cuadrillaName:(newRoundData.cuadrillaName||'').trim(),
-    azulP1:aP1,azulP2:aP2,
-    rojaP1:rP1,rojaP2:rP2,
+    cuadrillaName: cuaName, 
+    azulP1:aP1, azulP2:aP2,
+    rojaP1:rP1, rojaP2:rP2,
     azulPairId:azPair,
     rojaPairId:roPair,
     completed:false
   };
+  
   t.rounds.push(newRound);
   if(t.status==='completed') t.status='active';
+  
   addingRoundToTraining=null;
   newRoundData={label:'',azulPairId:'',rojaPairId:'',cuadrillaName:'',azulP1:'',azulP2:'',rojaP1:'',rojaP2:''};
-  save();showToast('Lanzada agregada');render();
+  save();
+  showToast('Lanzada agregada');
+  render();
 }
 
 /* ═══════════════════════════════════════════
@@ -3508,14 +3701,21 @@ function _rcard(r,idx,meta){
   const partial=res?res.filter(x=>x.partial):[];
   const fail=res?res.filter(x=>!x.done&&!x.partial):[];
   const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
+  
+  // MAGIA VISUAL
+  const azP1=players.find(x=>x.id===r.azulP1); const azP2=players.find(x=>x.id===r.azulP2);
+  const roP1=players.find(x=>x.id===r.rojaP1); const roP2=players.find(x=>x.id===r.rojaP2);
+  const nAz = ap ? ap.name : [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
+  const nRo = rp ? rp.name : [roP1?.name, roP2?.name].filter(Boolean).join(' & ');
+
   return`<div class="rcard">
     <div class="rcard-top">
       <div>
         <div class="rcard-lbl">${runLabel(r,idx)}</div>
         ${r.ts?`<div style="font-size:10px;color:var(--text3);margin-top:1px">📅 ${fmtTs(r.ts)}</div>`:''}
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
-          ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
-          ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+          ${nAz?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${nAz}</span>`:''}
+          ${nRo?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${nRo}</span>`:''}
           ${meta?`<span style="font-size:11px;color:var(--text3)">${meta}</span>`:''}
         </div>
       </div>
@@ -3537,13 +3737,19 @@ function _rcard(r,idx,meta){
 /* ── RANKING ── collapsible per run */
 function _rankingSection(subset,prefix){
   const sk=prefix+'_rank';
-  const mapped=[...subset].map(r => ({r, i: runs.indexOf(r)})); // Mantener el ID global original
+  const mapped=[...subset].map(r => ({r, i: runs.indexOf(r)}));
   const sorted=_sortRunObjs(mapped,sk);
   if(!sorted.length)return`<div class="empty">Sin lanzadas.</div>`;
   const bar=_sortBar(sk,[['score','Puntaje'],['date','Fecha']],'score');
   return bar+`<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${subset.length} lanzada${subset.length!==1?'s':''}</div>`+
   sorted.map(({r,i},pos)=>{
     const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
+    // MAGIA VISUAL
+    const azP1=players.find(x=>x.id===r.azulP1); const azP2=players.find(x=>x.id===r.azulP2);
+    const roP1=players.find(x=>x.id===r.rojaP1); const roP2=players.find(x=>x.id===r.rojaP2);
+    const nAz = ap ? ap.name : [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
+    const nRo = rp ? rp.name : [roP1?.name, roP2?.name].filter(Boolean).join(' & ');
+
     const key=`${prefix}_run_${r.id}`;const isOpen=!!statsOpen[key];
     const isDel=confDel['run_'+r.id];
     const res=getMissionResults(r.missions);
@@ -3559,8 +3765,8 @@ function _rankingSection(subset,prefix){
             ${r.ts?`<div style="font-size:10px;color:var(--text3)">📅 ${fmtTs(r.ts)}</div>`:''}
             ${r.trainingId?`<div style="font-size:11px;color:var(--text3)">${getTraining(r.trainingId)?.name||''}</div>`:''}
             <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">
-              ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
-              ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+              ${nAz?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${nAz}</span>`:''}
+              ${nRo?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${nRo}</span>`:''}
             </div>
           </div>
         </div>
@@ -3619,24 +3825,28 @@ function _esElUsuarioActual(playerId) {
 function _playersSection(subset,prefix){
   const pMap={};
   players.forEach(p=>{
-    // Inicializar SOLAMENTE si es el usuario actual (o si es admin inicializa todos)
     if (_esElUsuarioActual(p.id)) {
       pMap[p.id]={p,refs:[],scores:[]};
     }
   });
   
   subset.forEach((r)=>{
-    const idx = runs.indexOf(r); // Mantener ID de ronda global
+    const idx = runs.indexOf(r);
     const add=(pid,base,p1,p2)=>{
       let pairId=pid;
       if((!pairId||!getPair(pairId))&&p1&&p2){pairId=autoGetOrCreatePair(p1,p2);if(pairId)r[base+'PairId']=pairId;}
-      const pr=getPair(pairId);if(!pr)return;
+      const pr=getPair(pairId);
       
-      [pr.p1,pr.p2].filter(Boolean).forEach(id=>{
-        // Si el ID no está en pMap, fue filtrado arriba (es un rival/compañero, no el usuario actual)
+      // MAGIA AQUÍ: Iterar sobre p1 y p2 (los jugadores reales), tengan pareja o no
+      [p1,p2].filter(Boolean).forEach(id=>{
         if(!pMap[id]) return; 
         
-        pMap[id].refs.push({r,idx,base,pairName:pr.name});
+        // Si no hay pareja, unimos los nombres de los que están en la base
+        const azP1=players.find(x=>x.id===p1); const azP2=players.find(x=>x.id===p2);
+        let pairName = pr ? pr.name : [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
+        if(!pairName) pairName = "Individual"; // Por si acaso
+        
+        pMap[id].refs.push({r,idx,base,pairName});
         pMap[id].scores.push(Number(r.score));
       });
     };
@@ -3781,6 +3991,9 @@ function _bestName(names){
   return names.reduce((a,b)=>score(b)>score(a)?b:a);
 }
 
+/* ── POR CUADRILLA (Filtrado Estricto) ── */
+// ... (Tus funciones _normStr y _bestName se quedan iguales, solo copia esto hacia abajo)
+
 function _cuadrillasSection(subset,prefix){
   const groups={};
   subset.forEach((r)=>{
@@ -3790,18 +4003,16 @@ function _cuadrillasSection(subset,prefix){
     const [ro1,ro2]=_runBasePlayers(r,'roja');
     if((!az||!getPair(az))&&az1&&az2){az=autoGetOrCreatePair(az1,az2)||'';if(az)r.azulPairId=az;}
     if((!ro||!getPair(ro))&&ro1&&ro2){ro=autoGetOrCreatePair(ro1,ro2)||'';if(ro)r.rojaPairId=ro;}
-    if(!az&&!ro)return;
+    if(!az&&!ro && (!az1 && !ro1))return; // Cambiado para no ignorar si hay jugadores solos
 
-    // 🛑 FILTRO: Validar que el usuario actual se encuentre dentro de alguna de las parejas de la cuadrilla
     const inAzul = _esElUsuarioActual(az1) || _esElUsuarioActual(az2);
     const inRoja = _esElUsuarioActual(ro1) || _esElUsuarioActual(ro2);
     
-    // Si el usuario logueado es Jugador y NO está en la cuadrilla en ninguna base, la ignoramos completamente
     if (!inAzul && !inRoja && usuarioActual && usuarioActual.rol === 'jugador') return; 
 
     const cuaRaw=(r.cuadrillaName||'').trim();
     const normCua=_normStr(cuaRaw);
-    const pairKey=[az,ro].sort().join('||');
+    const pairKey=[az,ro,az1,ro1].sort().join('||'); // Ajuste para agrupar solos
     const gkey=normCua?`n:${normCua}`:`p:${pairKey}`;
     
     if(!groups[gkey])groups[gkey]={az,ro,names:[],refs:[],scores:[]};
@@ -3819,16 +4030,27 @@ function _cuadrillasSection(subset,prefix){
   const bar3=_sortBar(sk3,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas'],['az','A–Z']],'score');
   return bar3+allCua.map(({az,ro,names,refs,scores},ci)=>{
     const ap=getPair(az);const rp=getPair(ro);
+    const refRun = refs[0]?.r;
+    
+    // MAGIA VISUAL
+    let nAz = ap?.name; let nRo = rp?.name;
+    if (refRun) {
+        const azP1=players.find(x=>x.id===refRun.azulP1); const azP2=players.find(x=>x.id===refRun.azulP2);
+        const roP1=players.find(x=>x.id===refRun.rojaP1); const roP2=players.find(x=>x.id===refRun.rojaP2);
+        if (!nAz) nAz = [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
+        if (!nRo) nRo = [roP1?.name, roP2?.name].filter(Boolean).join(' & ');
+    }
+
     const bv=best(scores);const av=avg(scores);
-    const displayName=_bestName(names)||[ap?.name,rp?.name].filter(Boolean).join(' + ')||`Cuadrilla ${ci+1}`;
+    const displayName=_bestName(names)||[nAz,nRo].filter(Boolean).join(' + ')||`Cuadrilla ${ci+1}`;
     const key=`${prefix}_cua_${ci}`;const isOpen=!!statsOpen[key];
     return`<div class="coll-card">
       <div class="coll-hdr" onclick="toggleOpen('${key}')">
         <div style="flex:1;min-width:0">
           <div style="font-family:inherit;font-size:15px;font-weight:700">${displayName}</div>
           <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">
-            ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
-            ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+            ${nAz?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${nAz}</span>`:''}
+            ${nRo?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${nRo}</span>`:''}
           </div>
           <div style="font-size:12px;color:var(--text3);margin-top:3px">${refs.length} ronda${refs.length!==1?'s':''} · Mejor: <strong style="color:var(--green)">${bv}</strong> · Prom: <strong>${av}</strong></div>
         </div>
@@ -3848,8 +4070,8 @@ function _cuadrillasSection(subset,prefix){
         </div>
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:10px 14px;margin-bottom:12px">
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${ap?`<span class="bpill azul" style="font-size:11px"><span class="dot azul"></span>${ap.name}</span>`:''}
-            ${rp?`<span class="bpill roja" style="font-size:11px"><span class="dot roja"></span>${rp.name}</span>`:''}
+            ${nAz?`<span class="bpill azul" style="font-size:11px"><span class="dot azul"></span>${nAz}</span>`:''}
+            ${nRo?`<span class="bpill roja" style="font-size:11px"><span class="dot roja"></span>${nRo}</span>`:''}
           </div>
         </div>
         <button class="btn btn-green" style="width:100%;font-weight:700" onclick="(function(){_buscarFilter={..._emptyBuscarFilter(),cuadrillaText:'${displayName.replace(/'/g,String.fromCharCode(92,39)).replace(/"/g,'&quot;')}'};tab='buscar';document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));render();})()">
@@ -3906,6 +4128,13 @@ function _trainingRoundsSection(t,sub){
   return orderedRuns.map(({run,roundIdx,round},pos)=>{
     const runIdx=runs.indexOf(run);
     const ap=getPair(run.azulPairId);const rp=getPair(run.rojaPairId);
+    
+    // MAGIA VISUAL
+    const azP1=players.find(x=>x.id===run.azulP1); const azP2=players.find(x=>x.id===run.azulP2);
+    const roP1=players.find(x=>x.id===run.rojaP1); const roP2=players.find(x=>x.id===run.rojaP2);
+    const nAz = ap ? ap.name : [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
+    const nRo = rp ? rp.name : [roP1?.name, roP2?.name].filter(Boolean).join(' & ');
+
     const rondaLabel=roundIdx!==null?`Ronda ${roundIdx+1}`:runLabel(run,runIdx);
     const cuaName=run.cuadrillaName||(round?.cuadrillaName)||'';
     const res=getMissionResults(run.missions);
@@ -3920,8 +4149,8 @@ function _trainingRoundsSection(t,sub){
           ${cuaName?`<div style="font-size:12px;color:var(--text3);margin-top:1px;font-weight:500">${cuaName}</div>`:''}
           ${run.ts?`<div style="font-size:10px;color:var(--text3);margin-top:1px">📅 ${fmtTs(run.ts)}</div>`:''}
           <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
-            ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
-            ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+            ${nAz?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${nAz}</span>`:''}
+            ${nRo?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${nRo}</span>`:''}
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -4376,7 +4605,10 @@ function _entityRuns(tipo,item){
     if(!p)return[];
     return runsFiltradas.filter(r=>{
       const az=getPair(r.azulPairId);const ro=getPair(r.rojaPairId);
-      return(az&&(az.p1===p.id||az.p2===p.id))||(ro&&(ro.p1===p.id||ro.p2===p.id));
+      // AHORA BUSCA DIRECTO AL JUGADOR, AUNQUE NO HAYA PAREJA
+      return (r.azulP1===p.id || r.azulP2===p.id || r.rojaP1===p.id || r.rojaP2===p.id) ||
+             (az&&(az.p1===p.id||az.p2===p.id)) ||
+             (ro&&(ro.p1===p.id||ro.p2===p.id));
     });
   } else if(tipo==='parejas'){
     const pr=pairs.find(x=>x.id===item.id||x.name===item.name);
@@ -5365,77 +5597,6 @@ function delRun(id){
   confDel={};save();showToast('Lanzada eliminada');render();
 }
 
-/* ═══════════════════════════════════════════
-   TAB: BUSCAR RONDAS
-═══════════════════════════════════════════ */
-function _limpiarBuscar(){
-  _buscarFilter=_emptyBuscarFilter();
-  _buscarPending={text:'',cuadrillaText:'',minScore:'',maxScore:''};
-  render();
-}
-
-/* ── BUSCAR: pair DnD ── */
-let _bqDragPid=null;
-function bqDragStart(e,pid){_bqDragPid=pid;e.dataTransfer.setData('text/plain',pid);setTimeout(()=>{const el=document.getElementById('bqchip_'+pid);if(el)el.classList.add('dragging');},0);}
-function bqDragEnd(){if(_bqDragPid){const el=document.getElementById('bqchip_'+_bqDragPid);if(el)el.classList.remove('dragging');}  _bqDragPid=null;}
-function bqDragOver(e,z){e.preventDefault();const el=document.getElementById(z);if(el)el.classList.add('over');}
-function bqDragLeave(z){const el=document.getElementById(z);if(el)el.classList.remove('over');}
-function bqDropToPool(e){e.preventDefault();}
-function bqDropTo(e,slot){
-  e.preventDefault();
-  const pid=e.dataTransfer.getData('text/plain')||_bqDragPid;
-  if(!pid)return;
-  const zone=e.currentTarget;if(zone)zone.classList.remove('over');
-  const other=slot==='bqP1'?'bqP2':'bqP1';
-  if(_buscarFilter[other]===pid){showToast('Selecciona jugadores diferentes');return;}
-  _buscarFilter[slot]=pid;
-  _bqDragPid=null;render();
-}
-function _applyBqPair(){}
-let _bqTouchPid=null,_bqTouchClone=null,_bqTouchEl=null;
-function bqTouchStart(e,pid){
-  _bqTouchPid=pid;_bqDragPid=pid;
-  const el=e.currentTarget;_bqTouchEl=el;
-  _bqTouchClone=el.cloneNode(true);
-  _bqTouchClone.style.cssText='position:fixed;opacity:.8;pointer-events:none;z-index:9999;';
-  document.body.appendChild(_bqTouchClone);
-  el.classList.add('dragging');
-  const t=e.touches[0];
-  _bqTouchClone.style.left=(t.clientX-40)+'px';
-  _bqTouchClone.style.top=(t.clientY-20)+'px';
-}
-function bqTouchMove(e){
-  if(!_bqTouchClone)return;e.preventDefault();
-  const t=e.touches[0];
-  _bqTouchClone.style.left=(t.clientX-40)+'px';
-  _bqTouchClone.style.top=(t.clientY-20)+'px';
-  document.querySelectorAll('#bq-slot1,#bq-slot2').forEach(z=>{
-    const r=z.getBoundingClientRect();
-    z.classList.toggle('over',t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom);
-  });
-}
-function bqTouchEnd(e){
-  if(!_bqTouchClone||!_bqTouchPid)return;
-  const t=e.changedTouches[0];
-  _bqTouchClone.style.display='none';
-  const target=document.elementFromPoint(t.clientX,t.clientY);
-  _bqTouchClone.style.display='';
-  if(target){
-    const zone=target.closest('#bq-slot1,#bq-slot2');
-    if(zone){
-      const slot=zone.id==='bq-slot1'?'bqP1':'bqP2';
-      const other=slot==='bqP1'?'bqP2':'bqP1';
-      if(_buscarFilter[other]!==_bqTouchPid)_buscarFilter[slot]=_bqTouchPid;
-      else showToast('Selecciona jugadores diferentes');
-    }
-  }
-  _bqTouchClone.remove();_bqTouchClone=null;
-  if(_bqTouchEl)_bqTouchEl.classList.remove('dragging');
-  _bqTouchEl=null;_bqTouchPid=null;_bqDragPid=null;
-  document.querySelectorAll('#bq-slot1,#bq-slot2').forEach(z=>z.classList.remove('over'));
-  render();
-}
-
 function renderBuscar(){
   let filtered=[...runsFiltradas];
   const txt=(_buscarFilter.text||'').trim().toLowerCase();
@@ -5473,7 +5634,7 @@ function renderBuscar(){
   if(!isNaN(minS)) filtered=filtered.filter(r=>Number(r.score)>=minS);
   if(!isNaN(maxS)) filtered=filtered.filter(r=>Number(r.score)<=maxS);
 
-  // Build detected pairs from runs (same logic as renderParejas)
+  // Build detected pairs from runs
   const detectedPairsMap={};
   runsFiltradas.forEach(r=>{
     [['azulP1','azulP2'],['rojaP1','rojaP2']].forEach(([k1,k2])=>{
@@ -5500,13 +5661,13 @@ function renderBuscar(){
       ontouchmove="bqTouchMove(event)"
       ontouchend="bqTouchEnd(event)">${p.name}</div>`;
   }).join('');
+
   function bqSlotHtml(pid,slot){
     if(!pid) return `<span style="font-size:12px;color:var(--text3)">Arrastra un jugador</span>`;
     const p=getPlayer(pid);
     return `<div class="player-chip in-pair" style="cursor:default">${p?p.name:'?'}<button class="chip-remove" onclick="_buscarFilter['${slot}']='';_applyBqPair();render()" type="button" style="margin-left:4px">×</button></div>`;
   }
 
-  // Matched pair display if both slots are filled
   let matchedPairInfo='';
   if(_buscarFilter.bqP1&&_buscarFilter.bqP2){
     const key=[_buscarFilter.bqP1,_buscarFilter.bqP2].sort().join('|');
@@ -5525,9 +5686,6 @@ function renderBuscar(){
   }
 
   const playerOpts=players.map(p=>`<option value="${p.id}"${_buscarFilter.jugadorId===p.id?' selected':''}>${p.name}</option>`).join('');
-  // Keep pair opts for backward compat chip display
-  const pairOpts2=pairs.map(p=>`<option value="${p.id}"${_buscarFilter.parejaId===p.id?' selected':''}>${p.name}</option>`).join('');
-
   const hasFilter=txt||_buscarFilter.jugadorId||_buscarFilter.parejaId||cuaQ||_buscarFilter.minScore||_buscarFilter.maxScore||_buscarFilter.bqP1||_buscarFilter.bqP2||_buscarFilter.dateFromTs!==null||_buscarFilter.dateToTs!==null;
 
   const chips=[];
@@ -5540,13 +5698,18 @@ function renderBuscar(){
   const results=sorted.length?sorted.map((r,pos)=>{
     const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
     const res=getMissionResults(r.missions);
+    
+    // 👇 CAMBIO AQUÍ: Ahora devuelve p.name completo 👇
+    const getPName = (pid) => { const p = getPlayer(pid); return p ? p.name : ''; };
+    const txtAzul = ap ? ap.name : [getPName(r.azulP1), getPName(r.azulP2)].filter(Boolean).join(' & ');
+    const txtRoja = rp ? rp.name : [getPName(r.rojaP1), getPName(r.rojaP2)].filter(Boolean).join(' & ');
+
     const done=res?res.filter(x=>x.done):[];
     const partial=res?res.filter(x=>x.partial):[];
     const fail=res?res.filter(x=>!x.done&&!x.partial):[];
     const key='bq_'+r.id;const isOpen=!!statsOpen[key];
     const isDel=confDel['run_'+r.id];
     const medalCls=pos===0?'gold':pos===1?'silver':pos===2?'bronze':'';
-
     const esEntrenador = usuarioActual && usuarioActual.rol === 'entrenador';
 
     return`<div class="coll-card">
@@ -5558,8 +5721,8 @@ function renderBuscar(){
             ${r.cuadrillaName?`<div style="font-size:11px;color:var(--text3)">📋 ${r.cuadrillaName}</div>`:''}
             ${r.ts?`<div style="font-size:10px;color:var(--text3)">📅 ${fmtTs(r.ts)}</div>`:''}
             <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">
-              ${ap?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${ap.name}</span>`:''}
-              ${rp?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${rp.name}</span>`:''}
+              ${txtAzul?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${txtAzul}</span>`:''}
+              ${txtRoja?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${txtRoja}</span>`:''}
               ${r.trainingId?`<span style="font-size:10px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1px 6px">${getTraining(r.trainingId)?.name||''}</span>`:''}
             </div>
           </div>
@@ -5590,7 +5753,7 @@ function renderBuscar(){
           <button class="btn btn-sm" onclick="cancelDel('run_${r.id}')">Cancelar</button></div></div>`:''}
       </div>`:''}
     </div>`;
-  }).join(''):(hasFilter?`<div class="empty">No hay rondas con esos filtros.<br><span style="font-size:12px">Intenta ajustar los criterios</span></div>`:`<div class="empty">Guarda rondas para buscarlas aquí.</div>`);
+  }).join(''):(hasFilter?`<div class="empty">No hay rondas con esos filtros.</div>`:`<div class="empty">Guarda rondas para buscarlas aquí.</div>`);
 
   return`<div style="margin-bottom:16px">
     <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -5601,57 +5764,43 @@ function renderBuscar(){
           onkeydown="if(event.key==='Enter'){_aplicarBuscar();}"
           style="width:100%;padding:14px 16px 14px 42px;background:var(--surface);border:1.5px solid var(--border2);border-radius:20px;font-size:15px;">
       </div>
-      <button class="btn btn-green" onclick="_aplicarBuscar()" style="border-radius:20px;padding:14px 28px;font-size:15px;font-weight:800;min-width:120px;box-shadow:3px 3px 0 rgba(42,111,56,0.25)">🔍 Buscar</button>
-      ${hasFilter?`<button class="btn btn-sm" onclick="_limpiarBuscar()" style="border-radius:20px;padding:14px 18px;font-size:13px;font-weight:700;color:var(--red);border-color:rgba(224,82,82,0.4)">✕ Limpiar</button>`:''}
+      <button class="btn btn-green" onclick="_aplicarBuscar()" style="border-radius:20px;padding:14px 28px;font-size:15px;font-weight:800;min-width:120px;">🔍 Buscar</button>
+      ${hasFilter?`<button class="btn btn-sm" onclick="_limpiarBuscar()" style="border-radius:20px;color:var(--red);">✕ Limpiar</button>`:''}
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
       <div style="position:relative">
         <select onchange="_buscarFilter.jugadorId=this.value;render()"
-          style="appearance:none;-webkit-appearance:none;padding:8px 28px 8px 12px;font-size:12px;font-weight:700;border:1.5px solid ${_buscarFilter.jugadorId?'var(--teal)':'var(--border)'};border-radius:20px;background:${_buscarFilter.jugadorId?'rgba(13,110,138,0.1)':'var(--surface2)'};color:${_buscarFilter.jugadorId?'var(--teal)':'var(--text2)'};cursor:pointer;">
+          style="appearance:none;padding:8px 28px 8px 12px;font-size:12px;font-weight:700;border:1.5px solid ${_buscarFilter.jugadorId?'var(--teal)':'var(--border)'};border-radius:20px;background:var(--surface2);">
           <option value="">👤 Todos los jugadores</option>${playerOpts}
         </select>
-        <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;color:var(--text3)">▾</span>
+        <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:9px;">▾</span>
       </div>
-      <div style="display:flex;align-items:center;gap:5px;border:1.5px solid ${_buscarFilter.minScore||_buscarFilter.maxScore?'var(--teal)':'var(--border)'};border-radius:20px;padding:6px 14px;background:${_buscarFilter.minScore||_buscarFilter.maxScore?'rgba(13,110,138,0.1)':'var(--surface2)'}">
+      <div style="display:flex;align-items:center;gap:5px;border:1.5px solid var(--border);border-radius:20px;padding:6px 14px;background:var(--surface2)">
         <input type="number" id="bq-min" placeholder="Mín" value="${_buscarFilter.minScore||''}"
           oninput="_buscarPending.minScore=this.value" onkeydown="if(event.key==='Enter'){_aplicarBuscar();}"
-          style="width:72px;border:none;background:transparent;font-size:14px;font-weight:700;color:var(--teal);text-align:center;outline:none;">
-        <span style="font-size:12px;color:var(--text3)">—</span>
+          style="width:72px;border:none;background:transparent;text-align:center;outline:none;">
+        <span style="color:var(--text3)">—</span>
         <input type="number" id="bq-max" placeholder="Máx" value="${_buscarFilter.maxScore||''}"
           oninput="_buscarPending.maxScore=this.value" onkeydown="if(event.key==='Enter'){_aplicarBuscar();}"
-          style="width:72px;border:none;background:transparent;font-size:14px;font-weight:700;color:var(--teal);text-align:center;outline:none;">
-        <span style="font-size:11px;color:var(--text3);font-weight:600">pts</span>
+          style="width:72px;border:none;background:transparent;text-align:center;outline:none;">
       </div>
       ${chips.length?`<div style="display:flex;gap:4px;flex-wrap:wrap">${chips.join('')}</div>`:''}
     </div>
 
     <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:12px;font-weight:700;color:var(--text2)">🤝 Buscar por pareja — arrastra dos jugadores</div>
-      </div>
-      <div class="player-pool" style="min-height:40px;padding:8px;margin-bottom:10px;border-radius:var(--rs);" id="bq-pool"
-        ondragover="event.preventDefault()" ondrop="bqDropToPool(event)">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px">🤝 Buscar por pareja — arrastra dos jugadores</div>
+      <div class="player-pool" id="bq-pool" ondragover="event.preventDefault()" ondrop="bqDropToPool(event)" style="padding:8px;margin-bottom:10px;">
         ${bChips}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Jugador 1</div>
-          <div class="drop-zone${_buscarFilter.bqP1?' filled':''}" id="bq-slot1"
-            ondragover="bqDragOver(event,'bq-slot1')" ondragleave="bqDragLeave('bq-slot1')"
-            ondrop="bqDropTo(event,'bqP1')">${bqSlotHtml(_buscarFilter.bqP1,'bqP1')}</div>
-        </div>
-        <div>
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Jugador 2</div>
-          <div class="drop-zone${_buscarFilter.bqP2?' filled':''}" id="bq-slot2"
-            ondragover="bqDragOver(event,'bq-slot2')" ondragleave="bqDragLeave('bq-slot2')"
-            ondrop="bqDropTo(event,'bqP2')">${bqSlotHtml(_buscarFilter.bqP2,'bqP2')}</div>
-        </div>
+        <div class="drop-zone${_buscarFilter.bqP1?' filled':''}" id="bq-slot1" ondragover="bqDragOver(event,'bq-slot1')" ondragleave="bqDragLeave('bq-slot1')" ondrop="bqDropTo(event,'bqP1')">${bqSlotHtml(_buscarFilter.bqP1,'bqP1')}</div>
+        <div class="drop-zone${_buscarFilter.bqP2?' filled':''}" id="bq-slot2" ondragover="bqDragOver(event,'bq-slot2')" ondragleave="bqDragLeave('bq-slot2')" ondrop="bqDropTo(event,'bqP2')">${bqSlotHtml(_buscarFilter.bqP2,'bqP2')}</div>
       </div>
       ${matchedPairInfo}
     </div>
   </div>
-  <div style="font-size:12px;color:var(--text3);font-weight:600;margin-bottom:10px">${filtered.length} ronda${filtered.length!==1?'s':''} encontrada${filtered.length!==1?'s':''}</div>
+  <div style="font-size:12px;color:var(--text3);margin-bottom:10px">${filtered.length} ronda(s) encontrada(s)</div>
   ${results}`;
 }
 
@@ -5671,25 +5820,69 @@ function doLogout() {
 /* ═══════════════════════════════════════════
    INIT — check for cached team, otherwise show login
 ═══════════════════════════════════════════ */
+/* ═══════════════════════════════════════════
+   INIT — check for cached team, otherwise show login
+═══════════════════════════════════════════ */
 async function init(){
   const loading = document.getElementById('loading-wrap');
   const loginWrap = document.getElementById('login-wrap');
-  try{
+  
+  try {
     // Try auto-login from cached team
     const cached = localStorage.getItem('stat_saas_session');
     if(cached){
       const data = JSON.parse(cached);
       // Validar si el usuario sigue en la base de datos (por si el admin lo borró)
       const snap = await db.ref(`users/${data.username}`).once('value');
+      
       if(snap.exists()){
         loading.style.display='none';
+        
+        // Entramos a la app
         await accesoPermitido(data);
+        
+        // 🔥 EL RESCATISTA DE SESIONES CERRADAS 🔥
+        // Se ejecuta solo si entró con éxito y hay datos huérfanos
+        const respaldoPrevio = localStorage.getItem('stat_respaldo_offline');
+        if (respaldoPrevio && navigator.onLine) {
+          try {
+            if(typeof showToast === 'function') showToast('🔄 Subiendo rondas pendientes de tu última sesión...');
+            
+            const backup = JSON.parse(respaldoPrevio);
+            const teamId = data.teamId || currentTeamId; 
+            
+            // Subimos directamente la caja fuerte a Firebase sin tocar las variables globales
+            const updates = {
+              [`teams/${teamId}/data/players`]: backup.players || [],
+              [`teams/${teamId}/data/pairs`]: backup.pairs || [],
+              [`teams/${teamId}/data/trainings`]: backup.trainings || [],
+              [`teams/${teamId}/data/runs`]: backup.runs || []
+            };
+            await db.ref().update(updates);
+            
+            // Limpiamos la caja fuerte porque ya todo está seguro en la nube
+            localStorage.removeItem('stat_respaldo_offline');
+            
+            if(typeof showToast === 'function') showToast('✅ ¡Todas tus rondas fueron recuperadas y guardadas!');
+            
+            // Recargamos la interfaz para mostrar los datos que acabamos de rescatar
+            if(typeof render === 'function') render();
+            
+          } catch(err) {
+            console.error("Error al rescatar datos previos:", err);
+          }
+        }
+        
         return;
+        
       } else {
          localStorage.removeItem('stat_saas_session'); // Limpiar si ya no existe
       }
     }
-  } catch(e){}
+  } catch(e) {
+    console.error("Error en init:", e);
+  }
+  
   loading.style.display='none';
   loginWrap.style.display='flex';
 }
