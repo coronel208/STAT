@@ -359,6 +359,15 @@ const db = firebase.database();
 let allTeams = [];
 let currentFilter = '';
 
+/* Hash de la contraseña de admin — antes se guardaba y comparaba en texto
+   plano en Firebase (legible por cualquiera con acceso a la base). */
+async function _hashPass(str){
+  const enc = new TextEncoder().encode(String(str));
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function _looksHashed(s){ return typeof s === 'string' && /^[0-9a-f]{64}$/.test(s); }
+
 /* ── LOAD ADMIN PIN FROM FIREBASE ON PAGE LOAD ── */
 async function loadAdminPin(){
   try{
@@ -366,8 +375,9 @@ async function loadAdminPin(){
     if(snap.exists() && snap.val()){
       _adminPin = snap.val();
     } else {
-      // First time: write default PIN to Firebase
-      await db.ref('_admin/pin').set(DEFAULT_ADMIN_PIN);
+      // First time: write default PIN to Firebase, already hashed
+      _adminPin = await _hashPass(DEFAULT_ADMIN_PIN);
+      await db.ref('_admin/pin').set(_adminPin);
     }
   } catch(e){
     // If read fails (rules not yet set), keep default
@@ -388,7 +398,14 @@ async function checkPin(){
   if(!pass){ document.getElementById('gate-err').textContent='Introduce la contraseña'; return; }
   // Refresh from Firebase before checking
   await loadAdminPin();
-  if(pass === _adminPin){
+  const inputHash = await _hashPass(pass);
+  const ok = _looksHashed(_adminPin) ? (_adminPin === inputHash) : (_adminPin === pass);
+  if(ok){
+    if(!_looksHashed(_adminPin)){
+      // Migración silenciosa de un PIN viejo guardado en texto plano.
+      try{ await db.ref('_admin/pin').set(inputHash); }catch(e){}
+      _adminPin = inputHash;
+    }
     document.getElementById('gate').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('g-pass').value='';
@@ -601,7 +618,8 @@ async function changeAdminPin(){
   if(!current){
     msg.style.color='var(--red)'; msg.textContent='Introduce la contraseña actual'; return;
   }
-  if(current !== _adminPin){
+  const currentOk = _looksHashed(_adminPin) ? (await _hashPass(current)) === _adminPin : current === _adminPin;
+  if(!currentOk){
     msg.style.color='var(--red)'; msg.textContent='La contraseña actual es incorrecta'; return;
   }
   if(!newPass||newPass.length<4){
@@ -611,8 +629,9 @@ async function changeAdminPin(){
     msg.style.color='var(--red)'; msg.textContent='Las contraseñas nuevas no coinciden'; return;
   }
   try{
-    await db.ref('_admin/pin').set(newPass);
-    _adminPin = newPass;
+    const newHash = await _hashPass(newPass);
+    await db.ref('_admin/pin').set(newHash);
+    _adminPin = newHash;
     document.getElementById('pin-current').value='';
     document.getElementById('pin-new').value='';
     document.getElementById('pin-confirm').value='';
