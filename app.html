@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>STAT — Scoring & Team Analytics Tool · Temporada 2025–2026</title>
 <link rel="icon" type="image/png" href="images/icon_stat.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="images/icon_stat.png">
+<meta name="theme-color" content="#0E1F35">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="STAT">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap');
@@ -686,7 +693,13 @@ body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6
 
     <span id="hdr-invite" style="display:none; font-size:10px; font-weight:900; color:#0e1f35; background:#ffb400; padding:3px 8px; border-radius:6px; letter-spacing:1px;"></span>
 
-    <span class="pill" id="hdr-sync">● En línea</span>
+    <span class="pill" id="hdr-sync" style="display:inline-flex;align-items:center;gap:7px" title="Estado de conexión">
+      <span style="display:inline-flex;align-items:center;gap:4px">
+        <span id="dot-net" title="Internet: conectado" style="width:7px;height:7px;border-radius:50%;background:#2BD99A;display:inline-block;transition:background .25s;box-shadow:0 0 4px currentColor"></span>
+        <span id="dot-db" title="Base de datos: conectado" style="width:7px;height:7px;border-radius:50%;background:#2BD99A;display:inline-block;transition:background .25s;box-shadow:0 0 4px currentColor"></span>
+      </span>
+      <span id="hdr-sync-txt">En línea</span>
+    </span>
     <a href="index.html" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 10px;font-size:11px;text-decoration:none;font-weight:600;letter-spacing:.3px;margin-right:2px">← Inicio</a>
     <button id="hdr-logout" onclick="doLogout()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:none;letter-spacing:0.3px;">Salir</button>
   </div>
@@ -930,18 +943,38 @@ function teamSlug(name){
     .slice(0,40) || 'equipo';
 }
 
+/* ── Indicador de conexión (2 puntos: internet + base de datos) ──
+   El texto de #hdr-sync-txt cuenta la historia (qué está pasando ahora
+   mismo: subiendo, guardado local...); los puntos son el estado ambiente
+   de cada cosa por separado, porque se puede tener internet y aun así no
+   estar conectado a Firebase (o viceversa por un instante). */
+function _setSyncText(txt){
+  const el = document.getElementById('hdr-sync-txt');
+  if(el) el.textContent = txt;
+}
+function _setDot(id, ok, label){
+  const d = document.getElementById(id);
+  if(!d) return;
+  d.style.background = ok ? '#2BD99A' : '#F2726C';
+  d.title = label + (ok ? ': conectado' : ': sin conexión');
+}
+function _setNetDot(ok){ _setDot('dot-net', ok, 'Internet'); }
+function _setDbDot(ok){ _setDot('dot-db', ok, 'Base de datos'); }
+
+// Firebase expone el estado real del socket en vivo en esta ruta especial.
+db.ref('.info/connected').on('value', snap => { _setDbDot(snap.val()===true); });
+_setNetDot(navigator.onLine);
+
 /* ── Firebase save (debounced 800ms) + BLINDAJE OFFLINE ── */
 function save() {
   if (!currentTeamId) return;
   clearTimeout(syncTimeout);
-  
-  const dot = document.getElementById('hdr-sync');
-  if (dot) dot.textContent = '↑ Procesando…';
+  _setSyncText('↑ Procesando…');
 
   syncTimeout = setTimeout(async () => {
     // 1. SI NO HAY INTERNET (Guardado en Caja Fuerte Local)
     if (!navigator.onLine) {
-      if (dot) dot.textContent = '⚠ Guardado local';
+      _setSyncText('⚠ Guardado local');
       const backup = { players, pairs, trainings, runs };
       localStorage.setItem('stat_respaldo_offline', JSON.stringify(backup));
       return; // Detenemos aquí para no hacer chocar a Firebase
@@ -949,8 +982,8 @@ function save() {
 
     // 2. SI HAY INTERNET (Intento normal de subida)
     try {
-      if (dot) dot.textContent = '↑ Subiendo a nube…';
-      
+      _setSyncText('↑ Subiendo a nube…');
+
       const updates = {
         [`teams/${currentTeamId}/data/players`]: players,
         [`teams/${currentTeamId}/data/pairs`]: pairs,
@@ -961,15 +994,15 @@ function save() {
       };
 
       await db.ref().update(updates);
-      
+
       // Si subió perfecto, borramos el respaldo local porque ya está en la nube
       localStorage.removeItem('stat_respaldo_offline');
-      if (dot) dot.textContent = '● En línea';
-      
+      _setSyncText('En línea');
+
     } catch (e) {
       console.error('Firebase save error', e);
       // Si Firebase falla porque el WiFi parpadeó (aunque navigator.onLine diga que hay)
-      if (dot) dot.textContent = '⚠ Guardado local (Red Inestable)';
+      _setSyncText('⚠ Guardado local (Red Inestable)');
       const backup = { players, pairs, trainings, runs };
       localStorage.setItem('stat_respaldo_offline', JSON.stringify(backup));
     }
@@ -980,27 +1013,27 @@ function save() {
    EL RESCATISTA: AUTO-SINCRONIZACIÓN OFFLINE
 ═══════════════════════════════════════════ */
 window.addEventListener('online', async () => {
+  _setNetDot(true);
   const hayRespaldo = localStorage.getItem('stat_respaldo_offline');
   if (hayRespaldo) {
     if (typeof showToast === 'function') showToast('🔄 Internet recuperado. Sincronizando datos a la nube...');
-    
+
     // Forzamos un guardado al detectar internet
-    save(); 
-    
+    save();
+
     setTimeout(() => {
       if (typeof showToast === 'function') showToast('✅ ¡Datos sincronizados con éxito!');
     }, 1500);
   } else {
     if (typeof showToast === 'function') showToast('🌐 Conexión restablecida');
-    const dot = document.getElementById('hdr-sync');
-    if (dot) dot.textContent = '● En línea';
+    _setSyncText('En línea');
   }
 });
 
 window.addEventListener('offline', () => {
+  _setNetDot(false);
   if (typeof showToast === 'function') showToast('📡 Sin WiFi. STAT guardará todo en tu dispositivo.');
-  const dot = document.getElementById('hdr-sync');
-  if (dot) dot.textContent = '⚠ Offline';
+  _setSyncText('⚠ Offline');
 });
 
 /* ── Load team data from Firebase ── */
@@ -1417,22 +1450,29 @@ function _missionPartsForRun(m, ms){
 }
 /* Bloque "detalle por parte" para las misiones parciales/fallidas de una
    ronda — se agrega debajo del resumen COMPLETAS/PARCIALES/FALLIDAS. */
-function _partsDetailBlock(fail, partial, ms){
+function _partsDetailBlock(fail, partial, ms, parentKey){
   const rows=[...partial,...fail].map(x=>{
     const mo=MISSIONS.find(m=>m.code===x.code);
     const parts=mo?_missionPartsForRun(mo,ms):[];
-    // Si no se tocó ninguna parte, no aporta nada mostrarla — ya dice "fallida" arriba.
-    if(!parts.length || !parts.some(p=>p.status!=='sin')) return '';
-    const chips=parts.map(p=>{
-      const bg=p.status==='ok'?'var(--green-l)':p.status==='bad'?'var(--red-l)':'var(--surface2)';
-      const fg=p.status==='ok'?'var(--green-d)':p.status==='bad'?'var(--red)':'var(--text3)';
-      const ic=p.status==='ok'?'✓':p.status==='bad'?'✗':'·';
+    // Solo lo que sí se marcó (logrado o fallido) — lo "sin marcar" no aporta
+    // nada aquí y era la mitad del ruido visual.
+    const tocadas=parts.filter(p=>p.status!=='sin');
+    if(!tocadas.length) return '';
+    const chips=tocadas.map(p=>{
+      const bg=p.status==='ok'?'var(--green-l)':'var(--red-l)';
+      const fg=p.status==='ok'?'var(--green-d)':'var(--red)';
+      const ic=p.status==='ok'?'✓':'✗';
       return `<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;background:${bg};color:${fg}">${ic} ${p.label}</span>`;
     }).join('');
     return `<div style="margin-bottom:5px"><span style="font-size:10px;font-weight:800;color:var(--text2)">${x.code}</span> <span style="display:inline-flex;gap:4px;flex-wrap:wrap;vertical-align:middle">${chips}</span></div>`;
   }).join('');
   if(!rows) return '';
-  return `<div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px">🔎 DETALLE POR PARTE</div>${rows}</div>`;
+  const dKey=(parentKey||'parts')+'_parts';
+  const dOpen=!!statsOpen[dKey];
+  return `<div style="margin-top:6px">
+    <button class="btn btn-sm" style="width:100%" onclick="toggleOpen('${dKey}')">${dOpen?'▲ Ocultar detalle por parte':'🔎 Ver detalle por parte'}</button>
+    ${dOpen?`<div style="margin-top:6px">${rows}</div>`:''}
+  </div>`;
 }
 function avg(arr){return arr.length?Math.round(arr.reduce((a,b)=>a+b,0)/arr.length):null;}
 function best(arr){return arr.length?Math.max(...arr):null;}
@@ -4220,7 +4260,7 @@ function _rcard(r,idx,meta){
       <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px">✗ FALLIDAS (${fail.length})</div>
         <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div>
       </div>
-      ${_partsDetailBlock(fail,partial,r.missions)}`:`<div style="font-size:12px;color:var(--text3);margin-top:4px">Sin detalle de misiones</div>`}
+      ${_partsDetailBlock(fail,partial,r.missions,'rcard_'+r.id)}`:`<div style="font-size:12px;color:var(--text3);margin-top:4px">Sin detalle de misiones</div>`}
   </div>`;
 }
 
@@ -4279,7 +4319,7 @@ function _rankingSection(subset,prefix){
           <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px">✗ FALLIDAS (${fail.length})</div>
             <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div>
           </div>
-          ${_partsDetailBlock(fail,partial,r.missions)}`:`<div style="font-size:12px;color:var(--text3)">Sin detalle de misiones</div>`}
+          ${_partsDetailBlock(fail,partial,r.missions,key)}`:`<div style="font-size:12px;color:var(--text3)">Sin detalle de misiones</div>`}
         <div style="margin-top:8px;padding:8px 10px;background:${r.note?'var(--amber-l)':'var(--surface2)'};border:1px solid ${r.note?'#F5C4B3':'var(--border)'};border-radius:var(--rs)">
           <div style="font-size:10px;font-weight:700;color:${r.note?'var(--amber)':'var(--text3)'};text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-family:inherit">💬 Comentarios</div>
           <div style="font-size:13px;color:${r.note?'var(--text)':'var(--text3)'};font-style:${r.note?'normal':'italic'};font-weight:${r.note?'500':'400'}">${r.note||'Sin comentarios'}</div>
@@ -4583,9 +4623,11 @@ function _cuadrillasSection(subset,prefix){
             ${nRo?`<span class="bpill roja" style="font-size:11px"><span class="dot roja"></span>${nRo}</span>`:''}
           </div>
         </div>
-        <button class="btn btn-green" style="width:100%;font-weight:700" onclick="(function(){_buscarFilter={..._emptyBuscarFilter(),cuadrillaText:'${displayName.replace(/'/g,String.fromCharCode(92,39)).replace(/"/g,'&quot;')}'};tab='buscar';document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));render();})()">
+        <button class="btn btn-green" style="width:100%;font-weight:700;margin-bottom:12px" onclick="(function(){_buscarFilter={..._emptyBuscarFilter(),cuadrillaText:'${displayName.replace(/'/g,String.fromCharCode(92,39)).replace(/"/g,'&quot;')}'};tab='buscar';document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));render();})()">
           🔍 Ver rondas de ${displayName} →
         </button>
+        ${renderDesgloseMisiones(refs.map(x=>x.r), 'Roja', 'var(--red)')}
+        ${renderDesgloseMisiones(refs.map(x=>x.r), 'Azul', 'var(--blue)')}
       </div>`:''}
     </div>`;
   }).join('');
@@ -4681,7 +4723,7 @@ function _trainingRoundsSection(t,sub){
           <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px">✗ FALLIDAS (${fail.length})</div>
             <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div>
           </div>
-          ${_partsDetailBlock(fail,partial,run.missions)}
+          ${_partsDetailBlock(fail,partial,run.missions,rKey)}
           <div style="margin-top:8px;padding:8px 10px;background:${run.note?'var(--amber-l)':'var(--surface2)'};border:1px solid ${run.note?'#F5C4B3':'var(--border)'};border-radius:var(--rs)">
             <div style="font-size:10px;font-weight:700;color:${run.note?'var(--amber)':'var(--text3)'};text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-family:inherit">💬 Comentarios</div>
             <div style="font-size:13px;color:${run.note?'var(--text)':'var(--text3)'};font-style:${run.note?'normal':'italic'};font-weight:${run.note?'500':'400'}">${run.note||'Sin comentarios'}</div>
@@ -6007,6 +6049,11 @@ function renderSubPaginaLanzada(wd, id) {
     </div>`;
 }
 
+/* Toggle "por lanzada" vs "por misión" dentro del desglose de un jugador/
+   pareja/cuadrilla — compartido entre Roja y Azul, no hace falta uno por base. */
+let _desgloseSub = 'lanzada';
+function _setDesgloseSub(v){ _desgloseSub=v; render(); }
+
 /* ── FUNCIÓN REUTILIZABLE: RENDERIZAR MISIONES AGRUPADAS Y CONTADORES ── */
 function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS) {
   if(!rondasBase.length) return `<div class="empty">Sin rondas jugadas en Base ${baseNombre}.</div>`;
@@ -6053,9 +6100,27 @@ function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS) {
           </div>
        </div>
        <div style="padding:15px; background:var(--surface2);">
+       <div style="display:flex;gap:6px;margin-bottom:14px">
+         <button onclick="_setDesgloseSub('lanzada')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${_desgloseSub==='lanzada'?colorCSS:'var(--border2)'};background:${_desgloseSub==='lanzada'?colorCSS:'var(--surface)'};color:${_desgloseSub==='lanzada'?'#fff':'var(--text2)'};cursor:pointer">Por lanzada</button>
+         <button onclick="_setDesgloseSub('mision')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${_desgloseSub==='mision'?colorCSS:'var(--border2)'};background:${_desgloseSub==='mision'?colorCSS:'var(--surface)'};color:${_desgloseSub==='mision'?'#fff':'var(--text2)'};cursor:pointer">Por misión</button>
+       </div>
   `;
-  if(!lzBase.length) html += `<div class="empty">No hay lanzadas configuradas para esta base.</div>`;
-  else lzBase.forEach(lz => { html += effTable(rondasBase, `LANZADA: ${lz.name}`, lz.targetPts); });
+  if(_desgloseSub==='mision'){
+    html += effTable(rondasBase, `Todas las misiones — Base ${baseNombre}`);
+  } else if(!lzBase.length) {
+    html += `<div class="empty">No hay lanzadas configuradas para esta base.</div>`;
+  } else {
+    lzBase.forEach(lz => {
+      let lzFullCount=0;
+      rondasBase.forEach(r=>{
+        let pts=0;
+        lz.missions.forEach(mc=>{ const mo=MISSIONS.find(m=>m.code===mc); if(mo) pts+=Math.min(mScoreFor(mo,r.missions), lz.targetPts[mc]||0); });
+        if(lz.max>0 && pts>=lz.max) lzFullCount++;
+      });
+      html += `<div style="font-size:11px;font-weight:800;color:${colorCSS};margin-bottom:6px">🎯 "${lz.name}" completada por completo: ${lzFullCount} ${lzFullCount===1?'vez':'veces'}</div>`;
+      html += effTable(rondasBase, `LANZADA: ${lz.name}`, lz.targetPts);
+    });
+  }
   html += `</div></div>`;
   return html;
 }
@@ -6678,7 +6743,7 @@ function renderBuscar(){
             <div class="mpills">${partial.map(m=>`<span class="mpill partial">${m.code} +${m.pts}</span>`).join('')}</div></div>`:''}
           <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px">✗ FALLIDAS (${fail.length})</div>
             <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div></div>
-          ${_partsDetailBlock(fail,partial,r.missions)}
+          ${_partsDetailBlock(fail,partial,r.missions,key)}
           <div style="margin-top:10px;padding:11px 14px;background:${r.note?'var(--amber-l)':'var(--surface)'};border:1px solid ${r.note?'var(--amber-b)':'var(--border)'};border-radius:var(--rs)">
             <div style="font-size:10px;font-weight:800;color:${r.note?'var(--amber)':'var(--text3)'};text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">💬 Comentarios</div>
             <div style="font-size:13px;color:${r.note?'var(--text)':'var(--text3)'};font-style:${r.note?'normal':'italic'}">${r.note||'Sin comentarios'}</div>
@@ -6825,6 +6890,12 @@ async function init(){
   loginWrap.style.display='flex';
 }
 init();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW no registrado:', e));
+  });
+}
 </script>
 </body>
 </html>

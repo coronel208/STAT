@@ -1,0 +1,15 @@
+{
+  "name": "STAT — Scoring & Team Analytics Tool",
+  "short_name": "STAT",
+  "description": "Registro de puntaje y estadísticas para equipos de FIRST LEGO League.",
+  "start_url": "./app.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0E1F35",
+  "theme_color": "#0E1F35",
+  "icons": [
+    { "src": "images/icon_stat.png", "sizes": "1024x1024", "type": "image/jpeg", "purpose": "any" },
+    { "src": "images/icon_stat.png", "sizes": "1024x1024", "type": "image/jpeg", "purpose": "maskable" }
+  ]
+}
