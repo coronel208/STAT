@@ -6035,13 +6035,22 @@ function renderEfectividadJugadores(wd) {
   const stats = players.map(p => {
     if (!checkEsUsuario(p.id)) return null; 
     
-    let rojaR = 0, azulR = 0; wd.forEach(r => { if(r.rojaP1===p.id || r.rojaP2===p.id) rojaR++; if(r.azulP1===p.id || r.azulP2===p.id) azulR++; });
+    let rojaR = 0, azulR = 0; const scores=[];
+    wd.forEach(r => { if(r.rojaP1===p.id || r.rojaP2===p.id){ rojaR++; scores.push(Number(r.score)||0); } if(r.azulP1===p.id || r.azulP2===p.id){ azulR++; scores.push(Number(r.score)||0); } });
     if(rojaR===0 && azulR===0) return null;
+    const total = scores.reduce((a,b)=>a+b,0);
+    const max = Math.max(...scores);
+    const prom = Math.round(total/scores.length);
     return `
     <div class="card" onclick="jugadorDetalle='${p.id}'; jugadorDetalleTab='base'; render();" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3 style="color:var(--heading); margin:0; font-size:18px; font-weight:800;">👤 ${p.name}</h3>
         <div style="font-size:10px; color:var(--text3); font-weight:800;">${rojaR+azulR} RONDAS</div>
+      </div>
+      <div style="display:flex; gap:16px; margin-top:10px; flex-wrap:wrap;">
+        <div><div style="font-size:9px;color:var(--text3);font-weight:800">MÁXIMO</div><div style="font-size:16px;font-weight:900;color:var(--heading);font-family:'JetBrains Mono',monospace">${max}</div></div>
+        <div><div style="font-size:9px;color:var(--text3);font-weight:800">PROMEDIO</div><div style="font-size:16px;font-weight:900;color:var(--heading);font-family:'JetBrains Mono',monospace">${prom}</div></div>
+        <div><div style="font-size:9px;color:var(--text3);font-weight:800">TOTAL</div><div style="font-size:16px;font-weight:900;color:var(--heading);font-family:'JetBrains Mono',monospace">${total}</div></div>
       </div>
     </div>`;
   }).filter(x=>x).join('');
