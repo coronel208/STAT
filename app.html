@@ -22,18 +22,18 @@
                           así el texto no queda invisible sobre su propio fondo navy. */
   --teal:    #0D6E8A;
   --cyan:    #00C2D4;
-  --gold:    #F5A623;
-  --gold-d:  #C17F0A;
+  --gold:    #D9A521; /* dorado más cálido y menos anaranjado que el original, combina mejor con el navy */
+  --gold-d:  #A67D0E;
 
-  /* Surfaces */
-  --bg:      #F8F9FA;
+  /* Surfaces — tono ligeramente azulado para acompañar el navy de marca */
+  --bg:      #F6F8FB;
   --surface: #FFFFFF;
-  --surface2:#F0F4F8;
-  --surface3:#E8EDF2;
+  --surface2:#EEF3F8;
+  --surface3:#E6ECF3;
 
   /* Borders */
-  --border:  #DDE3EA;
-  --border2: #C0CBD6;
+  --border:  #DCE3EC;
+  --border2: #B9C6D3;
 
   /* Text */
   --text:    #1A2332;
@@ -498,11 +498,11 @@ input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--te
   .score-big{font-size:1.8rem;}
 }
 
-/* ══ TEMA OSCURO — alternable por cualquier usuario (🌙 en el header).
-   Paleta: negro, blanco, azul rey (acento) y azul marino (marca/superficies
-   oscuras). La mayoría de la UI ya usa variables CSS (--surface,--navy,--cyan,
-   etc.) así que redefinirlas aquí basta; solo un puñado de reglas con colores
-   fijos (pestañas, botón cyan) se sobreescriben aparte. ══ */
+/* ══ TEMA ESPECIAL — solo para superadmin (aplicado automáticamente según rol,
+   ver aplicarTemaGlobal()). Paleta: negro, blanco, azul rey (acento) y azul
+   marino (marca/superficies oscuras). La mayoría de la UI ya usa variables CSS
+   (--surface,--navy,--cyan, etc.) así que redefinirlas aquí basta; solo un
+   puñado de reglas con colores fijos se sobreescriben aparte. ══ */
 body.modo-oscuro{
   --bg:      #0A0A0D;
   --surface: #15151C;
@@ -531,9 +531,18 @@ body.modo-oscuro{
   color:#FFFFFF;
 }
 body.modo-oscuro input, body.modo-oscuro select, body.modo-oscuro textarea{color:#FFFFFF;}
-body.modo-oscuro .tabs{background:var(--surface) !important;}
-body.modo-oscuro .tbtn.active{background:rgba(65,105,225,0.12) !important;}
+body.modo-oscuro .hdr, body.modo-oscuro .tabs{background:rgba(21,21,28,0.94) !important;backdrop-filter:blur(12px);}
+body.modo-oscuro .tabs{border-bottom-color:rgba(65,105,225,0.4) !important;}
+body.modo-oscuro .tbtn.active{color:#6C8CF5 !important;border-bottom-color:#6C8CF5 !important;background:rgba(65,105,225,0.12) !important;}
+body.modo-oscuro .tbtn:not(.active):hover{color:#8FA6F2 !important;}
+body.modo-oscuro .sec-lbl{color:#6C8CF5 !important;}
+body.modo-oscuro .hub-btn{border-color:#3B5BDB !important;}
+body.modo-oscuro .hub-btn-title{color:#6C8CF5 !important;}
+body.modo-oscuro [draggable="true"], body.modo-oscuro .player-chip{border-color:#3B5BDB !important;}
+body.modo-oscuro span.sbadge{color:#0A0A0D !important;background:#6C8CF5 !important;}
+body.modo-oscuro .btn-gold, body.modo-oscuro .btn-cyan{border-color:#3B5BDB !important;}
 body.modo-oscuro .btn-cyan:hover{background:#5B82E8 !important;}
+body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6C8CF5 !important;color:#fff !important;}
 </style>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -700,7 +709,6 @@ body.modo-oscuro .btn-cyan:hover{background:#5B82E8 !important;}
     <span id="hdr-invite" style="display:none; font-size:10px; font-weight:900; color:#0e1f35; background:#ffb400; padding:3px 8px; border-radius:6px; letter-spacing:1px;"></span>
 
     <span class="pill" id="hdr-sync">● En línea</span>
-    <button id="hdr-theme-toggle" onclick="toggleTemaOscuro()" title="Cambiar tema" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 9px;font-size:12px;cursor:pointer;line-height:1">🌙</button>
     <a href="index.html" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 10px;font-size:11px;text-decoration:none;font-weight:600;letter-spacing:.3px;margin-right:2px">← Inicio</a>
     <button id="hdr-logout" onclick="doLogout()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:none;letter-spacing:0.3px;">Salir</button>
   </div>
@@ -812,19 +820,6 @@ let players=[]; // [{id,name}]
 let pairs=[];   // [{id,name,p1,p2}]
 let trainings=[];// [{id,name,ts,status,rounds:[{id,order,label,azulPairId,rojaPairId,completed}]}]
 let runs=[];    // [{id,roundName,note,azulPairId,rojaPairId,missions,score,ts,trainingId,trainingRoundId}]
-
-// Tema de color (claro/oscuro), preferencia guardada por dispositivo
-let temaOscuro = localStorage.getItem('temaOscuro')==='1';
-function applyTemaOscuro(){
-  document.body.classList.toggle('modo-oscuro', temaOscuro);
-  const btn=document.getElementById('hdr-theme-toggle');
-  if(btn) btn.textContent = temaOscuro?'☀️':'🌙';
-}
-function toggleTemaOscuro(){
-  temaOscuro=!temaOscuro;
-  localStorage.setItem('temaOscuro', temaOscuro?'1':'0');
-  applyTemaOscuro();
-}
 
 // UI helpers
 let confDel={};
@@ -1644,148 +1639,8 @@ function aplicarTemaGlobal() {
     document.head.appendChild(styleNormal);
   }
 
-  // -- ESTILOS VIP (Solo para SuperAdmin) --
-  let styleEl = document.getElementById('vip-superadmin-styles');
-
-  if (esSuper) {
-    document.body.classList.add('modo-vip');
-
-    if (!styleEl) {
-      styleEl = document.createElement('style');
-      styleEl.id = 'vip-superadmin-styles';
-      styleEl.innerHTML = `
-        /* ═══ PALETA VIP (superadmin) ═══
-           Reescrito por completo: la versión anterior redefinía --bg/--surface/--cyan
-           etc. pero dejaba --navy, --text3 y los colores semánticos (--red/--green/
-           --amber/--blue) sin tocar — esas variables se usan como TEXTO en decenas de
-           lugares, así que quedaban oscuras sobre el nuevo fondo oscuro (texto
-           invisible). Además había reglas que se pisaban entre sí (.sec-lbl definido
-           dorado y luego navy dos líneas después). Este bloque cubre TODAS las
-           variables de color usadas como texto en la app y no se contradice. */
-        body.modo-vip {
-          /* superficies */
-          --bg: #0B1929 !important;
-          --surface: #132235 !important;
-          --surface2: #1A2E45 !important;
-          --surface3: #21375A !important;
-          --border: rgba(255,255,255,0.14) !important;
-          --border2: rgba(255,255,255,0.24) !important;
-
-          /* texto (--heading reemplaza los usos de --navy como color de texto) */
-          --text: #F5F8FB !important;
-          --text2: rgba(255,255,255,0.82) !important;
-          --text3: rgba(255,255,255,0.58) !important;
-          --heading: #F5F8FB !important;
-
-          /* acento de marca → dorado, identidad VIP */
-          --cyan: #FFC107 !important;
-          --teal: #F5A623 !important;
-          --gold: #FFD700 !important;
-          --gold-d: #C17F0A !important;
-
-          /* semánticos — versiones brillantes, legibles sobre fondo oscuro */
-          --green: #2BD99A !important;
-          --green-d: #1FCB8D !important;
-          --green-l: rgba(43,217,154,0.14) !important;
-          --green-b: #2BD99A !important;
-
-          --amber: #FFC107 !important;
-          --amber-l: rgba(255,193,7,0.14) !important;
-          --amber-b: #FFC107 !important;
-
-          --red: #F2726C !important;
-          --red-l: rgba(242,114,108,0.14) !important;
-          --red-b: #F2726C !important;
-
-          --blue: #5AA9F5 !important;
-          --blue-l: rgba(90,169,245,0.14) !important;
-          --blue-b: #5AA9F5 !important;
-
-          background-color: #0B1929 !important;
-          background-image: radial-gradient(circle at top, #0F2440 0%, #050D18 100%) !important;
-          background-attachment: fixed !important;
-          color: #F5F8FB !important;
-        }
-
-        /* Inputs/selects no siempre heredan var(--text) */
-        body.modo-vip input, body.modo-vip select, body.modo-vip textarea {
-          color: #F5F8FB !important;
-        }
-
-        /* Encabezado y barra de pestañas */
-        body.modo-vip header, body.modo-vip .tabs, body.modo-vip nav, body.modo-vip .bottom-bar {
-          background: rgba(19, 34, 53, 0.92) !important;
-          backdrop-filter: blur(12px) !important;
-          border-bottom: 2px solid rgba(255, 193, 7, 0.4) !important;
-        }
-        /* Pestaña activa: acento dorado con glow (distinto de un heading normal) */
-        body.modo-vip .tbtn.active, body.modo-vip .tab.active, body.modo-vip .nav-item.active {
-          color: #FFC107 !important;
-          border-bottom-color: #FFC107 !important;
-          text-shadow: 0 0 10px rgba(255, 193, 7, 0.45) !important;
-        }
-        body.modo-vip .tbtn:not(.active):hover, body.modo-vip .tab:not(.active):hover {
-          color: #F5A623 !important;
-        }
-
-        /* Contenedor principal */
-        body.modo-vip #main, body.modo-vip .main {
-          box-shadow: 0 0 50px rgba(245, 166, 35, 0.08) !important;
-          border: 1px solid rgba(255, 215, 0, 0.15) !important;
-          background: rgba(10, 25, 45, 0.4) !important;
-          backdrop-filter: blur(10px) !important;
-          max-width: 1100px !important;
-          overflow: visible !important;
-          height: auto !important;
-          max-height: none !important;
-        }
-
-        /* Badge de código de invitación */
-        body.modo-vip .invite-badge-top {
-          background: #FFC107 !important;
-          border: 1px solid #FFD700 !important;
-          color: #0B1929 !important;
-          box-shadow: 0 0 10px rgba(255, 193, 7, 0.4) !important;
-        }
-
-        /* Etiquetas de sección (eyebrow) con acento dorado */
-        body.modo-vip .sec-lbl { color: #FFC107 !important; }
-
-        /* Tarjetas del hub (Lanzada suelta / Entrenamiento) */
-        body.modo-vip .hub-btn {
-          background: rgba(15, 36, 64, 0.85) !important;
-          border: 1px solid #FFC107 !important;
-        }
-        body.modo-vip .hub-btn-title { color: #FFC107 !important; }
-
-        /* Elementos arrastrables y chips de jugador */
-        body.modo-vip [draggable="true"], body.modo-vip .player-chip {
-          border-color: #FFC107 !important;
-          box-shadow: 0 0 5px rgba(255, 193, 7, 0.25) !important;
-        }
-
-        /* Insignias de estado (sbadge) — dorado con texto oscuro, siempre legible */
-        body.modo-vip span.sbadge {
-          color: #0B1929 !important;
-          background: #FFC107 !important;
-        }
-
-        /* Botones destacados con marco dorado */
-        body.modo-vip .btn-gold, body.modo-vip .btn-cyan {
-          border: 2px solid #FFC107 !important;
-          box-shadow: 0 4px 0 rgba(255, 193, 7, 0.4) !important;
-        }
-        body.modo-vip .btn-gold:active, body.modo-vip .btn-cyan:active {
-          transform: translateY(2px) !important;
-          box-shadow: 0 2px 0 rgba(255, 193, 7, 0.4) !important;
-        }
-      `;
-      document.head.appendChild(styleEl);
-    }
-  } else {
-    document.body.classList.remove('modo-vip');
-    if (styleEl) styleEl.remove();
-  }
+  // -- TEMA ESPECIAL (Solo para SuperAdmin) — paleta fija, no configurable --
+  document.body.classList.toggle('modo-oscuro', esSuper);
 }
 
 /* ═══════════════════════════════════════════
@@ -4901,7 +4756,7 @@ let _tendenciaHidden=new Set(); // set of mission codes hidden in tendencia char
 
 // Función dinámica para leer los colores CSS actuales vía JavaScript:
 function _getChartColors() {
-  // OJO: las variables de tema del modo VIP se redefinen en body.modo-vip,
+  // OJO: las variables del tema especial (superadmin) se redefinen en body.modo-oscuro,
   // no en :root — leerlas desde document.documentElement (el <html>) siempre
   // devuelve los valores claros originales porque un hijo nunca sobreescribe
   // el estilo calculado de su padre. Por eso el texto de las gráficas
@@ -5228,7 +5083,7 @@ const esAdminActual = () => (typeof usuarioActual !== 'undefined' && usuarioActu
 
 // Función dinámica para leer colores seguros para la rejilla de gráficas
 function _getChartColors() {
-  // OJO: las variables de tema del modo VIP se redefinen en body.modo-vip,
+  // OJO: las variables del tema especial (superadmin) se redefinen en body.modo-oscuro,
   // no en :root — leerlas desde document.documentElement (el <html>) siempre
   // devuelve los valores claros originales porque un hijo nunca sobreescribe
   // el estilo calculado de su padre. Por eso el texto de las gráficas
@@ -5355,21 +5210,33 @@ function renderAnalisisResumen(){
   let bestBlock='';
   if(wd.length){
     const stats=MISSIONS.map(m=>{
-      let full=0; wd.forEach(r=>{ if(mScoreFor(m,r.missions)>=mMaxScore(m)) full++; });
-      return {m, pct: Math.round((full/wd.length)*100)};
+      const maxPts=mMaxScore(m);
+      let full=0, partial=0, fail=0;
+      wd.forEach(r=>{
+        const pts=mScoreFor(m,r.missions);
+        if(pts<=0) fail++; else if(pts<maxPts) partial++; else full++;
+      });
+      return {m, pctFull: Math.round((full/wd.length)*100), pctPartial: Math.round((partial/wd.length)*100), pctFail: Math.round((fail/wd.length)*100)};
     });
-    const bestM=stats.reduce((a,x)=>x.pct>a.pct?x:a);
-    const worstM=stats.reduce((a,x)=>x.pct<a.pct?x:a);
+    const bestM=stats.reduce((a,x)=>x.pctFull>a.pctFull?x:a);
+    const worstM=stats.reduce((a,x)=>x.pctFull<a.pctFull?x:a);
+    const breakdown=(x)=>`<div style="display:flex;gap:8px;margin-top:4px;font-size:11px;font-weight:700">
+        <span style="color:var(--green)">✓ ${x.pctFull}%</span>
+        <span style="color:var(--amber)">~ ${x.pctPartial}%</span>
+        <span style="color:var(--red)">✗ ${x.pctFail}%</span>
+      </div>`;
     bestBlock=`<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <div class="card" style="flex:1;min-width:180px;padding:14px;cursor:pointer" onclick="switchAnalisisSub('misiones')">
         <div style="font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase">Misión más fuerte</div>
-        <div style="font-size:18px;font-weight:900;color:var(--green);margin-top:4px">${bestM.m.code} · ${bestM.pct}%</div>
+        <div style="font-size:18px;font-weight:900;color:var(--green);margin-top:4px">${bestM.m.code} · ${bestM.pctFull}%</div>
         <div style="font-size:12px;color:var(--text2)">${bestM.m.name}</div>
+        ${breakdown(bestM)}
       </div>
       <div class="card" style="flex:1;min-width:180px;padding:14px;cursor:pointer" onclick="switchAnalisisSub('misiones')">
         <div style="font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase">Misión más débil</div>
-        <div style="font-size:18px;font-weight:900;color:var(--red);margin-top:4px">${worstM.m.code} · ${worstM.pct}%</div>
+        <div style="font-size:18px;font-weight:900;color:var(--red);margin-top:4px">${worstM.m.code} · ${worstM.pctFull}%</div>
         <div style="font-size:12px;color:var(--text2)">${worstM.m.name}</div>
+        ${breakdown(worstM)}
       </div>
     </div>`;
   }
@@ -6840,7 +6707,6 @@ async function init(){
   loading.style.display='none';
   loginWrap.style.display='flex';
 }
-applyTemaOscuro();
 init();
 </script>
 </body>
