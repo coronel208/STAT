@@ -497,6 +497,43 @@ input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--te
   .tbtn{font-size:0.7rem;padding:10px 8px;}
   .score-big{font-size:1.8rem;}
 }
+
+/* ══ TEMA OSCURO — alternable por cualquier usuario (🌙 en el header).
+   Paleta: negro, blanco, azul rey (acento) y azul marino (marca/superficies
+   oscuras). La mayoría de la UI ya usa variables CSS (--surface,--navy,--cyan,
+   etc.) así que redefinirlas aquí basta; solo un puñado de reglas con colores
+   fijos (pestañas, botón cyan) se sobreescriben aparte. ══ */
+body.modo-oscuro{
+  --bg:      #0A0A0D;
+  --surface: #15151C;
+  --surface2:#1E1E28;
+  --surface3:#282833;
+  --border:  rgba(255,255,255,0.14);
+  --border2: rgba(255,255,255,0.26);
+
+  --text:    #FFFFFF;
+  --text2:   rgba(255,255,255,0.82);
+  --text3:   rgba(255,255,255,0.58);
+  --heading: #FFFFFF;
+
+  --navy:    #16294A;
+  --cyan:    #4169E1;
+  --teal:    #2E4FC7;
+  --gold:    #4169E1;
+  --gold-d:  #2E4FC7;
+
+  --green:   #2BD99A; --green-d:#1FCB8D; --green-l:rgba(43,217,154,0.14); --green-b:#2BD99A;
+  --amber:   #FFB84D; --amber-l:rgba(255,184,77,0.14); --amber-b:#FFB84D;
+  --red:     #F2726C; --red-l:  rgba(242,114,108,0.14); --red-b: #F2726C;
+  --blue:    #4169E1; --blue-l: rgba(65,105,225,0.16); --blue-b:#4169E1;
+
+  background-color:#0A0A0D;
+  color:#FFFFFF;
+}
+body.modo-oscuro input, body.modo-oscuro select, body.modo-oscuro textarea{color:#FFFFFF;}
+body.modo-oscuro .tabs{background:var(--surface) !important;}
+body.modo-oscuro .tbtn.active{background:rgba(65,105,225,0.12) !important;}
+body.modo-oscuro .btn-cyan:hover{background:#5B82E8 !important;}
 </style>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -663,6 +700,7 @@ input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--te
     <span id="hdr-invite" style="display:none; font-size:10px; font-weight:900; color:#0e1f35; background:#ffb400; padding:3px 8px; border-radius:6px; letter-spacing:1px;"></span>
 
     <span class="pill" id="hdr-sync">● En línea</span>
+    <button id="hdr-theme-toggle" onclick="toggleTemaOscuro()" title="Cambiar tema" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 9px;font-size:12px;cursor:pointer;line-height:1">🌙</button>
     <a href="index.html" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 10px;font-size:11px;text-decoration:none;font-weight:600;letter-spacing:.3px;margin-right:2px">← Inicio</a>
     <button id="hdr-logout" onclick="doLogout()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:none;letter-spacing:0.3px;">Salir</button>
   </div>
@@ -775,6 +813,19 @@ let pairs=[];   // [{id,name,p1,p2}]
 let trainings=[];// [{id,name,ts,status,rounds:[{id,order,label,azulPairId,rojaPairId,completed}]}]
 let runs=[];    // [{id,roundName,note,azulPairId,rojaPairId,missions,score,ts,trainingId,trainingRoundId}]
 
+// Tema de color (claro/oscuro), preferencia guardada por dispositivo
+let temaOscuro = localStorage.getItem('temaOscuro')==='1';
+function applyTemaOscuro(){
+  document.body.classList.toggle('modo-oscuro', temaOscuro);
+  const btn=document.getElementById('hdr-theme-toggle');
+  if(btn) btn.textContent = temaOscuro?'☀️':'🌙';
+}
+function toggleTemaOscuro(){
+  temaOscuro=!temaOscuro;
+  localStorage.setItem('temaOscuro', temaOscuro?'1':'0');
+  applyTemaOscuro();
+}
+
 // UI helpers
 let confDel={};
 let confStop={}; // {trainingId: 'pause'|'stop'|'reuse'|null}
@@ -828,7 +879,8 @@ function _applySort(arr,key,defBy){
   const s=[...arr];
   if(cur.by==='score')s.sort((a,b)=>cur.dir==='desc'?(best(b.scores)||0)-(best(a.scores)||0):(best(a.scores)||0)-(best(b.scores)||0));
   else if(cur.by==='avg')s.sort((a,b)=>cur.dir==='desc'?(avg(b.scores)||0)-(avg(a.scores)||0):(avg(a.scores)||0)-(avg(b.scores)||0));
-  else if(cur.by==='rounds')s.sort((a,b)=>cur.dir==='desc'?(b.refs||[]).length-(a.refs||[]).length:(a.refs||[]).length-(b.refs||[]).length);
+  else if(cur.by==='rounds')s.sort((a,b)=>{const rb=b.rounds!==undefined?b.rounds:(b.refs||[]).length,ra=a.rounds!==undefined?a.rounds:(a.refs||[]).length;return cur.dir==='desc'?rb-ra:ra-rb;});
+  else if(cur.by==='fecha')s.sort((a,b)=>cur.dir==='desc'?(b.created||0)-(a.created||0):(a.created||0)-(b.created||0));
   else if(cur.by==='az')s.sort((a,b)=>cur.dir==='asc'?(a.name||'').localeCompare(b.name||''):(b.name||'').localeCompare(a.name||''));
   return s;
 }
@@ -4513,12 +4565,12 @@ function _cuadrillasSection(subset,prefix){
   });
   
   const sk3=prefix+'_cua';
-  const rawCua=Object.values(groups).map(g=>({...g,name:_bestName(g.names||[])||''}));
+  const rawCua=Object.values(groups).map(g=>({...g,name:_bestName(g.names||[])||'',created:Math.min(...g.refs.map(x=>x.r.ts||Infinity))}));
   const allCua=_applySort(rawCua,sk3,'score');
-  
+
   if(!allCua.length) return `<div class="empty">Sin cuadrillas registradas para tu jugador.</div>`;
-  
-  const bar3=_sortBar(sk3,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas'],['az','A–Z']],'score');
+
+  const bar3=_sortBar(sk3,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas'],['fecha','Fecha'],['az','A–Z']],'score');
   return bar3+allCua.map(({az,ro,names,refs,scores},ci)=>{
     const ap=getPair(az);const rp=getPair(ro);
     const refRun = refs[0]?.r;
@@ -6069,15 +6121,23 @@ function _mejorBaseJugador(pid, wd){
 }
 
 function renderEfectividadJugadores(wd) {
-  const stats = players.map(p => {
-    if (!checkEsUsuario(p.id)) return null; 
-    
+  const sk='an_jugadores';
+  const raw = players.map(p => {
+    if (!checkEsUsuario(p.id)) return null;
     let rojaR = 0, azulR = 0; const scores=[];
     wd.forEach(r => { if(r.rojaP1===p.id || r.rojaP2===p.id){ rojaR++; scores.push(Number(r.score)||0); } if(r.azulP1===p.id || r.azulP2===p.id){ azulR++; scores.push(Number(r.score)||0); } });
     if(rojaR===0 && azulR===0) return null;
+    const created = parseInt((p.id||'').slice(0,-3),36)||0;
+    return {p, scores, rounds:rojaR+azulR, name:p.name, created};
+  }).filter(x=>x);
+  const sorted = _applySort(raw, sk, 'score');
+  if(!sorted.length) return `<div style="animation: fadeIn 0.3s ease;"><div class="empty">Sin datos suficientes.</div></div>`;
+  const bar = _sortBar(sk,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas'],['fecha','Fecha'],['az','A–Z']],'score');
+
+  const stats = sorted.map(({p, scores, rounds}) => {
     const total = scores.reduce((a,b)=>a+b,0);
-    const max = Math.max(...scores);
-    const prom = Math.round(total/scores.length);
+    const max = best(scores);
+    const prom = avg(scores);
 
     const rolBase=(baseName)=>{
       const subset=wd.filter(r=>(baseName==='roja'?r.rojaP1:r.azulP1)===p.id||(baseName==='roja'?r.rojaP2:r.azulP2)===p.id);
@@ -6093,7 +6153,7 @@ function renderEfectividadJugadores(wd) {
     <div class="card" onclick="jugadorDetalle='${p.id}'; jugadorDetalleTab='base'; render();" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3 style="color:var(--heading); margin:0; font-size:18px; font-weight:800;">👤 ${p.name}</h3>
-        <div style="font-size:10px; color:var(--text3); font-weight:800;">${rojaR+azulR} RONDAS</div>
+        <div style="font-size:10px; color:var(--text3); font-weight:800;">${rounds} RONDAS</div>
       </div>
       <div style="display:flex; gap:16px; margin-top:10px; flex-wrap:wrap;">
         <div><div style="font-size:9px;color:var(--text3);font-weight:800">MÁXIMO</div><div style="font-size:16px;font-weight:900;color:var(--heading);font-family:'JetBrains Mono',monospace">${max}</div></div>
@@ -6106,8 +6166,8 @@ function renderEfectividadJugadores(wd) {
         ${rolAzul?`<span>🔵 ${rolAzul}</span>`:''}
       </div>`:''}
     </div>`;
-  }).filter(x=>x).join('');
-  return `<div style="animation: fadeIn 0.3s ease;">${stats || '<div class="empty">Sin datos suficientes.</div>'}</div>`;
+  }).join('');
+  return `<div style="animation: fadeIn 0.3s ease;">${bar}${stats}</div>`;
 }
 
 /* ── 5.1 DETALLE JUGADOR (CON COLORES CHARTJS ARREGLADOS) ── */
@@ -6200,24 +6260,35 @@ function renderEfectividadParejas(wd) {
   wd.forEach(r => {
     const addP = (p1, p2, isRoja) => {
       if(!p1 || !p2) return; const id = [p1, p2].sort().join('-');
-      if(!parejasData[id]) parejasData[id] = { id, p1, p2, rR:0, aR:0 };
+      if(!parejasData[id]) parejasData[id] = { id, p1, p2, rR:0, aR:0, scores:[], refs:[] };
       isRoja ? parejasData[id].rR++ : parejasData[id].aR++;
+      parejasData[id].scores.push(Number(r.score)||0);
+      parejasData[id].refs.push(r);
     };
     addP(r.rojaP1, r.rojaP2, true); addP(r.azulP1, r.azulP2, false);
   });
   const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? p.name : '---'; };
 
-  const html = Object.values(parejasData).map(p => {
-    if (!checkEsUsuario(p.p1) && !checkEsUsuario(p.p2)) return '';
+  const sk='an_parejas';
+  const raw = Object.values(parejasData)
+    .filter(p => checkEsUsuario(p.p1) || checkEsUsuario(p.p2))
+    .map(p => ({...p, name:[getP(p.p1),getP(p.p2)].join(' & '), created:Math.min(...p.refs.map(r=>r.ts||Infinity))}));
+  const sorted = _applySort(raw, sk, 'score');
+  if(!sorted.length) return `<div class="empty">No tienes datos con ninguna pareja registrada.</div>`;
+  const bar = _sortBar(sk,[['score','Mejor'],['avg','Promedio'],['rounds','Rondas'],['fecha','Fecha'],['az','A–Z']],'score');
+
+  const html = sorted.map(p => {
+    const bv=best(p.scores), av=avg(p.scores);
     return `
     <div class="card" onclick="parejaDetalle='${p.id}'; parejaDetalleTab='base'; render();" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-         <div class="bpill" style="background:var(--surface2); border-color:var(--border2); color:var(--text); font-size:13px; padding:6px 12px;">👥 ${getP(p.p1)} & ${getP(p.p2)}</div>
+         <div class="bpill" style="background:var(--surface2); border-color:var(--border2); color:var(--text); font-size:13px; padding:6px 12px;">👥 ${p.name}</div>
          <div style="font-size:10px; color:var(--text3); font-weight:800;">${p.rR + p.aR} RONDAS JUNTOS</div>
       </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:8px">Mejor: <strong style="color:var(--green)">${bv}</strong> · Promedio: <strong>${av}</strong></div>
     </div>`;
   }).join('');
-  return `<div style="animation: fadeIn 0.3s ease;">${html || '<div class="empty">No tienes datos con ninguna pareja registrada.</div>'}</div>`;
+  return `<div style="animation: fadeIn 0.3s ease;">${bar}${html}</div>`;
 }
 
 /* ── 6.1 DETALLE PAREJAS ── */
@@ -6769,6 +6840,7 @@ async function init(){
   loading.style.display='none';
   loginWrap.style.display='flex';
 }
+applyTemaOscuro();
 init();
 </script>
 </body>
