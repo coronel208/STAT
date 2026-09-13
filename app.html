@@ -780,6 +780,28 @@ const MISSIONS=[
     {id:'fp_tok',label:'Fichas restantes al final de la partida',pts:0,type:'token'}]},
 ];
 
+/* Cada objeto del Foro (M14) sale de completar otra misión primero — no tiene
+   sentido dejar poder marcarlo logrado si esa misión de origen no se hizo
+   (ej. no puedes dejar el mineral en el foro si nunca lo sacaste de la forja).
+   Mapa fijo en vez de un sistema genérico de dependencias: son siempre los
+   mismos 7 objetos de esta temporada, ya lo dice el "hint" de M14 arriba. */
+const FORO_DEPS = {
+  'Cepillo':            'M01',
+  'Capa de suelo':      'M02',
+  'Artefacto valioso':  'M04',
+  'Carro oponente':     'M03',
+  'Mineral fosilizado': 'M06',
+  'Piedra molino':      'M07',
+  'Platillo':           'M10',
+};
+const FORO_ITEM_NAMES = Object.keys(FORO_DEPS);
+function _foroDepMet(nm){
+  const code = FORO_DEPS[nm];
+  if(!code) return true;
+  const mo = MISSIONS.find(m=>m.code===code);
+  return mo ? mScoreFor(mo, mState) > 0 : true;
+}
+
 /* ═══════════════════════════════════════════
    STATE
 ═══════════════════════════════════════════ */
@@ -879,11 +901,12 @@ function _applySort(arr,key,defBy){
   else if(cur.by==='az')s.sort((a,b)=>cur.dir==='asc'?(a.name||'').localeCompare(b.name||''):(b.name||'').localeCompare(a.name||''));
   return s;
 }
-function _sortRunObjs(arr,key){
-  const cur=_getSort(key,'score');
+function _sortRunObjs(arr,key,defBy){
+  const cur=_getSort(key,defBy||'score');
   const s=[...arr];
   if(cur.by==='score')s.sort((a,b)=>cur.dir==='desc'?Number(b.r.score)-Number(a.r.score):Number(a.r.score)-Number(b.r.score));
   else if(cur.by==='date')s.sort((a,b)=>cur.dir==='desc'?(b.r.ts||0)-(a.r.ts||0):(a.r.ts||0)-(b.r.ts||0));
+  else if(cur.by==='az')s.sort((a,b)=>cur.dir==='asc'?(a.r.roundName||'').localeCompare(b.r.roundName||''):(b.r.roundName||'').localeCompare(a.r.roundName||''));
   return s;
 }
 
@@ -1315,7 +1338,7 @@ function defaultMState(){
     // check: null = sin marcar, true = logrado, false = marcado como fallido
     if(p.type==='check')s[p.id]=null;
     else if(p.type==='counter'){
-      const names=_overrideNames(m.code,p.id);
+      const names=_overrideNames(m.code,p.id) || (m.code==='M14'?FORO_ITEM_NAMES:null);
       // Con sub-acciones nombradas, cada unidad es un check independiente
       // (tri-state); sin nombrar, sigue siendo un contador simple 0..max.
       s[p.id]=names ? new Array(names.length).fill(null) : 0;
@@ -1326,8 +1349,22 @@ function defaultMState(){
 }
 /* Puntos de un parámetro tipo counter, soportando ambos formatos:
    número simple (contador genérico) o array tri-state (sub-acciones nombradas). */
+/* Firebase Realtime DB no guarda arrays con huecos (valores null) como array:
+   los guarda como objeto {"4":true} con solo las claves no-null. Sin esto, un
+   estado tri-state con la mayoría de ítems sin marcar (el caso normal) se lee
+   de vuelta como objeto y se pierde/rompe el conteo. Reconstruye el array. */
+function _triArr(v){
+  if(Array.isArray(v)) return v;
+  if(v && typeof v==='object'){
+    const arr=[];
+    Object.keys(v).forEach(k=>{ arr[+k]=v[k]; });
+    return arr;
+  }
+  return null;
+}
 function _counterPts(v,pts){
-  if(Array.isArray(v)) return v.filter(x=>x===true).length*pts;
+  const arr=_triArr(v);
+  if(arr) return arr.filter(x=>x===true).length*pts;
   return (v||0)*pts;
 }
 function calcScore(ms){
@@ -1377,6 +1414,47 @@ function getMissionResults(ms){
     const done=pts>=max;
     return{code:m.code,name:m.name,pts,max,done,partial};
   });
+}
+/* Desglose por parte de UNA ronda ya jugada — qué partes de una misión
+   parcial/fallida sí se hicieron y cuáles no (check-type y sub-acciones
+   nombradas de un contador, incluyendo las fijas de Foro). */
+function _missionPartsForRun(m, ms){
+  const parts=[];
+  m.params.forEach(p=>{
+    if(p.type==='check'){
+      const v = ms ? ms[p.id] : undefined;
+      parts.push({label:p.label, bonus:!!p.bonus, status: v===true?'ok':v===false?'bad':'sin'});
+    } else if(p.type==='counter'){
+      const names=_overrideNames(m.code,p.id) || (m.code==='M14'?FORO_ITEM_NAMES:null);
+      if(names){
+        const arr = _triArr(ms ? ms[p.id] : undefined);
+        names.forEach((nm,idx)=>{
+          const v = arr ? arr[idx] : undefined;
+          parts.push({label:nm, bonus:false, status: v===true?'ok':v===false?'bad':'sin'});
+        });
+      }
+    }
+  });
+  return parts;
+}
+/* Bloque "detalle por parte" para las misiones parciales/fallidas de una
+   ronda — se agrega debajo del resumen COMPLETAS/PARCIALES/FALLIDAS. */
+function _partsDetailBlock(fail, partial, ms){
+  const rows=[...partial,...fail].map(x=>{
+    const mo=MISSIONS.find(m=>m.code===x.code);
+    const parts=mo?_missionPartsForRun(mo,ms):[];
+    // Si no se tocó ninguna parte, no aporta nada mostrarla — ya dice "fallida" arriba.
+    if(!parts.length || !parts.some(p=>p.status!=='sin')) return '';
+    const chips=parts.map(p=>{
+      const bg=p.status==='ok'?'var(--green-l)':p.status==='bad'?'var(--red-l)':'var(--surface2)';
+      const fg=p.status==='ok'?'var(--green-d)':p.status==='bad'?'var(--red)':'var(--text3)';
+      const ic=p.status==='ok'?'✓':p.status==='bad'?'✗':'·';
+      return `<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;background:${bg};color:${fg}">${ic} ${p.label}</span>`;
+    }).join('');
+    return `<div style="margin-bottom:5px"><span style="font-size:10px;font-weight:800;color:var(--text2)">${x.code}</span> <span style="display:inline-flex;gap:4px;flex-wrap:wrap;vertical-align:middle">${chips}</span></div>`;
+  }).join('');
+  if(!rows) return '';
+  return `<div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px">🔎 DETALLE POR PARTE</div>${rows}</div>`;
 }
 function avg(arr){return arr.length?Math.round(arr.reduce((a,b)=>a+b,0)/arr.length):null;}
 function best(arr){return arr.length?Math.max(...arr):null;}
@@ -1727,9 +1805,10 @@ function _admRoleStyle(rol){
   return {color:'#22D3E8', icon:'👤'};
 }
 
-function _admUserCard(u, uKey){
+function _admUserCard(u, uKey, esSuper){
   const rol=(u.rol||'').toLowerCase();
   const {color,icon}=_admRoleStyle(rol);
+  const esSuperUser=rol==='superadmin';
   return `
     <div class="adm-user-card">
       <div>
@@ -1739,6 +1818,7 @@ function _admUserCard(u, uKey){
         <div class="adm-user-meta">ACCESO: <b>${u.username}</b></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${esSuper?`<button class="adm-btn ${esSuperUser?'adm-btn-red':'adm-btn-gold'} adm-btn-sm" onclick="_admToggleSuperadmin('${uKey}',${esSuperUser})">${esSuperUser?'👑 Quitar superadmin':'👑 Hacer superadmin'}</button>`:''}
         <button class="adm-btn adm-btn-gold adm-btn-sm" onclick="editarNombreUsuario('${uKey}')">✏ Usuario</button>
         <button class="adm-btn adm-btn-gold adm-btn-sm" onclick="editarPasswordUsuario('${uKey}')">🔑 Clave</button>
         <button class="adm-btn adm-btn-red adm-btn-sm" onclick="_admDeleteUser('${uKey}')">🗑</button>
@@ -1746,7 +1826,7 @@ function _admUserCard(u, uKey){
     </div>`;
 }
 
-function _admUsersSection(teamKey, users){
+function _admUsersSection(teamKey, users, esSuper){
   const openKey=teamKey+':users'; const isOpen=!!_admOpen[openKey];
   return `
     <div class="adm-subsec">
@@ -1754,8 +1834,21 @@ function _admUsersSection(teamKey, users){
         <span>👤 Usuarios<span class="adm-count">${users.length}</span></span>
         <span>${isOpen?'▲':'▼'}</span>
       </div>
-      ${isOpen?`<div class="adm-subsec-body">${users.length?users.map(([uKey,u])=>_admUserCard(u,uKey)).join(''):'<div class="adm-empty">No hay usuarios en este equipo.</div>'}</div>`:''}
+      ${isOpen?`<div class="adm-subsec-body">${users.length?users.map(([uKey,u])=>_admUserCard(u,uKey,esSuper)).join(''):'<div class="adm-empty">No hay usuarios en este equipo.</div>'}</div>`:''}
     </div>`;
+}
+
+async function _admToggleSuperadmin(userKey, esSuperActual){
+  const nuevoRol = esSuperActual ? 'entrenador' : 'superadmin';
+  const msg = esSuperActual
+    ? `¿Quitarle el rol de superadmin a "${userKey}"? Pasará a ser entrenador de su equipo.`
+    : `¿Hacer superadmin a "${userKey}"? Podrá ver y administrar TODOS los equipos.`;
+  if(!confirm(msg)) return;
+  try{
+    await db.ref('users/'+userKey).update({ rol: nuevoRol });
+    if(typeof showToast==='function') showToast(esSuperActual?'✓ Ya no es superadmin':'✓ Ahora es superadmin');
+    renderAdminPanel();
+  }catch(e){ alert('Error: '+e.message); }
 }
 
 function _admStrategySection(teamKey, lzArr){
@@ -1819,7 +1912,7 @@ function _admTeamCard(teamKey, team, usersOfTeam, esSuper){
           <button class="adm-btn adm-btn-ghost adm-btn-sm" onclick="_admDelTeamCancel()">Cancelar</button>
         </div>
       </div>`:''}
-    ${_admUsersSection(teamKey, usersOfTeam)}
+    ${_admUsersSection(teamKey, usersOfTeam, esSuper)}
     ${esSuper?_admStrategySection(teamKey, lz):''}
     ${_admDataSection(teamKey)}
   </div>`;
@@ -2802,21 +2895,25 @@ function renderMissions(){
         </div>`;
       }
       if(p.type==='counter'){
-        const names=_overrideNames(m.code,p.id);
+        const isForo = m.code==='M14' && !_overrideNames(m.code,p.id);
+        const names=_overrideNames(m.code,p.id) || (isForo?FORO_ITEM_NAMES:null);
         if(names){
           // Sub-acciones nombradas: cada una es un check independiente (✓/✗)
-          const arr=Array.isArray(mState[p.id])?mState[p.id]:new Array(names.length).fill(null);
+          const arr=_triArr(mState[p.id]) || new Array(names.length).fill(null);
           mState[p.id]=arr;
           return`<div class="prow" style="flex-direction:column;align-items:stretch;gap:6px">
             <div class="pdesc" style="margin-bottom:2px">${p.label} <span class="ppts-lbl">(${p.pts} c/u · máx ${p.max})</span></div>
-            ${names.map((nm,idx)=>`
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-                <span style="font-size:0.82rem;color:var(--text2)">${nm}</span>
+            ${names.map((nm,idx)=>{
+              const blocked = isForo && !_foroDepMet(nm);
+              return `
+              <div id="fdep_${p.id}_${idx}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;${blocked?'opacity:.45':''}">
+                <span style="font-size:0.82rem;color:var(--text2)">${nm}${blocked?` <span style="font-size:0.68rem;color:var(--text3)">(requiere ${FORO_DEPS[nm]})</span>`:''}</span>
                 <div class="chkbtns">
-                  <button type="button" id="cbok_${p.id}_${idx}" class="chkbtn ok${arr[idx]===true?' on':''}" title="Logrado" onclick="mSetNamedItem('${p.id}',${idx},true)">✓</button>
+                  <button type="button" id="cbok_${p.id}_${idx}" class="chkbtn ok${arr[idx]===true?' on':''}" title="${blocked?'Requiere completar '+FORO_DEPS[nm]+' primero':'Logrado'}" ${blocked?'disabled':''} onclick="mSetNamedItem('${p.id}',${idx},true)">✓</button>
                   <button type="button" id="cbbad_${p.id}_${idx}" class="chkbtn bad${arr[idx]===false?' on':''}" title="Falló" onclick="mSetNamedItem('${p.id}',${idx},false)">✗</button>
                 </div>
-              </div>`).join('')}
+              </div>`;
+            }).join('')}
           </div>`;
         }
         const val=mState[p.id]||0;
@@ -2916,13 +3013,23 @@ function _refreshMissions(){
           }
         }
       } else if(p.type==='counter'){
-        const names=_overrideNames(m.code,p.id);
-        if(names && Array.isArray(mState[p.id])){
-          mState[p.id].forEach((v,idx)=>{
+        const isForo = m.code==='M14' && !_overrideNames(m.code,p.id);
+        const names=_overrideNames(m.code,p.id) || (isForo?FORO_ITEM_NAMES:null);
+        const triArr=_triArr(mState[p.id]);
+        if(names && triArr){
+          mState[p.id]=triArr;
+          names.forEach((nm,idx)=>{
+            let v=triArr[idx];
+            const blocked = isForo && !_foroDepMet(nm);
+            if(blocked && v===true) v=triArr[idx]=null;
             const okBtn=document.getElementById(`cbok_${p.id}_${idx}`);
             const badBtn=document.getElementById(`cbbad_${p.id}_${idx}`);
-            if(okBtn) okBtn.classList.toggle('on', v===true);
+            if(okBtn){ okBtn.classList.toggle('on', v===true); okBtn.disabled=blocked; }
             if(badBtn) badBtn.classList.toggle('on', v===false);
+            if(isForo){
+              const row=document.getElementById(`fdep_${p.id}_${idx}`);
+              if(row) row.style.opacity=blocked?'.45':'1';
+            }
           });
         } else {
           const cv=document.getElementById('cv_'+p.id);
@@ -2950,8 +3057,11 @@ function mSetCheck(id,val){
 /* Igual que mSetCheck pero para una sub-acción nombrada dentro de un
    contador (mState[id] es un array tri-state, una entrada por sub-acción). */
 function mSetNamedItem(id,idx,val){
-  if(!Array.isArray(mState[id])) return;
-  mState[id][idx] = (mState[id][idx]===val) ? null : val;
+  const arr=_triArr(mState[id]);
+  if(!arr) return;
+  mState[id]=arr;
+  if(id==='m14_foro' && val===true && !_overrideNames('M14','m14_foro') && !_foroDepMet(FORO_ITEM_NAMES[idx])) return;
+  arr[idx] = (arr[idx]===val) ? null : val;
   _refreshMissions();
 }
 function mCounter(id,d,max){
@@ -4110,7 +4220,8 @@ function _rcard(r,idx,meta){
       </div>`:''}
       <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px">✗ FALLIDAS (${fail.length})</div>
         <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div>
-      </div>`:`<div style="font-size:12px;color:var(--text3);margin-top:4px">Sin detalle de misiones</div>`}
+      </div>
+      ${_partsDetailBlock(fail,partial,r.missions)}`:`<div style="font-size:12px;color:var(--text3);margin-top:4px">Sin detalle de misiones</div>`}
   </div>`;
 }
 
@@ -4168,7 +4279,8 @@ function _rankingSection(subset,prefix){
           </div>`:''}
           <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px">✗ FALLIDAS (${fail.length})</div>
             <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div>
-          </div>`:`<div style="font-size:12px;color:var(--text3)">Sin detalle de misiones</div>`}
+          </div>
+          ${_partsDetailBlock(fail,partial,r.missions)}`:`<div style="font-size:12px;color:var(--text3)">Sin detalle de misiones</div>`}
         <div style="margin-top:8px;padding:8px 10px;background:${r.note?'var(--amber-l)':'var(--surface2)'};border:1px solid ${r.note?'#F5C4B3':'var(--border)'};border-radius:var(--rs)">
           <div style="font-size:10px;font-weight:700;color:${r.note?'var(--amber)':'var(--text3)'};text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-family:inherit">💬 Comentarios</div>
           <div style="font-size:13px;color:${r.note?'var(--text)':'var(--text3)'};font-style:${r.note?'normal':'italic'};font-weight:${r.note?'500':'400'}">${r.note||'Sin comentarios'}</div>
@@ -4570,6 +4682,7 @@ function _trainingRoundsSection(t,sub){
           <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px">✗ FALLIDAS (${fail.length})</div>
             <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div>
           </div>
+          ${_partsDetailBlock(fail,partial,run.missions)}
           <div style="margin-top:8px;padding:8px 10px;background:${run.note?'var(--amber-l)':'var(--surface2)'};border:1px solid ${run.note?'#F5C4B3':'var(--border)'};border-radius:var(--rs)">
             <div style="font-size:10px;font-weight:700;color:${run.note?'var(--amber)':'var(--text3)'};text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-family:inherit">💬 Comentarios</div>
             <div style="font-size:13px;color:${run.note?'var(--text)':'var(--text3)'};font-style:${run.note?'normal':'italic'};font-weight:${run.note?'500':'400'}">${run.note||'Sin comentarios'}</div>
@@ -5441,13 +5554,13 @@ function effTable(subset, label, customTargets = null){
         });
         if(ok+bad>0) parts.push({ label:p.label, bonus:!!p.bonus, ok, bad, sin });
       } else if(p.type==='counter'){
-        const names=_overrideNames(m.code,p.id);
+        const names=_overrideNames(m.code,p.id) || (m.code==='M14'?FORO_ITEM_NAMES:null);
         if(!names) return;
         names.forEach((nm,idx)=>{
           let ok=0, bad=0, sin=0;
           subset.forEach(r=>{
-            const arr = r.missions ? r.missions[p.id] : undefined;
-            const v = Array.isArray(arr) ? arr[idx] : undefined;
+            const arr = _triArr(r.missions ? r.missions[p.id] : undefined);
+            const v = arr ? arr[idx] : undefined;
             if(v===true) ok++; else if(v===false) bad++; else sin++;
           });
           if(ok+bad>0) parts.push({ label:nm, bonus:false, ok, bad, sin });
@@ -5479,6 +5592,36 @@ function effTable(subset, label, customTargets = null){
 
   const cards = mStats.map(ms => {
     const col = ms.pctFull >= 80 ? 'var(--green)' : ms.pctFull >= 50 ? 'var(--amber)' : 'var(--red)';
+    const dKey = 'eff_'+label.replace(/[^a-zA-Z0-9]+/g,'_')+'_'+ms.code;
+    const dOpen = !!statsOpen[dKey];
+    const detalle = `
+      ${ms.fullRounds.length > 0 ? `
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
+        <div style="font-size:10px; font-weight:800; color:var(--green); margin-bottom:4px;">COMPLETADAS AL 100% EN:</div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.fullRounds.map(rl => `<span class="tag tag-green">${rl}</span>`).join('')}</div>
+      </div>` : ''}
+
+      ${ms.partialRounds.length > 0 ? `
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
+        <div style="font-size:10px; font-weight:800; color:var(--amber); margin-bottom:4px;">COMPLETADAS PARCIALMENTE:</div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.partialRounds.map(x => `<span style="background:var(--amber-l); color:var(--amber); border:1.5px solid var(--amber-b); padding:2px 7px; border-radius:var(--rss); font-size:0.7rem; font-weight:700;">${x.lbl} (${x.pts}/${x.maxPts})</span>`).join('')}</div>
+      </div>` : ''}
+
+      ${ms.failRounds.length > 0 ? `
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
+        <div style="font-size:10px; font-weight:800; color:var(--red); margin-bottom:4px;">FALLÓ COMPLETAMENTE EN:</div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.failRounds.map(rl => `<span class="fail-chip">${rl}</span>`).join('')}</div>
+      </div>` : ''}
+
+      ${ms.parts.length > 0 ? `
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
+        <div style="font-size:10px; font-weight:800; color:var(--text2); margin-bottom:4px;">DETALLE POR PARTE:</div>
+        ${ms.parts.map(p=>`
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; padding:3px 0;">
+            <span style="color:var(--text2);">${p.bonus?'<span class="btag">BONO</span>':''}${p.label}</span>
+            <span style="white-space:nowrap; font-weight:700;"><span style="color:var(--green);">✓${p.ok}</span> <span style="color:var(--red);">✗${p.bad}</span>${p.sin?` <span style="color:var(--text3);font-weight:600;">· ${p.sin} s/m</span>`:''}</span>
+          </div>`).join('')}
+      </div>` : ''}`;
     return `
     <div class="card" style="padding:12px; margin-bottom:10px; display:block;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -5504,33 +5647,9 @@ function effTable(subset, label, customTargets = null){
         <div><span style="color:var(--red); font-weight:800;">${ms.fail}</span> fallidas</div>
       </div>
       
-      ${ms.fullRounds.length > 0 ? `
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
-        <div style="font-size:10px; font-weight:800; color:var(--green); margin-bottom:4px;">COMPLETADAS AL 100% EN:</div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.fullRounds.map(rl => `<span class="tag tag-green">${rl}</span>`).join('')}</div>
-      </div>` : ''}
-      
-      ${ms.partialRounds.length > 0 ? `
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
-        <div style="font-size:10px; font-weight:800; color:var(--amber); margin-bottom:4px;">COMPLETADAS PARCIALMENTE:</div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.partialRounds.map(x => `<span style="background:var(--amber-l); color:var(--amber); border:1.5px solid var(--amber-b); padding:2px 7px; border-radius:var(--rss); font-size:0.7rem; font-weight:700;">${x.lbl} (${x.pts}/${x.maxPts})</span>`).join('')}</div>
-      </div>` : ''}
-      
-      ${ms.failRounds.length > 0 ? `
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
-        <div style="font-size:10px; font-weight:800; color:var(--red); margin-bottom:4px;">FALLÓ COMPLETAMENTE EN:</div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.failRounds.map(rl => `<span class="fail-chip">${rl}</span>`).join('')}</div>
-      </div>` : ''}
-
-      ${ms.parts.length > 0 ? `
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
-        <div style="font-size:10px; font-weight:800; color:var(--text2); margin-bottom:4px;">DETALLE POR PARTE:</div>
-        ${ms.parts.map(p=>`
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; padding:3px 0;">
-            <span style="color:var(--text2);">${p.bonus?'<span class="btag">BONO</span>':''}${p.label}</span>
-            <span style="white-space:nowrap; font-weight:700;"><span style="color:var(--green);">✓${p.ok}</span> <span style="color:var(--red);">✗${p.bad}</span>${p.sin?` <span style="color:var(--text3);font-weight:600;">· ${p.sin} s/m</span>`:''}</span>
-          </div>`).join('')}
-      </div>` : ''}
+      ${(ms.fullRounds.length||ms.partialRounds.length||ms.failRounds.length||ms.parts.length) ? `
+      <button class="btn btn-sm" style="width:100%;margin-top:2px" onclick="toggleOpen('${dKey}')">${dOpen?'▲ Ocultar detalle':'▾ Ver detalle por ronda y por parte'}</button>
+      ${dOpen?detalle:''}` : ''}
     </div>`;
   }).join('');
   
@@ -6515,7 +6634,10 @@ function renderBuscar(){
   if(cuaQ)chips.push(`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--amber-l);color:var(--amber);border:1px solid var(--amber-b);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700">📋 ${_buscarFilter.cuadrillaText}<button onclick="_buscarFilter.cuadrillaText='';render()" style="background:none;border:none;cursor:pointer;color:var(--amber);font-size:14px;line-height:1;padding:0 0 0 4px">×</button></span>`);
   if(_buscarFilter.dateFromTs!==null||_buscarFilter.dateToTs!==null)chips.push(`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--blue-l);color:var(--blue);border:1px solid var(--blue-b);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700">📅 ${_buscarFilter.rangeLabel||'Período'}<button onclick="_buscarFilter.dateFromTs=null;_buscarFilter.dateToTs=null;_buscarFilter.rangeLabel='';render()" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:14px;line-height:1;padding:0 0 0 4px">×</button></span>`);
 
-  const sorted=[...filtered].sort((a,b)=>Number(b.score)-Number(a.score));
+  const bqSortKey='buscar_sort';
+  const sortBar=_sortBar(bqSortKey,[['date','Fecha'],['score','Puntaje'],['az','A–Z']],'date');
+  const sortedByScore=_getSort(bqSortKey,'date').by==='score';
+  const sorted=_sortRunObjs(filtered.map(r=>({r})),bqSortKey,'date').map(x=>x.r);
   const results=sorted.length?sorted.map((r,pos)=>{
     const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
     const res=getMissionResults(r.missions);
@@ -6530,7 +6652,7 @@ function renderBuscar(){
     const fail=res?res.filter(x=>!x.done&&!x.partial):[];
     const key='bq_'+r.id;const isOpen=!!statsOpen[key];
     const isDel=confDel['run_'+r.id];
-    const medalCls=pos===0?'gold':pos===1?'silver':pos===2?'bronze':'';
+    const medalCls=sortedByScore?(pos===0?'gold':pos===1?'silver':pos===2?'bronze':''):'';
     const esEntrenador = usuarioActual && usuarioActual.rol === 'entrenador';
 
     return`<div class="coll-card">
@@ -6563,6 +6685,7 @@ function renderBuscar(){
             <div class="mpills">${partial.map(m=>`<span class="mpill partial">${m.code} +${m.pts}</span>`).join('')}</div></div>`:''}
           <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px">✗ FALLIDAS (${fail.length})</div>
             <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div></div>
+          ${_partsDetailBlock(fail,partial,r.missions)}
           <div style="margin-top:10px;padding:11px 14px;background:${r.note?'var(--amber-l)':'var(--surface)'};border:1px solid ${r.note?'var(--amber-b)':'var(--border)'};border-radius:var(--rs)">
             <div style="font-size:10px;font-weight:800;color:${r.note?'var(--amber)':'var(--text3)'};text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">💬 Comentarios</div>
             <div style="font-size:13px;color:${r.note?'var(--text)':'var(--text3)'};font-style:${r.note?'normal':'italic'}">${r.note||'Sin comentarios'}</div>
@@ -6622,6 +6745,7 @@ function renderBuscar(){
     </div>
   </div>
   <div style="font-size:12px;color:var(--text3);margin-bottom:10px">${filtered.length} ronda(s) encontrada(s)</div>
+  ${sortBar}
   ${results}`;
 }
 
