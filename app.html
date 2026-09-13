@@ -2966,6 +2966,10 @@ function renderMissions(){
     </div>
     <button class="btn btn-green btn-lg" type="button" onclick="saveRun()">Guardar ronda</button>
   </div>
+  ${esAdminActual()?`<div style="display:flex;justify-content:flex-end;margin:8px 0">
+    <button class="btn btn-sm" type="button" onclick="toggleMissionCfg()">⚙️ Sub-acciones por misión</button>
+  </div>`:''}
+  ${_missionCfgOpen ? renderMissionConfigPanel() : ''}
   ${items}
   <div style="display:flex;gap:8px;margin-top:10px">
     <button class="btn btn-red" type="button" onclick="cancelRound()">Cancelar</button>
@@ -5378,10 +5382,6 @@ function renderEfectividadMisiones() {
 
   return `
     <div style="animation: fadeIn 0.3s ease;">
-      ${esAdminActual()?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-        <button class="btn btn-sm" onclick="toggleMissionCfg()">⚙️ Configurar sub-acciones por misión</button>
-      </div>`:''}
-      ${_missionCfgOpen ? renderMissionConfigPanel() : ''}
       <div style="display:flex; gap:5px; margin-bottom:15px; background:var(--surface); padding:8px; border-radius:var(--r); overflow-x:auto; border:2px solid var(--navy); box-shadow:var(--shadow-sm);">
         <button onclick="misionesSubTab='global'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('global')}; font-weight:800; cursor:pointer; background:${bgActive('global')}; color:${txtActive('global')}; font-size:12px; transition:var(--transition);">GLOBAL</button>
         <button onclick="misionesSubTab='sueltas'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('sueltas')}; font-weight:800; cursor:pointer; background:${bgActive('sueltas')}; color:${txtActive('sueltas')}; font-size:12px; transition:var(--transition);">SUELTAS</button>
@@ -5872,10 +5872,12 @@ function renderEfectividadEstrategia(wd) {
 
   return `
     <div style="animation: fadeIn 0.3s ease;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; gap:8px; flex-wrap:wrap;">
          <div class="sec-lbl" style="margin-bottom:0; flex:1;">ESTRATEGIA ACTUAL</div>
-         ${esAdminActual() ? `<button onclick="showLanzadaForm=true; render();" class="btn btn-cyan btn-sm" style="margin-left:10px;">+ CREAR LANZADA</button>` : ''}
+         ${esAdminActual() ? `<button class="btn btn-sm" onclick="toggleMissionCfg()">⚙️ Sub-acciones por misión</button>` : ''}
+         ${esAdminActual() ? `<button onclick="showLanzadaForm=true; render();" class="btn btn-cyan btn-sm">+ CREAR LANZADA</button>` : ''}
       </div>
+      ${_missionCfgOpen ? renderMissionConfigPanel() : ''}
       ${noDataMsg}
       ${renderGrupo('Roja', 'var(--red)')}
       ${renderGrupo('Azul', 'var(--blue)')}
