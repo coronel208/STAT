@@ -503,6 +503,8 @@ input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--te
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <!-- Chart.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- SheetJS (exportar/importar Excel) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -906,7 +908,8 @@ function save() {
         [`teams/${currentTeamId}/data/pairs`]: pairs,
         [`teams/${currentTeamId}/data/trainings`]: trainings,
         [`teams/${currentTeamId}/data/runs`]: runs,
-        [`teams/${currentTeamId}/data/lanzadas`]: lanzadasConfiguradas
+        [`teams/${currentTeamId}/data/lanzadas`]: lanzadasConfiguradas,
+        [`teams/${currentTeamId}/data/missionOverrides`]: missionOverrides
       };
 
       await db.ref().update(updates);
@@ -962,8 +965,9 @@ async function loadTeamData(){
     trainings= d.trainings || [];
     runs     = d.runs      || [];
     lanzadasConfiguradas = d.lanzadas || [];
+    missionOverrides = d.missionOverrides || {};
   } else {
-    players=[]; pairs=[]; trainings=[]; runs=[]; lanzadasConfiguradas=[];
+    players=[]; pairs=[]; trainings=[]; runs=[]; lanzadasConfiguradas=[]; missionOverrides={};
   }
   // MIGRACIÓN: versiones previas guardaban las lanzadas solo en localStorage de
   // este dispositivo. Si Firebase no tiene nada todavía, las subimos una vez.
@@ -990,6 +994,7 @@ function startRealtimeSync(){
       trainings= d.trainings || [];
       runs     = d.runs      || [];
       lanzadasConfiguradas = d.lanzadas || [];
+      missionOverrides = d.missionOverrides || {};
       if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
       render();
     }
@@ -1228,6 +1233,14 @@ async function accesoPermitido(datos) {
 ═══════════════════════════════════════════ */
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
 function getPlayer(id){return players.find(p=>p.id===id);}
+/* Apellido (última palabra) para etiquetas resumidas — nombre completo si
+   solo hay una palabra. Se usa en vistas compactas; Jugadores y Parejas y
+   Cuadrillas muestran siempre el nombre completo aparte. */
+function lastName(name){
+  if(!name) return '';
+  const parts=name.trim().split(/\s+/);
+  return parts.length>1 ? parts[parts.length-1] : parts[0];
+}
 function getPair(id){return pairs.find(p=>p.id===id);}
 function getTraining(id){return trainings.find(t=>t.id===id);}
 function pairNames(pid){
@@ -1254,16 +1267,27 @@ function defaultMState(){
   MISSIONS.forEach(m=>m.params.forEach(p=>{
     // check: null = sin marcar, true = logrado, false = marcado como fallido
     if(p.type==='check')s[p.id]=null;
-    else if(p.type==='counter')s[p.id]=0;
+    else if(p.type==='counter'){
+      const names=_overrideNames(m.code,p.id);
+      // Con sub-acciones nombradas, cada unidad es un check independiente
+      // (tri-state); sin nombrar, sigue siendo un contador simple 0..max.
+      s[p.id]=names ? new Array(names.length).fill(null) : 0;
+    }
     else if(p.type==='token')s[p.id]=6;
   }));
   return s;
+}
+/* Puntos de un parámetro tipo counter, soportando ambos formatos:
+   número simple (contador genérico) o array tri-state (sub-acciones nombradas). */
+function _counterPts(v,pts){
+  if(Array.isArray(v)) return v.filter(x=>x===true).length*pts;
+  return (v||0)*pts;
 }
 function calcScore(ms){
   let t=0;
   MISSIONS.forEach(m=>m.params.forEach(p=>{
     if(p.type==='check'){if(ms[p.id]){if(p.requires&&!ms[p.requires])return;t+=p.pts;}}
-    else if(p.type==='counter')t+=(ms[p.id]||0)*p.pts;
+    else if(p.type==='counter')t+=_counterPts(ms[p.id],p.pts);
     else if(p.type==='token')t+=TOKEN_SCORES[ms[p.id]??6]||0;
   }));
   return t;
@@ -1282,7 +1306,7 @@ function mScoreFor(m,ms){
   let t=0;
   m.params.forEach(p=>{
     if(p.type==='check'){if(ms[p.id]){if(p.requires&&!ms[p.requires])return;t+=p.pts;}}
-    else if(p.type==='counter')t+=(ms[p.id]||0)*p.pts;
+    else if(p.type==='counter')t+=_counterPts(ms[p.id],p.pts);
     else if(p.type==='token')t+=TOKEN_SCORES[ms[p.id]??6]||0;
   });
   return t;
@@ -1890,7 +1914,162 @@ function _admTeamCard(teamKey, team, usersOfTeam, esSuper){
       </div>`:''}
     ${_admUsersSection(teamKey, usersOfTeam)}
     ${esSuper?_admStrategySection(teamKey, lz):''}
+    ${_admDataSection(teamKey)}
   </div>`;
+}
+
+/* ── Datos (Excel): exportar respaldo completo / importar (reemplazar o agregar) ── */
+function _admDataSection(teamKey){
+  const openKey=teamKey+':data'; const isOpen=!!_admOpen[openKey];
+  return `
+    <div class="adm-subsec">
+      <div class="adm-subsec-head" onclick="_admToggle('${openKey}')">
+        <span>💾 Datos (Excel)</span>
+        <span>${isOpen?'▲':'▼'}</span>
+      </div>
+      ${isOpen?`<div class="adm-subsec-body">
+        <button class="adm-btn adm-btn-cyan adm-btn-sm" onclick="admExportExcel('${teamKey}')">⬇ Exportar todo (.xlsx)</button>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--aborder)">
+          <div style="font-size:11px;color:var(--atext3);margin-bottom:6px">Importar un .xlsx exportado desde aquí antes:</div>
+          <input type="file" accept=".xlsx" id="adm-imp-file-${teamKey}" style="font-size:12px;margin-bottom:8px;display:block;color:var(--atext2)">
+          <select id="adm-imp-mode-${teamKey}" class="adm-input" style="margin-bottom:8px;max-width:320px">
+            <option value="merge">Agregar a lo existente (no borra nada)</option>
+            <option value="replace">Reemplazar todo (restaurar respaldo)</option>
+          </select>
+          <div>
+            <button class="adm-btn adm-btn-gold adm-btn-sm" onclick="admImportExcel('${teamKey}')">⬆ Importar</button>
+          </div>
+          <div id="adm-imp-msg-${teamKey}" style="font-size:12px;margin-top:8px;color:var(--atext2)"></div>
+        </div>
+      </div>`:''}
+    </div>`;
+}
+
+function admExportExcel(teamKey){
+  const team=_admTeamsCache[teamKey]||{};
+  const d=team.data||{};
+  exportTeamExcel(teamKey, team.name||teamKey, d.players||[], d.pairs||[], d.trainings||[], d.runs||[]);
+}
+
+function exportTeamExcel(teamId, teamName, playersArr, pairsArr, trainingsArr, runsArr){
+  if(typeof XLSX==='undefined'){ alert('No se pudo cargar la librería de Excel. Revisa tu conexión e inténtalo de nuevo.'); return; }
+  const pName=(pid)=>{ const p=playersArr.find(x=>x.id===pid); return p?p.name:''; };
+
+  const wsJugadores = XLSX.utils.json_to_sheet((playersArr||[]).map(p=>({
+    id:p.id, nombre:p.name, username:p.username||''
+  })));
+
+  const wsParejas = XLSX.utils.json_to_sheet((pairsArr||[]).map(p=>({
+    id:p.id, nombre:p.name, jugador1_id:p.p1||'', jugador1_nombre:pName(p.p1), jugador2_id:p.p2||'', jugador2_nombre:pName(p.p2)
+  })));
+
+  const wsRondas = XLSX.utils.json_to_sheet((runsArr||[]).map(r=>({
+    id:r.id, ronda:r.roundName||'', fecha:r.ts?new Date(r.ts).toISOString():'', puntaje:r.score,
+    entrenamiento_id:r.trainingId||'', entrenamiento_ronda_id:r.trainingRoundId||'',
+    azul_p1_id:r.azulP1||'', azul_p1_nombre:pName(r.azulP1), azul_p2_id:r.azulP2||'', azul_p2_nombre:pName(r.azulP2), azul_lanza_id:r.azulLanzadorId||'',
+    roja_p1_id:r.rojaP1||'', roja_p1_nombre:pName(r.rojaP1), roja_p2_id:r.rojaP2||'', roja_p2_nombre:pName(r.rojaP2), roja_lanza_id:r.rojaLanzadorId||'',
+    cuadrilla:r.cuadrillaName||'', comentario:r.note||'', guardado_por:r.savedBy||'',
+    missions_json: JSON.stringify(r.missions||{})
+  })));
+
+  const wsEntrenamientos = XLSX.utils.json_to_sheet((trainingsArr||[]).map(t=>({
+    id:t.id, nombre:t.name, fecha:t.ts?new Date(t.ts).toISOString():'', estado:t.status||'',
+    rounds_json: JSON.stringify(t.rounds||[])
+  })));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsJugadores, 'Jugadores');
+  XLSX.utils.book_append_sheet(wb, wsParejas, 'Parejas');
+  XLSX.utils.book_append_sheet(wb, wsRondas, 'Rondas');
+  XLSX.utils.book_append_sheet(wb, wsEntrenamientos, 'Entrenamientos');
+
+  const fecha = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `STAT_${teamId}_${fecha}.xlsx`);
+}
+
+async function admImportExcel(teamKey){
+  const fileInput = document.getElementById('adm-imp-file-'+teamKey);
+  const mode = document.getElementById('adm-imp-mode-'+teamKey).value;
+  const msg = document.getElementById('adm-imp-msg-'+teamKey);
+  const file = fileInput && fileInput.files[0];
+  if(!file){ msg.style.color='var(--ared)'; msg.textContent='Elegí primero un archivo .xlsx.'; return; }
+  if(typeof XLSX==='undefined'){ msg.style.color='var(--ared)'; msg.textContent='No se pudo cargar la librería de Excel.'; return; }
+
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const sheet=(name)=>{ const ws=wb.Sheets[name]; return ws ? XLSX.utils.sheet_to_json(ws, {defval:''}) : null; }
+
+    const jugadores = sheet('Jugadores');
+    const parejas = sheet('Parejas');
+    const rondas = sheet('Rondas');
+    const entrenamientos = sheet('Entrenamientos');
+    if(!jugadores || !rondas){
+      msg.style.color='var(--ared)';
+      msg.textContent='El archivo no tiene el formato esperado (faltan las hojas "Jugadores" y/o "Rondas"). Usá un .xlsx exportado desde este mismo panel.';
+      return;
+    }
+
+    // Firebase rechaza valores "undefined" explícitos en un update() — nunca
+    // usar undefined aquí, siempre '' o simplemente omitir la clave.
+    const newPlayers = jugadores.map(row=>{
+      const p = { id:String(row.id||uid()), name:String(row.nombre||'').trim() };
+      if(row.username) p.username = String(row.username);
+      return p;
+    });
+    const newPairs = (parejas||[]).map(row=>({ id:String(row.id||uid()), name:String(row.nombre||''), p1:String(row.jugador1_id||''), p2:String(row.jugador2_id||'') }));
+    const newRuns = rondas.map(row=>{
+      let missions={}; try{ missions=JSON.parse(row.missions_json||'{}'); }catch(e){}
+      return {
+        id:String(row.id||uid()), roundName:String(row.ronda||''), note:String(row.comentario||''),
+        azulP1:String(row.azul_p1_id||''), azulP2:String(row.azul_p2_id||''),
+        rojaP1:String(row.roja_p1_id||''), rojaP2:String(row.roja_p2_id||''),
+        azulLanzadorId:String(row.azul_lanza_id||''), rojaLanzadorId:String(row.roja_lanza_id||''),
+        azulPairId:'', rojaPairId:'',
+        cuadrillaName:String(row.cuadrilla||''), missions,
+        score:Number(row.puntaje)||0,
+        ts: row.fecha ? new Date(row.fecha).getTime() : Date.now(),
+        trainingId: row.entrenamiento_id ? String(row.entrenamiento_id) : null,
+        trainingRoundId: row.entrenamiento_ronda_id ? String(row.entrenamiento_ronda_id) : null,
+        savedBy: String(row.guardado_por||'excel')
+      };
+    });
+    const newTrainings = (entrenamientos||[]).map(row=>{
+      let rounds=[]; try{ rounds=JSON.parse(row.rounds_json||'[]'); }catch(e){}
+      return { id:String(row.id||uid()), name:String(row.nombre||''), ts: row.fecha?new Date(row.fecha).getTime():Date.now(), status:String(row.estado||'planned'), rounds };
+    });
+
+    const doApply = confirm(mode==='replace'
+      ? `¿REEMPLAZAR todos los datos de este equipo con lo del archivo?\n\nJugadores: ${newPlayers.length}\nParejas: ${newPairs.length}\nRondas: ${newRuns.length}\nEntrenamientos: ${newTrainings.length}\n\nEsto borra lo que había antes. No se puede deshacer.`
+      : `¿Agregar estos datos a los que ya existen en el equipo?\n\nJugadores nuevos: hasta ${newPlayers.length}\nParejas nuevas: hasta ${newPairs.length}\nRondas nuevas: hasta ${newRuns.length}\nEntrenamientos nuevos: hasta ${newTrainings.length}\n\n(Se ignoran los que ya existan con el mismo id.)`);
+    if(!doApply) return;
+
+    const teamData = ((_admTeamsCache[teamKey]||{}).data)||{};
+    let finalPlayers, finalPairs, finalRuns, finalTrainings;
+    if(mode==='replace'){
+      finalPlayers=newPlayers; finalPairs=newPairs; finalRuns=newRuns; finalTrainings=newTrainings;
+    } else {
+      const existP=teamData.players||[], existPr=teamData.pairs||[], existR=teamData.runs||[], existT=teamData.trainings||[];
+      const existIds=(arr)=>new Set(arr.map(x=>x.id));
+      const pIds=existIds(existP), prIds=existIds(existPr), rIds=existIds(existR), tIds=existIds(existT);
+      finalPlayers=[...existP, ...newPlayers.filter(x=>!pIds.has(x.id))];
+      finalPairs=[...existPr, ...newPairs.filter(x=>!prIds.has(x.id))];
+      finalRuns=[...existR, ...newRuns.filter(x=>!rIds.has(x.id))];
+      finalTrainings=[...existT, ...newTrainings.filter(x=>!tIds.has(x.id))];
+    }
+
+    await db.ref('teams/'+teamKey+'/data').update({
+      players: finalPlayers, pairs: finalPairs, runs: finalRuns, trainings: finalTrainings
+    });
+    msg.style.color='var(--agreen)';
+    msg.textContent='✓ Datos importados correctamente.';
+    if(typeof showToast==='function') showToast('✓ Datos importados');
+    renderAdminPanel();
+  } catch(e){
+    console.error(e);
+    msg.style.color='var(--ared)';
+    msg.textContent='Error al leer el archivo: '+e.message;
+  }
 }
 
 function arrLenAdm(v){ if(!v) return 0; return Array.isArray(v)?v.length:Object.keys(v).length; }
@@ -2219,28 +2398,6 @@ function startLoose(){
   roundMode='loose-config';render();
 }
 
-/* ── Selector de rol por base: quién LANZA (el otro recibe) ──
-   `obj` es el objeto que trae los campos {base}P1/{base}P2/{base}LanzadorId
-   (pendingRound, newRoundData o un slot del asistente de entrenamientos).
-   `setterFn` es el nombre de la función global que actualiza ese objeto y
-   vuelve a renderizar (cada pantalla usa un objeto distinto). */
-function _lanzadorPicker(obj,base,setterFn){
-  const p1=obj[base+'P1'], p2=obj[base+'P2'];
-  if(!p1||!p2) return '';
-  const cur=(obj[base+'LanzadorId']===p1||obj[base+'LanzadorId']===p2)?obj[base+'LanzadorId']:p1;
-  const n1=getPlayer(p1)?.name.split(' ')[0]||'?';
-  const n2=getPlayer(p2)?.name.split(' ')[0]||'?';
-  return `<div style="display:flex;gap:5px;margin-top:2px;align-items:center;flex-wrap:wrap">
-    <span style="font-size:10px;color:var(--text3);font-weight:700;white-space:nowrap">¿QUIÉN LANZA?</span>
-    <button type="button" class="btn btn-sm${cur===p1?' btn-cyan':''}" onclick="${setterFn}('${base}','${p1}')">🚀 ${n1}</button>
-    <button type="button" class="btn btn-sm${cur===p2?' btn-cyan':''}" onclick="${setterFn}('${base}','${p2}')">🚀 ${n2}</button>
-    <span style="font-size:10px;color:var(--text3)">(${cur===p1?n2:n1} recibe)</span>
-  </div>`;
-}
-function setLooseLanzador(base,pid){ pendingRound[base+'LanzadorId']=pid; render(); }
-function setNewRoundLanzador(base,pid){ newRoundData[base+'LanzadorId']=pid; render(); }
-function setWizLanzador(base,pid){ trainWizSlots[trainWizCurrentRound][base+'LanzadorId']=pid; render(); }
-
 /* ── LOOSE CONFIG ── */
 let looseModalOpen = false;
 
@@ -2282,7 +2439,18 @@ function renderLooseConfig(){
     </div>
     ${players.length?renderHubPairDnD():'<p style="font-size:12px;color:var(--text3);margin:8px 0">Sin jugadores. <a href="#" onclick="switchTab(\'parrilla\');return false;" style="color:var(--blue)">Agregar jugadores</a></p>'}
     <button class="btn btn-green btn-lg" style="width:100%;margin-top:12px" onclick="goToReady()">▶ Iniciar contador</button>
+    <button class="btn btn-sm" style="width:100%;margin-top:8px" onclick="goToMissionsDirect()">📝 Solo registrar puntaje (sin cronómetro)</button>
   </div>`;
+}
+
+/* Salta directo al formulario de misiones sin pasar por el cronómetro,
+   desde la propia pantalla de armar la ronda (sin tener que primero
+   "Iniciar contador" y recién ahí encontrar la opción). */
+function goToMissionsDirect(){
+  _syncPendingPairs();
+  stopTimerCleanup();
+  roundMode='missions'; mState=defaultMState();
+  render();
 }
 
 /* ── HUB DRAG & DROP (lanzada suelta) ── */
@@ -2304,9 +2472,9 @@ function renderHubPairDnD(){
   function slotHtml(pid,slot){
     if(!pid) return '<span style="font-size:12px;color:var(--text3)">Arrastra un jugador</span>';
     const p=getPlayer(pid);
-    const lz=slot.startsWith('azul')?'azulLanzadorId':'rojaLanzadorId';
-    return `<div class="player-chip in-pair" style="cursor:default">${p?p.name:'?'}<button class="chip-remove" onclick="pendingRound['${slot}']='';pendingRound['${lz}']='';render()" type="button" style="margin-left:4px">×</button></div>`;
+    return `<div class="player-chip in-pair" style="cursor:default">${p?p.name:'?'}<button class="chip-remove" onclick="pendingRound['${slot}']='';render()" type="button" style="margin-left:4px">×</button></div>`;
   }
+  const roleLbl=(txt,icon)=>`<div style="font-size:10px;font-weight:800;color:var(--text3);letter-spacing:.4px;display:flex;align-items:center;gap:4px">${icon} ${txt}</div>`;
 
   return `<div class="fg">
       <div class="field-lbl">Nombre de la cuadrilla <span style="font-size:11px;color:var(--text3)">(opcional)</span></div>
@@ -2320,29 +2488,31 @@ function renderHubPairDnD(){
       <div class="bbox azul">
         <div class="btit azul"><span class="dot azul"></span>Base Azul</div>
         <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+          ${roleLbl('LANZA','🚀')}
           <div class="drop-zone${pendingRound.azulP1?' filled':''}" id="hub-az1"
             ondragover="hubDragOver(event,'hub-az1')" ondragleave="hubDragLeave('hub-az1')"
             ondrop="hubDropTo(event,'azulP1')">${slotHtml(pendingRound.azulP1,'azulP1')}
           </div>
+          ${roleLbl('RECIBE','🤲')}
           <div class="drop-zone${pendingRound.azulP2?' filled':''}" id="hub-az2"
             ondragover="hubDragOver(event,'hub-az2')" ondragleave="hubDragLeave('hub-az2')"
             ondrop="hubDropTo(event,'azulP2')">${slotHtml(pendingRound.azulP2,'azulP2')}
           </div>
-          ${_lanzadorPicker(pendingRound,'azul','setLooseLanzador')}
         </div>
       </div>
       <div class="bbox roja">
         <div class="btit roja"><span class="dot roja"></span>Base Roja</div>
         <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+          ${roleLbl('LANZA','🚀')}
           <div class="drop-zone${pendingRound.rojaP1?' filled':''}" id="hub-ro1"
             ondragover="hubDragOver(event,'hub-ro1')" ondragleave="hubDragLeave('hub-ro1')"
             ondrop="hubDropTo(event,'rojaP1')">${slotHtml(pendingRound.rojaP1,'rojaP1')}
           </div>
+          ${roleLbl('RECIBE','🤲')}
           <div class="drop-zone${pendingRound.rojaP2?' filled':''}" id="hub-ro2"
             ondragover="hubDragOver(event,'hub-ro2')" ondragleave="hubDragLeave('hub-ro2')"
             ondrop="hubDropTo(event,'rojaP2')">${slotHtml(pendingRound.rojaP2,'rojaP2')}
           </div>
-          ${_lanzadorPicker(pendingRound,'roja','setLooseLanzador')}
         </div>
       </div>
     </div>`;
@@ -2725,6 +2895,23 @@ function renderMissions(){
         </div>`;
       }
       if(p.type==='counter'){
+        const names=_overrideNames(m.code,p.id);
+        if(names){
+          // Sub-acciones nombradas: cada una es un check independiente (✓/✗)
+          const arr=Array.isArray(mState[p.id])?mState[p.id]:new Array(names.length).fill(null);
+          mState[p.id]=arr;
+          return`<div class="prow" style="flex-direction:column;align-items:stretch;gap:6px">
+            <div class="pdesc" style="margin-bottom:2px">${p.label} <span class="ppts-lbl">(${p.pts} c/u · máx ${p.max})</span></div>
+            ${names.map((nm,idx)=>`
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <span style="font-size:0.82rem;color:var(--text2)">${nm}</span>
+                <div class="chkbtns">
+                  <button type="button" id="cbok_${p.id}_${idx}" class="chkbtn ok${arr[idx]===true?' on':''}" title="Logrado" onclick="mSetNamedItem('${p.id}',${idx},true)">✓</button>
+                  <button type="button" id="cbbad_${p.id}_${idx}" class="chkbtn bad${arr[idx]===false?' on':''}" title="Falló" onclick="mSetNamedItem('${p.id}',${idx},false)">✗</button>
+                </div>
+              </div>`).join('')}
+          </div>`;
+        }
         const val=mState[p.id]||0;
         return`<div class="prow">
           <div style="flex:1;min-width:0">
@@ -2818,8 +3005,18 @@ function _refreshMissions(){
           }
         }
       } else if(p.type==='counter'){
-        const cv=document.getElementById('cv_'+p.id);
-        if(cv)cv.textContent=mState[p.id]||0;
+        const names=_overrideNames(m.code,p.id);
+        if(names && Array.isArray(mState[p.id])){
+          mState[p.id].forEach((v,idx)=>{
+            const okBtn=document.getElementById(`cbok_${p.id}_${idx}`);
+            const badBtn=document.getElementById(`cbbad_${p.id}_${idx}`);
+            if(okBtn) okBtn.classList.toggle('on', v===true);
+            if(badBtn) badBtn.classList.toggle('on', v===false);
+          });
+        } else {
+          const cv=document.getElementById('cv_'+p.id);
+          if(cv)cv.textContent=mState[p.id]||0;
+        }
       } else if(p.type==='token'){
         const val=mState[p.id]??6;
         const tv=document.getElementById('tok_v');if(tv)tv.textContent=val;
@@ -2837,6 +3034,13 @@ function _refreshMissions(){
 function mSetCheck(id,val){
   mState[id] = (mState[id]===val) ? null : val;
   if(mState[id]!==true) MISSIONS.forEach(m=>m.params.forEach(p=>{if(p.requires===id)mState[p.id]=null;}));
+  _refreshMissions();
+}
+/* Igual que mSetCheck pero para una sub-acción nombrada dentro de un
+   contador (mState[id] es un array tri-state, una entrada por sub-acción). */
+function mSetNamedItem(id,idx,val){
+  if(!Array.isArray(mState[id])) return;
+  mState[id][idx] = (mState[id][idx]===val) ? null : val;
   _refreshMissions();
 }
 function mCounter(id,d,max){
@@ -2866,11 +3070,6 @@ function saveRun(){
   const azP = autoGetOrCreatePair(pendingRound.azulP1, pendingRound.azulP2);
   const roP = autoGetOrCreatePair(pendingRound.rojaP1, pendingRound.rojaP2);
 
-  // Lanzador efectivo: si no se marcó (o quedó apuntando a un jugador que ya
-  // no está en esa base), asumimos que lanza P1 y el otro recibe.
-  const azLz = (pendingRound.azulLanzadorId===pendingRound.azulP1||pendingRound.azulLanzadorId===pendingRound.azulP2) ? pendingRound.azulLanzadorId : (pendingRound.azulP1||'');
-  const roLz = (pendingRound.rojaLanzadorId===pendingRound.rojaP1||pendingRound.rojaLanzadorId===pendingRound.rojaP2) ? pendingRound.rojaLanzadorId : (pendingRound.rojaP1||'');
-
   const run = {
     id: uid(),
     roundName: pendingRound.roundName.trim(),
@@ -2882,9 +3081,9 @@ function saveRun(){
     azulP2: pendingRound.azulP2 || '',
     rojaP1: pendingRound.rojaP1 || '',
     rojaP2: pendingRound.rojaP2 || '',
-    // Rol por base: quién lanza (recibidor = el otro jugador de la base)
-    azulLanzadorId: pendingRound.azulP2 ? azLz : '',
-    rojaLanzadorId: pendingRound.rojaP2 ? roLz : '',
+    // Rol por base: la casilla de arriba (P1) lanza, la de abajo (P2) recibe
+    azulLanzadorId: pendingRound.azulP2 ? pendingRound.azulP1 : '',
+    rojaLanzadorId: pendingRound.rojaP2 ? pendingRound.rojaP1 : '',
     cuadrillaName: (pendingRound.cuadrillaName || '').trim(),
     missions: snap,
     score: score,
@@ -2981,6 +3180,7 @@ function renderTrainingStart(){
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
             ${!isDone&&!isEd?`<button class="btn btn-amber btn-sm" onclick="editTR('${t.id}','${r.id}','${r.azulPairId||''}','${r.rojaPairId||''}')">Editar parejas</button>`:''}
             ${isNext&&!isEd?`<button class="btn btn-green btn-sm" onclick="startTR('${t.id}','${r.id}')">▶ Iniciar</button>`:''}
+            ${isNext&&!isEd?`<button class="btn btn-sm" onclick="startTRDirect('${t.id}','${r.id}')">📝 Sin cronómetro</button>`:''}
           </div>
         </div>
       </div>
@@ -3000,17 +3200,19 @@ function renderTrainingStart(){
       <div class="bases-grid" style="margin-bottom:6px">
         <div class="bbox azul"><div class="btit azul"><span class="dot azul"></span>Base Azul</div>
           <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:10px;font-weight:800;color:var(--text3)">🚀 LANZA</div>
             <select onchange="newRoundData.azulP1=this.value;render()">${playerOpts(newRoundData.azulP1||'')}</select>
+            <div style="font-size:10px;font-weight:800;color:var(--text3)">🤲 RECIBE</div>
             <select onchange="newRoundData.azulP2=this.value;render()">${playerOpts(newRoundData.azulP2||'')}</select>
           </div>
-          ${_lanzadorPicker(newRoundData,'azul','setNewRoundLanzador')}
         </div>
         <div class="bbox roja"><div class="btit roja"><span class="dot roja"></span>Base Roja</div>
           <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:10px;font-weight:800;color:var(--text3)">🚀 LANZA</div>
             <select onchange="newRoundData.rojaP1=this.value;render()">${playerOpts(newRoundData.rojaP1||'')}</select>
+            <div style="font-size:10px;font-weight:800;color:var(--text3)">🤲 RECIBE</div>
             <select onchange="newRoundData.rojaP2=this.value;render()">${playerOpts(newRoundData.rojaP2||'')}</select>
           </div>
-          ${_lanzadorPicker(newRoundData,'roja','setNewRoundLanzador')}
         </div>
       </div>
       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">La pareja se crea automáticamente con el nombre de los dos jugadores.</div>
@@ -3109,6 +3311,22 @@ function startTR(tid,rid){
     trainingId:tid,trainingRoundId:rid};
   stopTimerCleanup();timerRemaining=TIMER_TOTAL;roundMode='ready';render();
 }
+/* Igual que startTR pero salta directo al formulario de misiones,
+   sin pasar por el cronómetro. */
+function startTRDirect(tid,rid){
+  const t=getTraining(tid);if(!t)return;
+  const r=t.rounds.find(x=>x.id===rid);if(!r)return;
+  const rIdx=t.rounds.indexOf(r)+1;
+  const roundName=r.label.trim()||`Ronda ${rIdx}`;
+  pendingRound={roundName:`${t.name} — ${roundName}`,note:'',
+    azulPairId:r.azulPairId||'',rojaPairId:r.rojaPairId||'',
+    azulP1:r.azulP1||'',azulP2:r.azulP2||'',
+    rojaP1:r.rojaP1||'',rojaP2:r.rojaP2||'',
+    azulLanzadorId:r.azulLanzadorId||'',rojaLanzadorId:r.rojaLanzadorId||'',
+    cuadrillaName:r.cuadrillaName||'',
+    trainingId:tid,trainingRoundId:rid};
+  stopTimerCleanup(); roundMode='missions'; mState=defaultMState(); render();
+}
 function finishTraining(id){
   const t=getTraining(id);if(t)t.status='completed';
   save();activeTrainingId=null;roundMode='hub';render();
@@ -3188,9 +3406,6 @@ function confirmAddRound(tid){
   const azPair=autoGetOrCreatePair(aP1,aP2)||'';
   const roPair=autoGetOrCreatePair(rP1,rP2)||'';
 
-  const azLz=(newRoundData.azulLanzadorId===aP1||newRoundData.azulLanzadorId===aP2)?newRoundData.azulLanzadorId:aP1;
-  const roLz=(newRoundData.rojaLanzadorId===rP1||newRoundData.rojaLanzadorId===rP2)?newRoundData.rojaLanzadorId:rP1;
-
   const newRound={
     id:uid(),
     order:t.rounds.length,
@@ -3198,8 +3413,9 @@ function confirmAddRound(tid){
     cuadrillaName: cuaName,
     azulP1:aP1, azulP2:aP2,
     rojaP1:rP1, rojaP2:rP2,
-    azulLanzadorId: aP2 ? azLz : '',
-    rojaLanzadorId: rP2 ? roLz : '',
+    // Rol por base: la casilla de arriba (P1) lanza, la de abajo (P2) recibe
+    azulLanzadorId: aP2 ? aP1 : '',
+    rojaLanzadorId: rP2 ? rP1 : '',
     azulPairId:azPair,
     rojaPairId:roPair,
     completed:false
@@ -3294,29 +3510,27 @@ function renderEntrenamientos(){
           <div class="bbox azul">
             <div class="btit azul"><span class="dot azul"></span>Base Azul</div>
             <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
-              <div style="font-size:10px;font-weight:700;color:var(--text3)">Jugador 1</div>
+              <div style="font-size:10px;font-weight:800;color:var(--text3)">🚀 LANZA</div>
               <div class="drop-zone${slot.azulP1?' filled':''}" id="tw-az1"
                 ondragover="twDragOver(event,'tw-az1')" ondragleave="twDragLeave('tw-az1')"
                 ondrop="twDrop(event,'azulP1')">${twSlot(slot.azulP1,'azulP1')}</div>
-              <div style="font-size:10px;font-weight:700;color:var(--text3)">Jugador 2</div>
+              <div style="font-size:10px;font-weight:800;color:var(--text3)">🤲 RECIBE</div>
               <div class="drop-zone${slot.azulP2?' filled':''}" id="tw-az2"
                 ondragover="twDragOver(event,'tw-az2')" ondragleave="twDragLeave('tw-az2')"
                 ondrop="twDrop(event,'azulP2')">${twSlot(slot.azulP2,'azulP2')}</div>
-              ${_lanzadorPicker(slot,'azul','setWizLanzador')}
             </div>
           </div>
           <div class="bbox roja">
             <div class="btit roja"><span class="dot roja"></span>Base Roja</div>
             <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
-              <div style="font-size:10px;font-weight:700;color:var(--text3)">Jugador 1</div>
+              <div style="font-size:10px;font-weight:800;color:var(--text3)">🚀 LANZA</div>
               <div class="drop-zone${slot.rojaP1?' filled':''}" id="tw-ro1"
                 ondragover="twDragOver(event,'tw-ro1')" ondragleave="twDragLeave('tw-ro1')"
                 ondrop="twDrop(event,'rojaP1')">${twSlot(slot.rojaP1,'rojaP1')}</div>
-              <div style="font-size:10px;font-weight:700;color:var(--text3)">Jugador 2</div>
+              <div style="font-size:10px;font-weight:800;color:var(--text3)">🤲 RECIBE</div>
               <div class="drop-zone${slot.rojaP2?' filled':''}" id="tw-ro2"
                 ondragover="twDragOver(event,'tw-ro2')" ondragleave="twDragLeave('tw-ro2')"
                 ondrop="twDrop(event,'rojaP2')">${twSlot(slot.rojaP2,'rojaP2')}</div>
-              ${_lanzadorPicker(slot,'roja','setWizLanzador')}
             </div>
           </div>
         </div>
@@ -3535,16 +3749,15 @@ function trainWizAddRound(){
 function finishTrainWiz(){
   if(!nTrainName.trim()){showToast('Escribe el nombre del entrenamiento');return;}
   const rounds=trainWizSlots.map((slot,i)=>{
-    const azLz=(slot.azulLanzadorId===slot.azulP1||slot.azulLanzadorId===slot.azulP2)?slot.azulLanzadorId:slot.azulP1;
-    const roLz=(slot.rojaLanzadorId===slot.rojaP1||slot.rojaLanzadorId===slot.rojaP2)?slot.rojaLanzadorId:slot.rojaP1;
     return{
       id:uid(),order:i,
       label:'',
       cuadrillaName:(slot.cuadrillaName||'').trim(),
       azulP1:slot.azulP1||'',azulP2:slot.azulP2||'',
       rojaP1:slot.rojaP1||'',rojaP2:slot.rojaP2||'',
-      azulLanzadorId: slot.azulP2 ? (azLz||'') : '',
-      rojaLanzadorId: slot.rojaP2 ? (roLz||'') : '',
+      // Rol por base: la casilla de arriba (P1) lanza, la de abajo (P2) recibe
+      azulLanzadorId: slot.azulP2 ? (slot.azulP1||'') : '',
+      rojaLanzadorId: slot.rojaP2 ? (slot.rojaP1||'') : '',
       azulPairId:autoGetOrCreatePair(slot.azulP1,slot.azulP2),
       rojaPairId:autoGetOrCreatePair(slot.rojaP1,slot.rojaP2),
       completed:false
@@ -4633,7 +4846,12 @@ let _tendenciaHidden=new Set(); // set of mission codes hidden in tendencia char
 
 // Función dinámica para leer los colores CSS actuales vía JavaScript:
 function _getChartColors() {
-  const style = getComputedStyle(document.documentElement);
+  // OJO: las variables de tema del modo VIP se redefinen en body.modo-vip,
+  // no en :root — leerlas desde document.documentElement (el <html>) siempre
+  // devuelve los valores claros originales porque un hijo nunca sobreescribe
+  // el estilo calculado de su padre. Por eso el texto de las gráficas
+  // quedaba invisible en modo oscuro. Hay que leerlas desde <body>.
+  const style = getComputedStyle(document.body);
   return {
     txt: style.getPropertyValue('--text').trim() || '#1A2332',
     tick: style.getPropertyValue('--text3').trim() || '#6B7E93',
@@ -4683,12 +4901,15 @@ function drawGraficas(){
     const scores=sorted.map(r=>r.score);
     const avgs=scores.map((_,i)=>{const w=scores.slice(Math.max(0,i-9),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
     
+    // Con muchas rondas, puntos grandes + todas las fechas rotadas se vuelven
+    // ilegibles — achicamos los puntos y limitamos cuántas fechas se muestran.
+    const dense=scores.length>40;
     _mkChart('gc_evol',{type:'line',data:{labels,datasets:[
-      {label:'Puntaje',data:scores,borderColor:'#0D6E8A',backgroundColor:'rgba(13,110,138,0.15)',tension:.4,pointRadius:5,pointBackgroundColor:'#0D6E8A',pointBorderColor:'#fff',pointBorderWidth:2,fill:true,borderWidth:2.5},
+      {label:'Puntaje',data:scores,borderColor:'#0D6E8A',backgroundColor:'rgba(13,110,138,0.15)',tension:.4,pointRadius:dense?1.5:5,pointBackgroundColor:'#0D6E8A',pointBorderColor:'#fff',pointBorderWidth:dense?0.5:2,fill:true,borderWidth:2.5},
       {label:'Promedio móvil (10)',data:avgs,borderColor:'#B85C00',borderDash:[6,4],tension:.4,pointRadius:0,fill:false,borderWidth:2}
     ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
       scales:{y:{suggestedMin:0,max:545,ticks:{color:colors.tick,font:{size:11}},grid:{color:colors.grid},border:{display:false}},
-              x:{ticks:{color:colors.tick,maxRotation:40,font:{size:10}},grid:{display:false},border:{display:false}}}})});
+              x:{ticks:{color:colors.tick,maxRotation:40,font:{size:10},autoSkip:true,maxTicksLimit:dense?10:20},grid:{display:false},border:{display:false}}}})});
   
   } else if(graficasSubTab==='tendencia'){
     const wd=runsFiltradas.filter(r=>r.missions).sort((a,b)=>a.ts-b.ts);
@@ -4749,10 +4970,10 @@ function drawGraficas(){
           grid:{color:colors.grid},border:{display:false},
           title:{display:true,text:'% acierto acumulado',color:colors.tick,font:{size:11}}
         },
-        x:{ticks:{color:colors.tick,maxRotation:40,font:{size:9}},grid:{display:false},border:{display:false}}
+        x:{ticks:{color:colors.tick,maxRotation:40,font:{size:9},autoSkip:true,maxTicksLimit:15},grid:{display:false},border:{display:false}}
       }
     })});
-  
+
   } else if(graficasSubTab==='misiones'){
     const wd=runsFiltradas.filter(r=>r.missions);if(!wd.length)return;
     const total=wd.length;
@@ -4920,6 +5141,21 @@ let editandoLanzadaId = null;
 let lanzadasConfiguradas = [];
 function saveLanzadas() { save(); }
 
+/* ── Sub-acciones nombradas por misión (configurable por el equipo) ──
+   Para misiones tipo "contador" (ej. M02: 3 unidades de 10 pts c/u) que en
+   realidad son 3 acciones DISTINTAS con el mismo puntaje, el admin puede
+   nombrarlas — así se registran como checks individuales en vez de un
+   contador genérico, y se sabe exactamente cuál se logró. Pensado para que
+   al cambiar de temporada (ej. BioGlow) no haga falta tocar código: se
+   reconfigura desde la propia app. Shape: { M02: { m02_sec: ['Sección A',...] } }
+   Un array vacío o ausente = comportamiento de contador genérico (por defecto). */
+let missionOverrides = {};
+function saveMissionOverrides(){ save(); }
+function _overrideNames(mCode, pid){
+  const arr = (missionOverrides[mCode] && missionOverrides[mCode][pid]) || null;
+  return (arr && arr.length) ? arr : null;
+}
+
 /* ── Edición de estrategias (lanzadas) de OTRO equipo desde el panel admin ──
    Cuando _admTargetTeamId tiene valor, el formulario de lanzadas (compartido
    con la pestaña Efectividad) lee/escribe sobre ese equipo en vez del equipo
@@ -4937,7 +5173,12 @@ const esAdminActual = () => (typeof usuarioActual !== 'undefined' && usuarioActu
 
 // Función dinámica para leer colores seguros para la rejilla de gráficas
 function _getChartColors() {
-  const style = getComputedStyle(document.documentElement);
+  // OJO: las variables de tema del modo VIP se redefinen en body.modo-vip,
+  // no en :root — leerlas desde document.documentElement (el <html>) siempre
+  // devuelve los valores claros originales porque un hijo nunca sobreescribe
+  // el estilo calculado de su padre. Por eso el texto de las gráficas
+  // quedaba invisible en modo oscuro. Hay que leerlas desde <body>.
+  const style = getComputedStyle(document.body);
   return {
     txt: style.getPropertyValue('--text').trim() || '#1A2332',
     tick: style.getPropertyValue('--text3').trim() || '#6B7E93',
@@ -5011,9 +5252,7 @@ function dibujarGrafica(canvasId, type, labels, data, colorHex, labelText, custo
    Efectividad, que estaban repetidas y dispersas)
 ═══════════════════════════════════════════ */
 let analisisSubTab='resumen';
-let analisisParejasSub='parejas';
 function switchAnalisisSub(t){ analisisSubTab=t; jugadorDetalle=null; parejaDetalle=null; lanzadaDetalle=null; render(); }
-function switchAnalisisParejasSub(t){ analisisParejasSub=t; parejaDetalle=null; render(); }
 
 function renderAnalisis(){
   if (showLanzadaForm && esAdminActual()) return renderLanzadaForm();
@@ -5023,14 +5262,27 @@ function renderAnalisis(){
 
   if(!runsFiltradas.length) return `<div class="empty">Guarda lanzadas para ver el análisis del equipo.</div>`;
 
-  const tabs=[['resumen','📊 Resumen'],['jugadores','👤 Jugadores'],['parejas','🤝 Parejas y Cuadrillas'],['misiones','🎯 Misiones'],['estrategia','🧭 Estrategia'],['entrenamientos','📋 Entrenamientos']];
-  const nav=`<div class="sub-tabs" style="flex-wrap:wrap">${tabs.map(([k,l])=>
-    `<button class="sub-tbtn ${analisisSubTab===k?'active':''}" onclick="switchAnalisisSub('${k}')">${l}</button>`).join('')}</div>`;
+  const pill=(k,l)=>`<button class="sub-tbtn ${analisisSubTab===k?'active':''}" onclick="switchAnalisisSub('${k}')">${l}</button>`;
+  const nav=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
+    ${pill('resumen','📊 Resumen')}
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;padding-left:2px">Participantes</span>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        ${pill('jugadores','👤 Jugadores')}
+        ${pill('parejas','🤝 Parejas')}
+        ${pill('cuadrillas','🚚 Cuadrillas')}
+      </div>
+    </div>
+    ${pill('misiones','🎯 Misiones')}
+    ${pill('estrategia','🧭 Estrategia')}
+    ${pill('entrenamientos','📋 Entrenamientos')}
+  </div>`;
 
   let body='';
   if(analisisSubTab==='resumen')            body=renderAnalisisResumen();
   else if(analisisSubTab==='jugadores')     body=renderEfectividadJugadores(runsFiltradas);
-  else if(analisisSubTab==='parejas')       body=renderAnalisisParejasCuadrillas();
+  else if(analisisSubTab==='parejas')       body=renderEfectividadParejas(runsFiltradas);
+  else if(analisisSubTab==='cuadrillas')    body=_cuadrillasSection(runsFiltradas,'analisis');
   else if(analisisSubTab==='misiones')      body=renderEfectividadMisiones();
   else if(analisisSubTab==='estrategia')    body=renderEfectividadEstrategia(runsFiltradas);
   else                                       body=statsTrainings();
@@ -5087,18 +5339,6 @@ function renderAnalisisResumen(){
     </div>`;
 }
 
-/* ── PAREJAS Y CUADRILLAS: unifica lo que antes vivía repartido ── */
-function renderAnalisisParejasCuadrillas(){
-  const nav=`<div style="display:flex;gap:6px;margin-bottom:14px">
-    <button class="btn btn-sm${analisisParejasSub==='parejas'?' btn-cyan':''}" style="flex:1" onclick="switchAnalisisParejasSub('parejas')">Parejas</button>
-    <button class="btn btn-sm${analisisParejasSub==='cuadrillas'?' btn-cyan':''}" style="flex:1" onclick="switchAnalisisParejasSub('cuadrillas')">Cuadrillas</button>
-  </div>`;
-  const body = analisisParejasSub==='parejas'
-    ? renderEfectividadParejas(runsFiltradas)
-    : _cuadrillasSection(runsFiltradas,'analisis');
-  return nav+body;
-}
-
 /* ── 1. ENRUTADOR PRINCIPAL DE EFECTIVIDAD (heredado, aún usado por Análisis) ── */
 function renderEfectividad() {
   if (showLanzadaForm && esAdminActual()) return renderLanzadaForm();
@@ -5138,6 +5378,10 @@ function renderEfectividadMisiones() {
 
   return `
     <div style="animation: fadeIn 0.3s ease;">
+      ${esAdminActual()?`<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn btn-sm" onclick="toggleMissionCfg()">⚙️ Configurar sub-acciones por misión</button>
+      </div>`:''}
+      ${_missionCfgOpen ? renderMissionConfigPanel() : ''}
       <div style="display:flex; gap:5px; margin-bottom:15px; background:var(--surface); padding:8px; border-radius:var(--r); overflow-x:auto; border:2px solid var(--navy); box-shadow:var(--shadow-sm);">
         <button onclick="misionesSubTab='global'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('global')}; font-weight:800; cursor:pointer; background:${bgActive('global')}; color:${txtActive('global')}; font-size:12px; transition:var(--transition);">GLOBAL</button>
         <button onclick="misionesSubTab='sueltas'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('sueltas')}; font-weight:800; cursor:pointer; background:${bgActive('sueltas')}; color:${txtActive('sueltas')}; font-size:12px; transition:var(--transition);">SUELTAS</button>
@@ -5150,6 +5394,83 @@ function renderEfectividadMisiones() {
       </div>
     </div>
   `;
+}
+
+/* ── Panel admin: nombrar sub-acciones de misiones tipo contador ── */
+let _missionCfgOpen = false;
+let _mcfgActive = new Set(); // 'code|pid' activos en el formulario (sin guardar aún)
+function toggleMissionCfg(){
+  _missionCfgOpen = !_missionCfgOpen;
+  if(_missionCfgOpen){
+    _mcfgActive = new Set();
+    MISSIONS.forEach(m=>m.params.forEach(p=>{
+      if(p.type==='counter' && _overrideNames(m.code,p.id)) _mcfgActive.add(m.code+'|'+p.id);
+    }));
+  }
+  render();
+}
+function mcfgToggleRow(mcode,pid,max,checkboxEl){
+  const key=mcode+'|'+pid;
+  const gridEl=document.getElementById('mcfg-grid-'+mcode+'-'+pid);
+  if(checkboxEl.checked){
+    _mcfgActive.add(key);
+    if(gridEl){
+      gridEl.style.display='grid';
+      gridEl.querySelectorAll('.mcfg-input').forEach((inp,i)=>{ if(!inp.value.trim()) inp.value='Unidad '+(i+1); });
+    }
+  } else {
+    _mcfgActive.delete(key);
+    if(gridEl) gridEl.style.display='none';
+  }
+}
+function renderMissionConfigPanel(){
+  const counters=[];
+  MISSIONS.forEach(m=>m.params.forEach(p=>{ if(p.type==='counter') counters.push({m,p}); }));
+  const rows = counters.map(({m,p})=>{
+    const names = _overrideNames(m.code,p.id) || [];
+    const active = _mcfgActive.has(m.code+'|'+p.id);
+    const inputs = Array.from({length:p.max}).map((_,i)=>
+      `<input class="mcfg-input" data-mcode="${m.code}" data-pid="${p.id}" value="${(names[i]||'').replace(/"/g,'&quot;')}" placeholder="Unidad ${i+1}" style="padding:6px 9px;font-size:12px;border:1.5px solid var(--border);border-radius:var(--rs);background:var(--surface2);color:var(--text)">`
+    ).join('');
+    return `
+      <div style="border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;margin-bottom:8px;background:var(--surface)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <div><span class="mcode${m.amber?' am':''}">${m.code}</span> <b style="font-size:13px">${p.label}</b> <span style="font-size:11px;color:var(--text3)">(${p.max} unidades · ${p.pts} pts c/u)</span></div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" ${active?'checked':''} onchange="mcfgToggleRow('${m.code}','${p.id}',${p.max},this)">
+            Nombrar sub-acciones
+          </label>
+        </div>
+        <div id="mcfg-grid-${m.code}-${p.id}" style="display:${active?'grid':'none'};grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin-top:8px">${inputs}</div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:14px;font-weight:800">⚙️ Configurar sub-acciones por misión</div>
+        <button class="btn btn-sm" onclick="_missionCfgOpen=false;render()">✕ Cerrar</button>
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Para misiones con varias acciones distintas que dan los mismos puntos (ej. 3 secciones de una misión), activá "Nombrar sub-acciones" y escribí cómo se llama cada una. Cuando cambie la temporada, volvé aquí y actualizá los nombres — no hace falta tocar código.</div>
+      ${rows}
+      <button class="btn btn-green" style="width:100%" onclick="saveMissionOverridesFromForm()">✓ Guardar cambios</button>
+    </div>`;
+}
+function saveMissionOverridesFromForm(){
+  const newOverrides={};
+  MISSIONS.forEach(m=>m.params.forEach(p=>{
+    if(p.type!=='counter') return;
+    const key=m.code+'|'+p.id;
+    if(!_mcfgActive.has(key)) return;
+    const inputs=[...document.querySelectorAll(`.mcfg-input[data-mcode="${m.code}"][data-pid="${p.id}"]`)];
+    const names=inputs.map((inp,i)=>inp.value.trim()||('Unidad '+(i+1)));
+    if(!newOverrides[m.code]) newOverrides[m.code]={};
+    newOverrides[m.code][p.id]=names;
+  }));
+  missionOverrides=newOverrides;
+  saveMissionOverrides();
+  _missionCfgOpen=false;
+  if(typeof showToast==='function') showToast('✓ Sub-acciones guardadas');
+  render();
 }
 
 function effBySueltas() { const loose = runsFiltradas.filter(r => !r.trainingId && r.missions); return loose.length ? effTable(loose, 'Lanzadas Sueltas') : `<div class="empty">No hay lanzadas sueltas registradas.</div>`; }
@@ -5188,7 +5509,35 @@ function effTable(subset, label, customTargets = null){
     const rawPartial = (partial / total) * 100;
     const rawFail = (fail / total) * 100;
 
-    return { code: m.code, name: m.name, full, partial, fail, total, maxPts, pctFull, pctPartial, pctFail, pctAny, rawFull, rawPartial, rawFail, fullRounds, partialRounds, failRounds };
+    // Desglose por parte: cuántas veces se marcó ✓ lograda, ✗ fallida
+    // explícitamente, o quedó sin marcar — incluye tanto las partes tipo
+    // check como las sub-acciones nombradas de un contador (si el equipo
+    // las configuró en "⚙️ Configurar sub-acciones por misión").
+    const parts = [];
+    m.params.forEach(p=>{
+      if(p.type==='check'){
+        let ok=0, bad=0, sin=0;
+        subset.forEach(r=>{
+          const v = r.missions ? r.missions[p.id] : undefined;
+          if(v===true) ok++; else if(v===false) bad++; else sin++;
+        });
+        if(ok+bad>0) parts.push({ label:p.label, bonus:!!p.bonus, ok, bad, sin });
+      } else if(p.type==='counter'){
+        const names=_overrideNames(m.code,p.id);
+        if(!names) return;
+        names.forEach((nm,idx)=>{
+          let ok=0, bad=0, sin=0;
+          subset.forEach(r=>{
+            const arr = r.missions ? r.missions[p.id] : undefined;
+            const v = Array.isArray(arr) ? arr[idx] : undefined;
+            if(v===true) ok++; else if(v===false) bad++; else sin++;
+          });
+          if(ok+bad>0) parts.push({ label:nm, bonus:false, ok, bad, sin });
+        });
+      }
+    });
+
+    return { code: m.code, name: m.name, full, partial, fail, total, maxPts, pctFull, pctPartial, pctFail, pctAny, rawFull, rawPartial, rawFail, fullRounds, partialRounds, failRounds, parts };
   });
 
   // 🛑 LÓGICA DE ORDENAMIENTO REPARADA (M01->M15 y M15->M01)
@@ -5253,6 +5602,16 @@ function effTable(subset, label, customTargets = null){
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
         <div style="font-size:10px; font-weight:800; color:var(--red); margin-bottom:4px;">FALLÓ COMPLETAMENTE EN:</div>
         <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.failRounds.map(rl => `<span class="fail-chip">${rl}</span>`).join('')}</div>
+      </div>` : ''}
+
+      ${ms.parts.length > 0 ? `
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
+        <div style="font-size:10px; font-weight:800; color:var(--text2); margin-bottom:4px;">DETALLE POR PARTE:</div>
+        ${ms.parts.map(p=>`
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; padding:3px 0;">
+            <span style="color:var(--text2);">${p.bonus?'<span class="btag">BONO</span>':''}${p.label}</span>
+            <span style="white-space:nowrap; font-weight:700;"><span style="color:var(--green);">✓${p.ok}</span> <span style="color:var(--red);">✗${p.bad}</span>${p.sin?` <span style="color:var(--text3);font-weight:600;">· ${p.sin} s/m</span>`:''}</span>
+          </div>`).join('')}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -5574,7 +5933,7 @@ function renderSubPaginaLanzada(wd, id) {
     }
     
     pts = Math.min(pts, 545); labels.unshift(runLabel(r, runs.indexOf(r))); ptsHist.unshift(pts); tooltipsData.unshift(ttLines);
-    const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? p.name.split(' ')[0] : '---'; };
+    const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? lastName(p.name) : '---'; };
     
     let equipoHTML = '';
     if(lan.base === 'Soporte') equipoHTML = `<span style="color:var(--text3); font-size:10px; font-weight:700;">${getP(r.rojaP1)} / ${getP(r.azulP1)}</span>`;
@@ -5679,7 +6038,7 @@ function renderEfectividadJugadores(wd) {
     return `
     <div class="card" onclick="jugadorDetalle='${p.id}'; jugadorDetalleTab='base'; render();" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3 style="color:var(--heading); margin:0; font-size:18px; font-weight:800;">👤 ${p.name.split(' ')[0]}</h3>
+        <h3 style="color:var(--heading); margin:0; font-size:18px; font-weight:800;">👤 ${p.name}</h3>
         <div style="font-size:10px; color:var(--text3); font-weight:800;">${rojaR+azulR} RONDAS</div>
       </div>
     </div>`;
@@ -5782,7 +6141,7 @@ function renderEfectividadParejas(wd) {
     };
     addP(r.rojaP1, r.rojaP2, true); addP(r.azulP1, r.azulP2, false);
   });
-  const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? p.name.split(' ')[0] : '---'; };
+  const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? p.name : '---'; };
 
   const html = Object.values(parejasData).map(p => {
     if (!checkEsUsuario(p.p1) && !checkEsUsuario(p.p2)) return '';
@@ -5799,7 +6158,7 @@ function renderEfectividadParejas(wd) {
 
 /* ── 6.1 DETALLE PAREJAS ── */
 function renderSubPaginaPareja(wd, id) {
-  const pIds = id.split('-'); const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? p.name.split(' ')[0] : '---'; };
+  const pIds = id.split('-'); const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? p.name : '---'; };
   const rRoja = wd.filter(r => [r.rojaP1, r.rojaP2].sort().join('-') === id);
   const rAzul = wd.filter(r => [r.azulP1, r.azulP2].sort().join('-') === id);
 
