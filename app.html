@@ -1774,7 +1774,7 @@ function _admStyles(){
   </style>`;
 }
 
-function _admToggle(key){ _admOpen[key]=!_admOpen[key]; renderAdminPanel(); }
+function _admToggle(key){ _admOpen[key]=!_admOpen[key]; _admRerender(); }
 
 function _admRoleStyle(rol){
   if(rol==='superadmin') return {color:'#FFD700', icon:'👑'};
@@ -2051,71 +2051,88 @@ async function admImportExcel(teamKey){
 
 function arrLenAdm(v){ if(!v) return 0; return Array.isArray(v)?v.length:Object.keys(v).length; }
 
+/* Recarga desde Firebase (equipos + usuarios cambiaron de verdad: crear,
+   borrar, guardar...). Para acciones que solo abren/cierran algo en la UI,
+   usa _admRerender() — evita el parpadeo y el salto de scroll de pedir todo
+   otra vez a Firebase para simplemente expandir una sección. */
 async function renderAdminPanel() {
   const el = document.getElementById('main');
+  const scrollY = window.scrollY;
   el.innerHTML = _admStyles()+'<div id="adm-wrap" class="adm-loading"><span class="adm-spin"></span>Cargando panel…</div>';
 
   try {
-    const miRol = (usuarioActual.rol || "").toLowerCase().trim();
-    const esSuper = (miRol === 'superadmin');
-    const miTeamId = usuarioActual.teamId;
-
     const [snapUsers, snapTeams] = await Promise.all([db.ref('users').once('value'), db.ref('teams').once('value')]);
-    const allUsers = snapUsers.val() || {};
-    const allTeams = snapTeams.val() || {};
-    _admTeamsCache = allTeams; _admUsersCache = allUsers;
-
-    const teamKeys = esSuper ? Object.keys(allTeams) : (miTeamId ? [miTeamId] : []);
-    let totalRuns=0, totalPlayers=0;
-    teamKeys.forEach(k=>{ const d=(allTeams[k]||{}).data||{}; totalRuns+=arrLenAdm(d.runs); totalPlayers+=arrLenAdm(d.players); });
-
-    const usersByTeam = {};
-    Object.keys(allUsers).forEach(uk=>{
-      const tid = allUsers[uk].teamId;
-      (usersByTeam[tid] = usersByTeam[tid]||[]).push([uk, allUsers[uk]]);
-    });
-
-    let html = _admStyles()+'<div id="adm-wrap">';
-    html += `<div class="adm-head">
-      <div>
-        <div class="adm-title">${esSuper?'👑 Panel Superadmin':'📋 Panel de Administrador'}</div>
-        <div class="adm-sub">${esSuper?'Gestiona todos los equipos, usuarios y estrategias · STAT 2025–2026':'Gestiona tu equipo y jugadores · STAT 2025–2026'}</div>
-      </div>
-      <button class="adm-btn adm-btn-ghost adm-btn-sm" onclick="renderAdminPanel()">↺ Actualizar</button>
-    </div>`;
-
-    if(esSuper){
-      html += `<div class="adm-stats">
-        <div class="adm-stat"><div class="adm-stat-n" style="color:var(--acyan)">${teamKeys.length}</div><div class="adm-stat-l">Equipos</div></div>
-        <div class="adm-stat"><div class="adm-stat-n" style="color:var(--agold)">${Object.keys(allUsers).length}</div><div class="adm-stat-l">Usuarios</div></div>
-        <div class="adm-stat"><div class="adm-stat-n" style="color:var(--agreen)">${totalRuns}</div><div class="adm-stat-l">Lanzadas totales</div></div>
-        <div class="adm-stat"><div class="adm-stat-n" style="color:var(--acyan)">${totalPlayers}</div><div class="adm-stat-l">Jugadores</div></div>
-      </div>`;
-
-      html += `<div class="adm-card">
-        <div class="adm-card-title">+ Crear nuevo equipo</div>
-        <div class="adm-form-row">
-          <input class="adm-input" id="adm-new-name" placeholder="Nombre del equipo">
-          <button class="adm-btn adm-btn-cyan" onclick="_admCreateTeam()">+ Crear</button>
-        </div>
-      </div>`;
-    }
-
-    if(!teamKeys.length){
-      html += `<div class="adm-empty">No hay equipos para mostrar.</div>`;
-    } else {
-      teamKeys.forEach(k=>{
-        html += _admTeamCard(k, allTeams[k]||{name:usuarioActual.teamName}, usersByTeam[k]||[], esSuper);
-      });
-    }
-
-    html += '</div>';
-    el.innerHTML = html;
-
+    _admUsersCache = snapUsers.val() || {};
+    _admTeamsCache = snapTeams.val() || {};
+    _admRerender();
+    window.scrollTo(0, scrollY);
   } catch(e) {
     console.error(e);
     el.innerHTML = _admStyles()+`<div id="adm-wrap"><div class="adm-error">⚠ Error: ${e.message}</div></div>`;
   }
+}
+
+/* Redibuja el panel con los datos ya cacheados (sin volver a pedirle nada a
+   Firebase) y mantiene el scroll donde estaba. Úsalo para toggles de UI
+   (abrir/cerrar secciones, entrar/salir de modo edición, etc). */
+function _admRerender(){
+  const el = document.getElementById('main');
+  if(!el) return;
+  if(!_admTeamsCache){ renderAdminPanel(); return; }
+  const scrollY = window.scrollY;
+  const allUsers = _admUsersCache || {};
+  const allTeams = _admTeamsCache || {};
+  const miRol = (usuarioActual.rol || "").toLowerCase().trim();
+  const esSuper = (miRol === 'superadmin');
+  const miTeamId = usuarioActual.teamId;
+
+  const teamKeys = esSuper ? Object.keys(allTeams) : (miTeamId ? [miTeamId] : []);
+  let totalRuns=0, totalPlayers=0;
+  teamKeys.forEach(k=>{ const d=(allTeams[k]||{}).data||{}; totalRuns+=arrLenAdm(d.runs); totalPlayers+=arrLenAdm(d.players); });
+
+  const usersByTeam = {};
+  Object.keys(allUsers).forEach(uk=>{
+    const tid = allUsers[uk].teamId;
+    (usersByTeam[tid] = usersByTeam[tid]||[]).push([uk, allUsers[uk]]);
+  });
+
+  let html = _admStyles()+'<div id="adm-wrap">';
+  html += `<div class="adm-head">
+    <div>
+      <div class="adm-title">${esSuper?'👑 Panel Superadmin':'📋 Panel de Administrador'}</div>
+      <div class="adm-sub">${esSuper?'Gestiona todos los equipos, usuarios y estrategias · STAT 2025–2026':'Gestiona tu equipo y jugadores · STAT 2025–2026'}</div>
+    </div>
+    <button class="adm-btn adm-btn-ghost adm-btn-sm" onclick="renderAdminPanel()">↺ Actualizar</button>
+  </div>`;
+
+  if(esSuper){
+    html += `<div class="adm-stats">
+      <div class="adm-stat"><div class="adm-stat-n" style="color:var(--acyan)">${teamKeys.length}</div><div class="adm-stat-l">Equipos</div></div>
+      <div class="adm-stat"><div class="adm-stat-n" style="color:var(--agold)">${Object.keys(allUsers).length}</div><div class="adm-stat-l">Usuarios</div></div>
+      <div class="adm-stat"><div class="adm-stat-n" style="color:var(--agreen)">${totalRuns}</div><div class="adm-stat-l">Lanzadas totales</div></div>
+      <div class="adm-stat"><div class="adm-stat-n" style="color:var(--acyan)">${totalPlayers}</div><div class="adm-stat-l">Jugadores</div></div>
+    </div>`;
+
+    html += `<div class="adm-card">
+      <div class="adm-card-title">+ Crear nuevo equipo</div>
+      <div class="adm-form-row">
+        <input class="adm-input" id="adm-new-name" placeholder="Nombre del equipo">
+        <button class="adm-btn adm-btn-cyan" onclick="_admCreateTeam()">+ Crear</button>
+      </div>
+    </div>`;
+  }
+
+  if(!teamKeys.length){
+    html += `<div class="adm-empty">No hay equipos para mostrar.</div>`;
+  } else {
+    teamKeys.forEach(k=>{
+      html += _admTeamCard(k, allTeams[k]||{name:usuarioActual.teamName}, usersByTeam[k]||[], esSuper);
+    });
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+  window.scrollTo(0, scrollY);
 }
 
 /* ── Equipos: crear / editar / eliminar (solo superadmin) ── */
@@ -2132,8 +2149,8 @@ async function _admCreateTeam(){
     renderAdminPanel();
   }catch(e){ alert('Error: '+e.message); }
 }
-function _admEditTeamOpen(k){ _admEditingTeam=k; _admDelTeamKey=null; renderAdminPanel(); }
-function _admEditTeamCancel(){ _admEditingTeam=null; renderAdminPanel(); }
+function _admEditTeamOpen(k){ _admEditingTeam=k; _admDelTeamKey=null; _admRerender(); }
+function _admEditTeamCancel(){ _admEditingTeam=null; _admRerender(); }
 async function _admEditTeamSave(k){
   const name=document.getElementById('adm-en-'+k).value.trim();
   if(!name) return alert('El nombre no puede estar vacío.');
@@ -2154,8 +2171,8 @@ async function _admRegenCode(k){
     renderAdminPanel();
   }catch(e){ alert('Error: '+e.message); }
 }
-function _admDelTeamOpen(k){ _admDelTeamKey=k; _admEditingTeam=null; renderAdminPanel(); }
-function _admDelTeamCancel(){ _admDelTeamKey=null; renderAdminPanel(); }
+function _admDelTeamOpen(k){ _admDelTeamKey=k; _admEditingTeam=null; _admRerender(); }
+function _admDelTeamCancel(){ _admDelTeamKey=null; _admRerender(); }
 async function _admDelTeamConfirm(k){
   try{
     await db.ref('teams/'+k).remove();
@@ -2170,13 +2187,13 @@ function _admNewLanzada(teamKey){
   _admTargetTeamId=teamKey;
   _admLzList=[...(((_admTeamsCache[teamKey]||{}).data||{}).lanzadas||[])];
   editandoLanzadaId=null; showLanzadaForm=true;
-  renderAdminPanel();
+  _admRerender();
 }
 function _admEditLanzada(teamKey,lzId){
   _admTargetTeamId=teamKey;
   _admLzList=[...(((_admTeamsCache[teamKey]||{}).data||{}).lanzadas||[])];
   editandoLanzadaId=lzId; showLanzadaForm=true;
-  renderAdminPanel();
+  _admRerender();
 }
 async function _admDeleteLanzadaFrom(teamKey,lzId){
   if(!confirm('¿Borrar esta estrategia?')) return;
@@ -5534,7 +5551,7 @@ function effTable(subset, label, customTargets = null){
           const v = r.missions ? r.missions[p.id] : undefined;
           if(v===true) ok++; else if(v===false) bad++; else sin++;
         });
-        if(ok+bad>0) parts.push({ label:p.label, bonus:!!p.bonus, ok, bad, sin });
+        parts.push({ label:p.label, bonus:!!p.bonus, ok, bad, sin });
       } else if(p.type==='counter'){
         const names=_overrideNames(m.code,p.id) || (m.code==='M14'?FORO_ITEM_NAMES:null);
         if(!names) return;
@@ -5545,7 +5562,7 @@ function effTable(subset, label, customTargets = null){
             const v = arr ? arr[idx] : undefined;
             if(v===true) ok++; else if(v===false) bad++; else sin++;
           });
-          if(ok+bad>0) parts.push({ label:nm, bonus:false, ok, bad, sin });
+          parts.push({ label:nm, bonus:false, ok, bad, sin });
         });
       }
     });
@@ -5576,34 +5593,28 @@ function effTable(subset, label, customTargets = null){
     const col = ms.pctFull >= 80 ? 'var(--green)' : ms.pctFull >= 50 ? 'var(--amber)' : 'var(--red)';
     const dKey = 'eff_'+label.replace(/[^a-zA-Z0-9]+/g,'_')+'_'+ms.code;
     const dOpen = !!statsOpen[dKey];
-    const detalle = `
-      ${ms.fullRounds.length > 0 ? `
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
-        <div style="font-size:10px; font-weight:800; color:var(--green); margin-bottom:4px;">COMPLETADAS AL 100% EN:</div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.fullRounds.map(rl => `<span class="tag tag-green">${rl}</span>`).join('')}</div>
-      </div>` : ''}
-
-      ${ms.partialRounds.length > 0 ? `
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
-        <div style="font-size:10px; font-weight:800; color:var(--amber); margin-bottom:4px;">COMPLETADAS PARCIALMENTE:</div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.partialRounds.map(x => `<span style="background:var(--amber-l); color:var(--amber); border:1.5px solid var(--amber-b); padding:2px 7px; border-radius:var(--rss); font-size:0.7rem; font-weight:700;">${x.lbl} (${x.pts}/${x.maxPts})</span>`).join('')}</div>
-      </div>` : ''}
-
-      ${ms.failRounds.length > 0 ? `
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
-        <div style="font-size:10px; font-weight:800; color:var(--red); margin-bottom:4px;">FALLÓ COMPLETAMENTE EN:</div>
-        <div style="display:flex; flex-wrap:wrap; gap:4px;">${ms.failRounds.map(rl => `<span class="fail-chip">${rl}</span>`).join('')}</div>
-      </div>` : ''}
-
-      ${ms.parts.length > 0 ? `
-      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:4px;">
-        <div style="font-size:10px; font-weight:800; color:var(--text2); margin-bottom:4px;">DETALLE POR PARTE:</div>
-        ${ms.parts.map(p=>`
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; padding:3px 0;">
-            <span style="color:var(--text2);">${p.bonus?'<span class="btag">BONO</span>':''}${p.label}</span>
-            <span style="white-space:nowrap; font-weight:700;"><span style="color:var(--green);">✓${p.ok}</span> <span style="color:var(--red);">✗${p.bad}</span>${p.sin?` <span style="color:var(--text3);font-weight:600;">· ${p.sin} s/m</span>`:''}</span>
-          </div>`).join('')}
-      </div>` : ''}`;
+    // Desglose por parte: fila compacta con mini-barra + % logrado/fallido.
+    // Usamos % (no el conteo crudo) porque con cientos de rondas un número
+    // como "312" no dice nada de un vistazo y además se ve enorme.
+    const detalle = ms.parts.length ? `
+      <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:6px;">
+        ${ms.parts.map(p=>{
+          const pTotal=p.ok+p.bad+p.sin;
+          const pctOk=pTotal?Math.round((p.ok/pTotal)*100):0;
+          const pctBad=pTotal?Math.round((p.bad/pTotal)*100):0;
+          const rawOk=pTotal?(p.ok/pTotal)*100:0, rawBad=pTotal?(p.bad/pTotal)*100:0;
+          return `<div style="margin-bottom:7px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:3px">
+              <span style="font-size:10.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.bonus?'<span class="btag" style="font-size:8px">BONO</span> ':''}${p.label}</span>
+              <span style="font-size:10.5px;font-weight:800;white-space:nowrap;color:var(--text3)"><span style="color:var(--green)">${pctOk}%✓</span> <span style="color:var(--red)">${pctBad}%✗</span></span>
+            </div>
+            <div style="display:flex;height:5px;border-radius:3px;overflow:hidden;background:var(--surface3)">
+              ${rawOk>0?`<div style="width:${rawOk}%;background:var(--green)"></div>`:''}
+              ${rawBad>0?`<div style="width:${rawBad}%;background:var(--red)"></div>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>` : '';
     return `
     <div class="card" style="padding:12px; margin-bottom:10px; display:block;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -5616,21 +5627,21 @@ function effTable(subset, label, customTargets = null){
           ${ms.pctPartial > 0 ? `<div style="font-size:10px; color:var(--amber); font-weight:900;">+${ms.pctPartial}% parcial</div>` : ''}
         </div>
       </div>
-      
+
       <div style="display:flex; height:10px; border-radius:var(--rss); overflow:hidden; background:var(--surface3); border:1.5px solid var(--border); margin-bottom:8px;">
         ${ms.rawFull > 0 ? `<div style="width:${ms.rawFull}%; background:var(--green);"></div>` : ''}
         ${ms.rawPartial > 0 ? `<div style="width:${ms.rawPartial}%; background:var(--amber);"></div>` : ''}
         ${ms.rawFail > 0 ? `<div style="width:${ms.rawFail}%; background:var(--red);"></div>` : ''}
       </div>
-      
+
       <div style="display:flex; gap:10px; font-size:11px; color:var(--text3); margin-bottom:8px; font-weight:600;">
         <div><span style="color:var(--green); font-weight:800;">${ms.full}</span> completas</div>
         ${ms.partial > 0 ? `<div><span style="color:var(--amber); font-weight:800;">${ms.partial}</span> parciales</div>` : ''}
         <div><span style="color:var(--red); font-weight:800;">${ms.fail}</span> fallidas</div>
       </div>
-      
-      ${(ms.fullRounds.length||ms.partialRounds.length||ms.failRounds.length||ms.parts.length) ? `
-      <button class="btn btn-sm" style="width:100%;margin-top:2px" onclick="toggleOpen('${dKey}')">${dOpen?'▲ Ocultar detalle':'▾ Ver detalle por ronda y por parte'}</button>
+
+      ${ms.parts.length ? `
+      <button class="btn btn-sm" style="width:100%;margin-top:2px" onclick="toggleOpen('${dKey}')">${dOpen?'▲ Ocultar desglose por parte':'▾ Ver desglose por parte'}</button>
       ${dOpen?detalle:''}` : ''}
     </div>`;
   }).join('');
@@ -5741,7 +5752,7 @@ function renderLanzadaForm() {
     <div class="card" style="animation: fadeIn 0.2s;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <h2 style="color:var(--heading); margin:0; font-size:1.2rem; font-weight:800;">${isEdit ? 'Editar Lanzada' : 'Crear Nueva Lanzada'}${_admTargetTeamId ? ' <span style="font-size:0.6em;color:var(--text3);font-weight:700">(equipo ajeno, vía admin)</span>' : ''}</h2>
-        <button onclick="showLanzadaForm=false; editandoLanzadaId=null; ${_admTargetTeamId ? '_admTargetTeamId=null; renderAdminPanel();' : 'render();'}" class="btn btn-sm">✕ CERRAR</button>
+        <button onclick="showLanzadaForm=false; editandoLanzadaId=null; ${_admTargetTeamId ? '_admTargetTeamId=null; _admRerender();' : 'render();'}" class="btn btn-sm">✕ CERRAR</button>
       </div>
       <div class="fg">
         <label class="field-lbl">NOMBRE DE LA LANZADA</label>
