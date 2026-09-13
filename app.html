@@ -3899,13 +3899,17 @@ function delTRResult(tid,rid){
    TAB: PARRILLA
 ═══════════════════════════════════════════ */
 function renderParrilla(){
-  
-  // 1. Si no hay jugadores, mostramos un mensaje indicando cómo se agregan ahora
+  const addForm = `<div class="card" style="padding:14px 18px;margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <input type="text" placeholder="Nombre del jugador" value="${nPlayerName}" oninput="nPlayerName=this.value" onkeydown="if(event.key==='Enter')addPlayer()" style="flex:1;min-width:160px">
+    <button class="btn btn-green" onclick="addPlayer()">+ Agregar jugador</button>
+  </div>`;
+
+  // 1. Si no hay jugadores, mostramos el formulario y un mensaje indicando cómo se agregan también
   if(!players.length) {
-    return `<div class="empty" style="padding:30px; text-align:center;">
+    return addForm + `<div class="empty" style="padding:30px; text-align:center;">
               No hay jugadores aún.<br>
               <span style="font-size:12px; color:var(--text3); display:block; margin-top:10px;">
-                Tus jugadores aparecerán aquí automáticamente cuando se registren usando el código de invitación del equipo.
+                Agrégalos arriba, o se sumarán solos cuando se registren usando el código de invitación del equipo.
               </span>
             </div>`;
   }
@@ -3915,12 +3919,9 @@ function renderParrilla(){
     const isEd = editingId.players === p.id;
     const isDel = confDel['p_'+p.id];
     const inPair = pairs.some(pr => pr.p1 === p.id || pr.p2 === p.id);
-    const myPairs = pairs.filter(pr => pr.p1 === p.id || pr.p2 === p.id);
-    
+
     const userBadge = p.username ? `<span style="font-size:11px; color:var(--cyan); background:rgba(0,194,212,0.1); padding:2px 6px; border-radius:4px; margin-left:6px;">@${p.username}</span>` : '';
 
-    // ARREGLO VIP PARRILLA: Texto "En pareja" estilizado directamente en HTML,
-    // garantizando fondo dorado brillante y texto oscuro que nunca falla.
     return `<div class="card" style="padding:14px 18px">
       <div style="display:flex;align-items:center;gap:12px">
         <div style="width:40px;height:40px;border-radius:50%;background:var(--green-l);border:2px solid var(--green-b);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;font-weight:800;color:var(--green-d)">${i+1}</div>
@@ -3928,10 +3929,8 @@ function renderParrilla(){
           ? `<input type="text" value="${editData.name||''}" oninput="editData.name=this.value" style="flex:1;font-size:15px" onkeydown="if(event.key==='Enter')savePlayerEdit('${p.id}')">`
           : `<div style="flex:1;min-width:0">
               <div style="font-size:16px;font-weight:700">${p.name} ${userBadge}</div>
-              <div style="font-size:12px;color:var(--text3);margin-top:2px">${myPairs.length?'En: '+myPairs.map(pr=>pr.name).join(', '):'Sin pareja asignada'}</div>
             </div>`}
         <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
-          ${inPair ? `<span class="tag" style="background:#FFC107; color:#000000; font-weight:900; padding:4px 8px; border-radius:6px; font-size:11px;">En pareja</span>` : ''}
           ${isEd
             ? `<button class="btn btn-green btn-sm" onclick="savePlayerEdit('${p.id}')">Guardar</button>
                <button class="btn btn-sm" onclick="cancelEdit('players')">Cancelar</button>`
@@ -3949,8 +3948,8 @@ function renderParrilla(){
     </div>`;
   }).join('');
 
-  // 3. Retornamos solo el contador de jugadores y la lista
-  return `<div style="font-size:12px;color:var(--text3);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px">${players.length} jugador${players.length!==1?'es':''} registrado${players.length!==1?'s':''}</div>` + list;
+  // 3. Retornamos el formulario, el contador de jugadores y la lista
+  return addForm + `<div style="font-size:12px;color:var(--text3);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px">${players.length} jugador${players.length!==1?'es':''} registrado${players.length!==1?'s':''}</div>` + list;
 }
 
 /* ═══════════════════════════════════════════
@@ -6031,6 +6030,38 @@ function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS) {
 }
 
 /* ── 5. EFECTIVIDAD JUGADORES ── */
+/* Mejor base para lanzar: promedio de % de completitud (puntos logrados / puntos
+   posibles de las lanzadas configuradas de esa base) entre las rondas donde el
+   jugador participó en esa base. */
+function _mejorBaseJugador(pid, wd){
+  const calcBase=(baseName)=>{
+    const lanzadasBase=lanzadasConfiguradas.filter(l=>l.base===baseName);
+    if(!lanzadasBase.length) return null;
+    let totalMax=0, totalPts=0, rondas=0;
+    lanzadasBase.forEach(l=>{
+      const rondasValidas=wd.filter(r=>{
+        const p1=baseName==='Roja'?r.rojaP1:r.azulP1;
+        const p2=baseName==='Roja'?r.rojaP2:r.azulP2;
+        return p1===pid||p2===pid;
+      });
+      if(!rondasValidas.length) return;
+      let ptsAcum=0;
+      rondasValidas.forEach(r=>{
+        let ptsRonda=0;
+        l.missions.forEach(mc=>{ const mo=MISSIONS.find(m=>m.code===mc); if(mo) ptsRonda+=Math.min(mScoreFor(mo,r.missions),(l.targetPts&&l.targetPts[mc]!==undefined)?l.targetPts[mc]:mMaxScore(mo)); });
+        ptsAcum+=Math.min(ptsRonda, l.max);
+      });
+      totalMax+=l.max; totalPts+=Math.round(ptsAcum/rondasValidas.length); rondas+=rondasValidas.length;
+    });
+    if(!totalMax) return null;
+    return {pct:Math.round((totalPts/totalMax)*100), rondas};
+  };
+  const roja=calcBase('Roja'), azul=calcBase('Azul');
+  if(!roja && !azul) return null;
+  if(roja && (!azul || roja.pct>=azul.pct)) return {base:'Roja', ...roja};
+  return {base:'Azul', ...azul};
+}
+
 function renderEfectividadJugadores(wd) {
   const stats = players.map(p => {
     if (!checkEsUsuario(p.id)) return null; 
@@ -6041,6 +6072,17 @@ function renderEfectividadJugadores(wd) {
     const total = scores.reduce((a,b)=>a+b,0);
     const max = Math.max(...scores);
     const prom = Math.round(total/scores.length);
+
+    const rolBase=(baseName)=>{
+      const subset=wd.filter(r=>(baseName==='roja'?r.rojaP1:r.azulP1)===p.id||(baseName==='roja'?r.rojaP2:r.azulP2)===p.id);
+      const lz=subset.filter(r=>r[baseName+'LanzadorId']===p.id).length;
+      const rc=subset.filter(r=>r[baseName+'LanzadorId']&&r[baseName+'LanzadorId']!==p.id).length;
+      return (lz||rc) ? `${lz}🚀 ${rc}🤲` : null;
+    };
+    const rolRoja=rolBase('roja'), rolAzul=rolBase('azul');
+    const mejorBase=_mejorBaseJugador(p.id, wd);
+    const mejorColor = mejorBase?.base==='Roja' ? 'var(--red)' : 'var(--blue)';
+
     return `
     <div class="card" onclick="jugadorDetalle='${p.id}'; jugadorDetalleTab='base'; render();" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -6052,6 +6094,11 @@ function renderEfectividadJugadores(wd) {
         <div><div style="font-size:9px;color:var(--text3);font-weight:800">PROMEDIO</div><div style="font-size:16px;font-weight:900;color:var(--heading);font-family:'JetBrains Mono',monospace">${prom}</div></div>
         <div><div style="font-size:9px;color:var(--text3);font-weight:800">TOTAL</div><div style="font-size:16px;font-weight:900;color:var(--heading);font-family:'JetBrains Mono',monospace">${total}</div></div>
       </div>
+      ${mejorBase?`<div style="margin-top:8px;font-size:11px;font-weight:800;color:${mejorColor}">🏆 Mejor base para lanzar: ${mejorBase.base} (${mejorBase.pct}%)</div>`:''}
+      ${(rolRoja||rolAzul)?`<div style="display:flex;gap:14px;margin-top:6px;font-size:11px;color:var(--text3);font-weight:600">
+        ${rolRoja?`<span>🔴 ${rolRoja}</span>`:''}
+        ${rolAzul?`<span>🔵 ${rolAzul}</span>`:''}
+      </div>`:''}
     </div>`;
   }).filter(x=>x).join('');
   return `<div style="animation: fadeIn 0.3s ease;">${stats || '<div class="empty">Sin datos suficientes.</div>'}</div>`;
