@@ -6054,7 +6054,13 @@ function _mejorBaseJugador(pid, wd){
       totalMax+=l.max; totalPts+=Math.round(ptsAcum/rondasValidas.length); rondas+=rondasValidas.length;
     });
     if(!totalMax) return null;
-    return {pct:Math.round((totalPts/totalMax)*100), rondas};
+    const rondasBase=wd.filter(r=>{
+      const p1=baseName==='Roja'?r.rojaP1:r.azulP1;
+      const p2=baseName==='Roja'?r.rojaP2:r.azulP2;
+      return p1===pid||p2===pid;
+    });
+    const avgScore=rondasBase.length?Math.round(rondasBase.reduce((a,r)=>a+(Number(r.score)||0),0)/rondasBase.length):null;
+    return {pct:Math.round((totalPts/totalMax)*100), avgScore, rondas};
   };
   const roja=calcBase('Roja'), azul=calcBase('Azul');
   if(!roja && !azul) return null;
@@ -6094,7 +6100,7 @@ function renderEfectividadJugadores(wd) {
         <div><div style="font-size:9px;color:var(--text3);font-weight:800">PROMEDIO</div><div style="font-size:16px;font-weight:900;color:var(--heading);font-family:'JetBrains Mono',monospace">${prom}</div></div>
         <div><div style="font-size:9px;color:var(--text3);font-weight:800">TOTAL</div><div style="font-size:16px;font-weight:900;color:var(--heading);font-family:'JetBrains Mono',monospace">${total}</div></div>
       </div>
-      ${mejorBase?`<div style="margin-top:8px;font-size:11px;font-weight:800;color:${mejorColor}">🏆 Mejor base para lanzar: ${mejorBase.base} (${mejorBase.pct}%)</div>`:''}
+      ${mejorBase?`<div style="margin-top:8px;font-size:11px;font-weight:800;color:${mejorColor}">🏆 Mejor base para lanzar: ${mejorBase.base} (${mejorBase.pct}%${mejorBase.avgScore!==null?' · '+mejorBase.avgScore+' pts prom':''})</div>`:''}
       ${(rolRoja||rolAzul)?`<div style="display:flex;gap:14px;margin-top:6px;font-size:11px;color:var(--text3);font-weight:600">
         ${rolRoja?`<span>🔴 ${rolRoja}</span>`:''}
         ${rolAzul?`<span>🔵 ${rolAzul}</span>`:''}

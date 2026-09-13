@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "mechatitans-stat",
+    "site": "stat-fll",
     "public": ".",
     "ignore": [
       "firebase.json",
