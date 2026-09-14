@@ -126,11 +126,17 @@ body{
 @media(max-width:640px){
   #hdr-temporada, #hdr-divider{display:none;}
   #hdr-user{display:none;}
-  #hdr-team{max-width:120px;font-size:11px !important;padding:5px 12px !important;}
+  /* El código de invitación es un detalle de admin, no algo que se
+     necesite de un vistazo — en celular ocupa una fila entera solo por
+     eso. Sigue disponible desde el Panel (lista de equipos / entrenador). */
+  #header-badge-container{display:none !important;}
+  #hdr-team{max-width:100px;font-size:11px !important;padding:5px 10px !important;}
   .hdr-logo-text{font-size:18px !important;}
-  #btn-admin-panel{padding:6px 12px !important;font-size:12px !important;}
-  #header-badge-container span{padding:6px 12px !important;font-size:11px !important;}
-  .hdr-right a, #hdr-logout{padding:6px 14px !important;font-size:12px !important;}
+  #btn-admin-panel{padding:6px 10px !important;font-size:12px !important;}
+  .hdr-right a, #hdr-logout{padding:6px 12px !important;font-size:12px !important;}
+  /* Textos largos junto a su ícono se esconden en celular: el ícono solo
+     ya comunica la acción y deja que todo el header quepa en una fila. */
+  .hdr-full-label{display:none;}
 }
 .hdr-logo-img{
   height:28px;width:auto;
@@ -278,6 +284,20 @@ body{
 }
 .an-navcard-wide .an-navicon{font-size:1.3rem;}
 .an-navcard-wide .an-navlbl{font-size:0.85rem;}
+
+/* ══ RECONOCIMIENTOS — slider horizontal tipo "stories" ══ */
+.awards-slider{
+  display:flex;gap:10px;overflow-x:auto;padding:2px 2px 8px;
+  scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+}
+.awards-slider::-webkit-scrollbar{display:none;}
+.award-post{
+  flex:0 0 auto;width:148px;scroll-snap-align:start;
+  background:var(--surface);border:2px solid var(--navy);border-top:4px solid;
+  border-radius:var(--r);padding:14px 12px;box-shadow:var(--shadow-sm);
+  transition:box-shadow 0.12s,transform 0.12s;
+}
+.award-post:active{transform:translate(1px,1px);box-shadow:none;}
 
 /* ══ INPUTS ══ */
 input[type=text],input[type=number],select,textarea{
@@ -781,7 +801,7 @@ body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6
 
     <span id="hdr-invite" style="display:none; font-size:10px; font-weight:900; color:#0e1f35; background:#ffb400; padding:3px 8px; border-radius:6px; letter-spacing:1px;"></span>
 
-    <a href="index.html" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 10px;font-size:11px;text-decoration:none;font-weight:600;letter-spacing:.3px;margin-right:2px">← Inicio</a>
+    <a href="index.html" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 10px;font-size:11px;text-decoration:none;font-weight:600;letter-spacing:.3px;margin-right:2px">🏠<span class="hdr-full-label"> Inicio</span></a>
     <button id="hdr-logout" onclick="doLogout()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:none;letter-spacing:0.3px;">Salir</button>
   </div>
 </header>
@@ -1364,7 +1384,7 @@ async function accesoPermitido(datos) {
   if(btnAdmin) {
     if(datos.rol === 'entrenador' || datos.rol === 'superadmin') {
       btnAdmin.style.display = 'inline-block';
-      btnAdmin.textContent = datos.rol === 'superadmin' ? '🛡️ SuperAdmin' : '⚙️ Panel';
+      btnAdmin.innerHTML = datos.rol === 'superadmin' ? '🛡️<span class="hdr-full-label"> SuperAdmin</span>' : '⚙️<span class="hdr-full-label"> Panel</span>';
     } else {
       btnAdmin.style.display = 'none';
     }
@@ -4925,19 +4945,24 @@ function renderAnalisis(){
 
 /* ── Tarjetas de reconocimientos (MVP, más lanzado, pareja más fiel, cuadrilla galáctica) ── */
 function _awardCard(emoji,title,name,sub,color,onclick){
-  return `<div class="card" style="flex:1;min-width:150px;padding:14px;${onclick?'cursor:pointer':''}"${onclick?` onclick="${onclick}"`:''}>
-    <div style="font-size:24px;line-height:1">${emoji}</div>
-    <div style="font-size:10px;color:var(--text3);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-top:7px">${title}</div>
-    <div style="font-size:15px;font-weight:900;color:${color};margin-top:2px;overflow-wrap:anywhere">${name}</div>
-    <div style="font-size:11px;color:var(--text2);margin-top:2px">${sub}</div>
+  return `<div class="award-post" style="border-top-color:${color};${onclick?'cursor:pointer':''}"${onclick?` onclick="${onclick}"`:''}>
+    <div style="font-size:28px;line-height:1">${emoji}</div>
+    <div style="font-size:10px;color:var(--text3);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-top:8px">${title}</div>
+    <div style="font-size:15px;font-weight:900;color:${color};margin-top:3px;overflow-wrap:anywhere">${name}</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:3px">${sub}</div>
   </div>`;
 }
 function _computeAwards(){
+  // _runBasePlayers cae de regreso a rojaPairId/azulPairId cuando la ronda
+  // no tiene rojaP1/rojaP2 puestos directo — sin eso, jugadores con rondas
+  // viejas guardadas solo por pareja quedaban sub-contados.
+  const roundBases = runsFiltradas.map(r=>({r, ro:_runBasePlayers(r,'roja'), az:_runBasePlayers(r,'azul')}));
+
   const playerStats=players.map(p=>{
     if(!checkEsUsuario(p.id)) return null;
     const scores=[]; let rounds=0;
-    runsFiltradas.forEach(r=>{
-      if(r.rojaP1===p.id||r.rojaP2===p.id||r.azulP1===p.id||r.azulP2===p.id){ rounds++; scores.push(Number(r.score)||0); }
+    roundBases.forEach(({r,ro,az})=>{
+      if(ro[0]===p.id||ro[1]===p.id||az[0]===p.id||az[1]===p.id){ rounds++; scores.push(Number(r.score)||0); }
     });
     if(!rounds) return null;
     return {p, rounds, avg:avg(scores)};
@@ -4946,25 +4971,24 @@ function _computeAwards(){
   const masLanzado = playerStats.length ? playerStats.reduce((a,x)=>x.rounds>a.rounds?x:a) : null;
 
   const pairMap={};
-  runsFiltradas.forEach(r=>{
+  roundBases.forEach(({r,ro,az})=>{
     const add=(p1,p2)=>{
       if(!p1||!p2) return;
       const id=[p1,p2].sort().join('-');
       if(!pairMap[id]) pairMap[id]={id,p1,p2,rounds:0,scores:[]};
       pairMap[id].rounds++; pairMap[id].scores.push(Number(r.score)||0);
     };
-    add(r.rojaP1,r.rojaP2); add(r.azulP1,r.azulP2);
+    add(ro[0],ro[1]); add(az[0],az[1]);
   });
   const pairArr=Object.values(pairMap).filter(x=>checkEsUsuario(x.p1)||checkEsUsuario(x.p2));
   const parejaFiel = pairArr.length ? pairArr.reduce((a,x)=>x.rounds>a.rounds?x:a) : null;
 
   const cuaMap={};
-  runsFiltradas.forEach(r=>{
-    const [az1,az2]=_runBasePlayers(r,'azul'); const [ro1,ro2]=_runBasePlayers(r,'roja');
-    if(usuarioActual && usuarioActual.rol==='jugador' && !checkEsUsuario(az1) && !checkEsUsuario(az2) && !checkEsUsuario(ro1) && !checkEsUsuario(ro2)) return;
+  roundBases.forEach(({r,ro,az})=>{
+    if(usuarioActual && usuarioActual.rol==='jugador' && !checkEsUsuario(az[0]) && !checkEsUsuario(az[1]) && !checkEsUsuario(ro[0]) && !checkEsUsuario(ro[1])) return;
     const cuaRaw=(r.cuadrillaName||'').trim();
     const norm=_normStr(cuaRaw);
-    const pk=[r.azulPairId||'',r.rojaPairId||'',az1||'',ro1||''].sort().join('||');
+    const pk=[r.azulPairId||'',r.rojaPairId||'',az[0]||'',ro[0]||''].sort().join('||');
     const gk=norm?'n:'+norm:'p:'+pk;
     if(!cuaMap[gk]) cuaMap[gk]={names:[],scores:[]};
     if(cuaRaw) cuaMap[gk].names.push(cuaRaw);
@@ -4984,8 +5008,8 @@ function _renderAwardsBlock(){
   if(!mvp && !masLanzado && !parejaFiel && !cuaBest) return '';
   const getP=(pid)=>{ const p=players.find(x=>x.id===pid); return p?p.name:'---'; };
   return `<div style="margin-bottom:16px">
-    <div class="an-group-lbl" style="margin-top:0">🏅 Reconocimientos</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:8px">🏅 Reconocimientos — desliza para ver más</div>
+    <div class="awards-slider">
       ${mvp?_awardCard('🏆','Jugador Más Valioso',mvp.p.name,`Promedio ${mvp.avg} pts · ${mvp.rounds} ronda${mvp.rounds!==1?'s':''}`,'var(--gold)',`jugadorDetalle='${mvp.p.id}';jugadorDetalleTab='base';render();`):''}
       ${masLanzado?_awardCard('🚀','El Más Lanzado',masLanzado.p.name,`${masLanzado.rounds} ronda${masLanzado.rounds!==1?'s':''} jugada${masLanzado.rounds!==1?'s':''}`,'var(--teal)',`jugadorDetalle='${masLanzado.p.id}';jugadorDetalleTab='base';render();`):''}
       ${parejaFiel?_awardCard('💞','La Pareja Más Fiel',`${getP(parejaFiel.p1)} &amp; ${getP(parejaFiel.p2)}`,`${parejaFiel.rounds} ronda${parejaFiel.rounds!==1?'s':''} juntos`,'var(--red)',`parejaDetalle='${parejaFiel.id}';parejaDetalleTab='base';render();`):''}
