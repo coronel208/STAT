@@ -855,17 +855,12 @@ function _foroDepMet(nm){
    STATE
 ═══════════════════════════════════════════ */
 let tab='ronda';
-let statsSubTab='global';
 let lanzadaDetalle = null; // Almacenará el ID (L1, L2...) de la lanzada seleccionada
 let filtroLanzadaInterno = 'todos';
-// Inner tab per outer section: 'ranking'|'jugadores'|'parejas'|'cuadrillas'
-let statsInner={'global':'ranking','rondas-sueltas':'ranking','entrenamientos':'ranking'};
 // Per-training inner tab (keyed by training id)
 let statsTrainInner={};
 // Collapse state: key → true=open, false=collapsed
 let statsOpen={};
-let effSubTab='global';
-let graficasSubTab='evolucion';
 
 // roundMode: 'hub'|'loose-config'|'training-start'|'ready'|'countdown'|'timer'|'missions'
 let roundMode='hub';
@@ -1676,15 +1671,6 @@ function _aplicarBuscar(){
   render();
 }
 
-function _irBuscarPromedio(){
-  const b=_rangeBounds();
-  _buscarFilter={..._emptyBuscarFilter(),dateFromTs:isFinite(b.from)?b.from:null,dateToTs:isFinite(b.to)?b.to:null,rangeLabel:_periodLabel()};
-  _buscarPending={text:'',minScore:'',maxScore:''};
-  tab='buscar';
-  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));
-  render();
-}
-
 // Variable global para guardar solo las rondas que el jugador puede ver
 let runsFiltradas = [];
 
@@ -1715,11 +1701,6 @@ function render() {
   else if (tab === 'entrenamientos') el.innerHTML = renderEntrenamientos();
   else if (tab === 'parrilla') el.innerHTML = renderParrilla();
   else if (tab === 'analisis') el.innerHTML = renderAnalisis();
-  else if (tab === 'estadisticas') el.innerHTML = renderEstadisticas();
-  else if (tab === 'graficas') el.innerHTML = renderGraficas();
-  else if (tab === 'efectividad' || tab === 'jugadores' || tab === 'parejas') {
-    el.innerHTML = renderEfectividad();
-  }
   else if (tab === 'buscar') el.innerHTML = renderBuscar();
   else if (tab === 'admin') { renderAdminPanel(); return; }
 
@@ -2411,8 +2392,6 @@ function switchTab(t){
 
   render();
 }
-function switchStatsSub(t){statsSubTab=t;render();}
-function switchEffSub(t){effSubTab=t;render();}
 /* ═══════════════════════════════════════════
    TAB: RONDA
 ═══════════════════════════════════════════ */
@@ -4157,117 +4136,7 @@ function renderParejas(){
 
 
 /* ─── Period filter state (persisted) ─── */
-let _statsRange = (function(){
-  try{const r=JSON.parse(localStorage.getItem('stat_range')||'null');
-    return r||{preset:'all',from:'',to:''};
-  }catch(e){return{preset:'all',from:'',to:''};}
-})();
-function _saveStatsRange(){try{localStorage.setItem('stat_range',JSON.stringify(_statsRange));}catch(e){}}
-function setStatsPreset(p){_statsRange={preset:p,from:'',to:''};_saveStatsRange();render();}
-function setStatsFrom(v){_statsRange.from=v;_statsRange.preset='custom';_saveStatsRange();render();}
-function setStatsTo(v){_statsRange.to=v;_statsRange.preset='custom';_saveStatsRange();render();}
-function _rangeBounds(){
-  const now=Date.now();
-  const day=86400000;
-  if(_statsRange.preset==='7d')   return {from:now-7*day, to:now+day};
-  if(_statsRange.preset==='30d')  return {from:now-30*day,to:now+day};
-  if(_statsRange.preset==='90d')  return {from:now-90*day,to:now+day};
-  if(_statsRange.preset==='season')return {from:new Date(new Date().getFullYear()-(new Date().getMonth()<7?1:0),7,1).getTime(),to:now+day};
-  if(_statsRange.preset==='custom'){
-    const f=_statsRange.from?new Date(_statsRange.from+'T00:00:00').getTime():-Infinity;
-    const t=_statsRange.to  ?new Date(_statsRange.to  +'T23:59:59').getTime(): Infinity;
-    return {from:f,to:t};
-  }
-  return {from:-Infinity,to:Infinity};
-}
-function _filterByRange(arr){
-  const {from,to}=_rangeBounds();
-  return arr.filter(r=>r.ts>=from && r.ts<=to);
-}
-function _periodLabel(){
-  const m={'all':'Todo el histórico','7d':'Últimos 7 días','30d':'Últimos 30 días','90d':'Últimos 90 días','season':'Esta temporada','custom':'Rango personalizado'};
-  return m[_statsRange.preset]||'Todo';
-}
-function _periodSelector(){
-  const presets=[['all','Todo'],['7d','7d'],['30d','30d'],['90d','90d'],['season','Temporada']];
-  const btns=presets.map(([k,l])=>`<button class="sub-tbtn${_statsRange.preset===k?' active':''}" style="padding:6px 12px;font-size:12px" onclick="setStatsPreset('${k}')">${l}</button>`).join('');
-  return `<div class="card" style="margin-bottom:12px;padding:12px 14px">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-      <span style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase">Período</span>
-      ${btns}
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:11px;color:var(--text3)">Personalizado:</span>
-      <input type="date" value="${_statsRange.from||''}" onchange="setStatsFrom(this.value)" style="font-size:12px;padding:5px 8px;width:auto">
-      <span style="font-size:11px;color:var(--text3)">→</span>
-      <input type="date" value="${_statsRange.to||''}" onchange="setStatsTo(this.value)" style="font-size:12px;padding:5px 8px;width:auto">
-      <span class="tag tag-green" style="font-size:10px;margin-left:auto">${_periodLabel()}</span>
-    </div>
-  </div>`;
-}
-function _summaryPanel(allRuns,periodRuns){
-  const perScores=periodRuns.map(r=>Number(r.score));
-  const avgPer=perScores.length?Math.round(perScores.reduce((a,b)=>a+b,0)/perScores.length):'—';
-  const bestPer=perScores.length?Math.max(...perScores):'—';
-  return `<div class="metric-grid" style="margin-bottom:14px">
-    <div class="metric-box"><div class="lbl">Promedio período</div><div class="val good">${avgPer}</div></div>
-    <div class="metric-box"><div class="lbl">Mejor del período</div><div class="val good">${bestPer}</div></div>
-    <div class="metric-box"><div class="lbl">Rondas período</div><div class="val">${periodRuns.length}</div></div>
-  </div>`;
-}
-
-/* ═══════════════════════════════════════════
-   TAB: ESTADÍSTICAS (FILTRADO 100% POR JUGADOR)
-═══════════════════════════════════════════ */
-
-function renderEstadisticas(){
-  // 1. Usamos exclusivamente runsFiltradas para que el jugador solo vea lo suyo
-  if(!runsFiltradas.length) return `<div class="empty">No hay suficientes rondas registradas para ver estadísticas.</div>`;
-  
-  const nav=`<div class="sub-tabs">
-    <button class="sub-tbtn ${statsSubTab==='global'?'active':''}" onclick="switchStatsSub('global')">Global</button>
-    <button class="sub-tbtn ${statsSubTab==='promedios'?'active':''}" onclick="switchStatsSub('promedios')">Promedio</button>
-    <button class="sub-tbtn ${statsSubTab==='rondas-sueltas'?'active':''}" onclick="switchStatsSub('rondas-sueltas')">Rondas sueltas</button>
-    <button class="sub-tbtn ${statsSubTab==='entrenamientos'?'active':''}" onclick="switchStatsSub('entrenamientos')">Entrenamientos</button>
-  </div>`;
-  
-  let body='';
-  if(statsSubTab==='promedios'){
-    body=_promediosPanel();
-  } else if(statsSubTab==='global'){
-    body=statsPanel(runsFiltradas, 'global');
-  } else if(statsSubTab==='rondas-sueltas'){
-    const loose = runsFiltradas.filter(r => !r.trainingId);
-    const filtered = _filterByRange(loose);
-    body = loose.length ? (_periodSelector() + _summaryPanel(loose, filtered) + statsPanel(filtered, 'rondas-sueltas')) : `<div class="empty">No hay rondas sueltas guardadas.</div>`;
-  } else {
-    body=statsTrainings();
-  }
-  return nav+body;
-}
-
-/* ── PROMEDIO sub-tab: por período ── */
-function _promediosPanel(){
-  const filtered = _filterByRange(runsFiltradas);
-  const perScores = filtered.map(r => Number(r.score));
-  const avgPer = perScores.length ? Math.round(perScores.reduce((a,b)=>a+b,0)/perScores.length) : '—';
-  const bestPer = perScores.length ? Math.max(...perScores) : '—';
-  return `
-    <div class="card" style="padding:14px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px">Promedio por período</div>
-      ${_periodSelector()}
-      <div class="metric-grid" style="margin-top:10px">
-        <div class="metric-box"><div class="lbl">Promedio período</div><div class="val good">${avgPer}</div></div>
-        <div class="metric-box"><div class="lbl">Mejor del período</div><div class="val">${bestPer}</div></div>
-        <div class="metric-box"><div class="lbl">Rondas período</div><div class="val">${filtered.length}</div></div>
-      </div>
-      <button class="btn btn-green" style="width:100%;justify-content:center;margin-top:12px;font-weight:800" onclick="_irBuscarPromedio()">🔍 Buscar lanzadas de este promedio →</button>
-    </div>
-  `;
-}
-
 /* ── switchers ── */
-function switchStatsInner(outerKey,t){statsInner[outerKey]=t;render();}
 function switchTrainInner(tid,t){statsTrainInner[tid]=t;render();}
 function toggleOpen(key){statsOpen[key]=!statsOpen[key];render();}
 
@@ -4277,13 +4146,6 @@ function _arrow(key){
   return`<svg class="coll-arrow${open?' open':''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>`;
 }
 
-/* Inner tab nav bar */
-function _innerNav(outerKey,cur){
-  return`<div class="inner-tabs">
-    ${[['ranking','Ranking'],['jugadores','Por jugador'],['parejas','Por pareja'],['cuadrillas','Por cuadrilla']].map(([k,l])=>
-      `<button class="inner-tbtn${cur===k?' active':''}" onclick="switchStatsInner('${outerKey}','${k}')">${l}</button>`).join('')}
-  </div>`;
-}
 function _innerNavTrain(tid,cur){
   return`<div class="inner-tabs">
     ${[['rondas','Por ronda'],['ranking','Ranking'],['jugadores','Por jugador'],['parejas','Por pareja'],['cuadrillas','Por cuadrilla']].map(([k,l])=>
@@ -4291,58 +4153,6 @@ function _innerNavTrain(tid,cur){
   </div>`;
 }
 
-/* Full stats panel for a run-subset (shows inner tabs) */
-function statsPanel(subset,outerKey){
-  const cur=statsInner[outerKey]||'ranking';
-  const nav=_innerNav(outerKey,cur);
-  let body='';
-  if(cur==='ranking')      body=_rankingSection(subset,outerKey);
-  else if(cur==='jugadores')body=_playersSection(subset,outerKey);
-  else if(cur==='parejas')  body=_pairsSection(subset,outerKey);
-  else                      body=_cuadrillasSection(subset,outerKey);
-  return nav+body;
-}
-
-/* ── run detail mini-card used inside open collapsibles ── */
-function _rcard(r,idx,meta){
-  const res=getMissionResults(r.missions);
-  const done=res?res.filter(x=>x.done):[];
-  const partial=res?res.filter(x=>x.partial):[];
-  const fail=res?res.filter(x=>!x.done&&!x.partial):[];
-  const ap=getPair(r.azulPairId);const rp=getPair(r.rojaPairId);
-  
-  // MAGIA VISUAL
-  const azP1=players.find(x=>x.id===r.azulP1); const azP2=players.find(x=>x.id===r.azulP2);
-  const roP1=players.find(x=>x.id===r.rojaP1); const roP2=players.find(x=>x.id===r.rojaP2);
-  const nAz = ap ? ap.name : [azP1?.name, azP2?.name].filter(Boolean).join(' & ');
-  const nRo = rp ? rp.name : [roP1?.name, roP2?.name].filter(Boolean).join(' & ');
-
-  return`<div class="rcard">
-    <div class="rcard-top">
-      <div>
-        <div class="rcard-lbl">${runLabel(r,idx)}</div>
-        ${r.ts?`<div style="font-size:10px;color:var(--text3);margin-top:1px">📅 ${fmtTs(r.ts)}</div>`:''}
-        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
-          ${nAz?`<span class="bpill azul" style="font-size:10px"><span class="dot azul"></span>${nAz}</span>`:''}
-          ${nRo?`<span class="bpill roja" style="font-size:10px"><span class="dot roja"></span>${nRo}</span>`:''}
-          ${meta?`<span style="font-size:11px;color:var(--text3)">${meta}</span>`:''}
-        </div>
-      </div>
-      <div class="rcard-score">${r.score} pts</div>
-    </div>
-    ${res?`
-      <div><div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:3px">✓ COMPLETAS (${done.length})</div>
-        <div class="mpills">${done.map(m=>`<span class="mpill done" title="${m.name}: ${m.pts}pts">${m.code} +${m.pts}</span>`).join('')||`<span style="font-size:11px;color:var(--text3)">Ninguna</span>`}</div>
-      </div>
-      ${partial.length?`<div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:3px">◑ PARCIALES (${partial.length})</div>
-        <div class="mpills">${partial.map(m=>`<span class="mpill partial" title="${m.name}: ${m.pts}/${m.max}pts">${m.code} +${m.pts}</span>`).join('')}</div>
-      </div>`:''}
-      <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px">✗ FALLIDAS (${fail.length})</div>
-        <div class="mpills">${fail.map(m=>`<span class="mpill fail">${m.code}</span>`).join('')}</div>
-      </div>
-      ${_partsDetailBlock(fail,partial,r.missions,'rcard_'+r.id)}`:`<div style="font-size:12px;color:var(--text3);margin-top:4px">Sin detalle de misiones</div>`}
-  </div>`;
-}
 
 /* ── RANKING ── collapsible per run */
 function _rankingSection(subset,prefix){
@@ -4820,15 +4630,6 @@ function _trainingRoundsSection(t,sub){
   }).join('');
 }
 
-/* ═══════════════════════════════════════════
-   TAB: GRÁFICAS (FILTRADO 100% POR JUGADOR/ADMIN)
-═══════════════════════════════════════════ */
-function switchGraficasSub(t){graficasSubTab=t;render();}
-
-// Tracks which graf cards are open
-let grafOpen={};
-function toggleGraf(key){grafOpen[key]=!grafOpen[key];render();}
-
 /* ── VALIDADOR SEGURO ── */
 const checkEsUsuario = (id) => {
   if (typeof _esElUsuarioActual === 'function') return _esElUsuarioActual(id);
@@ -4838,162 +4639,8 @@ const checkEsUsuario = (id) => {
   return p.username === usuarioActual.username || p.name === usuarioActual.nombre || p.name === usuarioActual.username;
 };
 
-function renderGraficas(){
-  if(!runsFiltradas.length)return`<div class="empty">Guarda lanzadas para ver gráficas.</div>`;
-  const nav=`<div class="sub-tabs">
-    <button class="sub-tbtn ${graficasSubTab==='evolucion'?'active':''}" onclick="switchGraficasSub('evolucion')">Evolución</button>
-    <button class="sub-tbtn ${graficasSubTab==='misiones'?'active':''}"  onclick="switchGraficasSub('misiones')">Por misión</button>
-    <button class="sub-tbtn ${graficasSubTab==='tendencia'?'active':''}" onclick="switchGraficasSub('tendencia')">Tendencia misiones</button>
-    <button class="sub-tbtn ${graficasSubTab==='jugadores'?'active':''}" onclick="switchGraficasSub('jugadores')">Por jugador</button>
-    <button class="sub-tbtn ${graficasSubTab==='parejas'?'active':''}"   onclick="switchGraficasSub('parejas')">Por pareja</button>
-    <button class="sub-tbtn ${graficasSubTab==='cuadrillas'?'active':''}" onclick="switchGraficasSub('cuadrillas')">Por cuadrilla</button>
-  </div>`;
-  let html='';
-  
-  if(graficasSubTab==='evolucion'){
-    html=`
-      <div class="card" style="margin-bottom:16px">
-        <div style="font-size:17px;font-weight:800;margin-bottom:3px">📈 Evolución de puntajes</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Cronológico · punteado = promedio móvil (10 rondas)</div>
-        <div style="position:relative;height:250px"><canvas id="gc_evol"></canvas></div>
-      </div>`;
-  } else if(graficasSubTab==='tendencia'){
-    const wd=runsFiltradas.filter(r=>r.missions).sort((a,b)=>a.ts-b.ts);
-    if(!wd.length){
-      html=`<div class="empty">Guarda rondas con datos de misiones para ver la tendencia.</div>`;
-    } else {
-      const mStats=MISSIONS.map((m,mi)=>{
-        let acc=0,tot=0;
-        const pts=wd.map(r=>{
-          tot++;
-          const s=mScoreFor(m,r.missions);
-          const mx=mMaxScore(m);
-          if(s>=mx) acc++;
-          else if(s>0) acc+=0.5;
-          return Math.round((acc/tot)*100);
-        });
-        const lastPct=pts[pts.length-1]??0;
-        const color=_PAL[mi%_PAL.length];
-        return{m,mi,pts,lastPct,color};
-      }).sort((a,b)=>b.lastPct-a.lastPct);
-
-      const labels=wd.map(r=>fmtTs(r.ts));
-
-      const selectorItems=mStats.map(({m,mi,lastPct,color})=>{
-        const checked=!_tendenciaHidden.has(m.code);
-        const pctCol=lastPct>=70?'var(--green-d)':lastPct>=40?'var(--amber)':'var(--red)';
-        return`<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:5px 10px;border-radius:20px;border:1.5px solid ${checked?color+'80':'var(--border)'};background:${checked?color+'12':'var(--surface2)'};transition:all 0.15s;margin:3px">
-          <input type="checkbox" ${checked?'checked':''} onchange="_tendenciaToggle('${m.code}');render()" style="accent-color:${color};width:14px;height:14px;cursor:pointer">
-          <span style="font-size:12px;font-weight:700;color:${checked?color:'var(--text3)'}">${m.code}</span>
-          <span style="font-size:11px;font-weight:800;color:${checked?pctCol:'var(--text3)'}">${lastPct}%</span>
-        </label>`;
-      }).join('');
-
-      html=`
-        <div class="card" style="margin-bottom:14px">
-          <div style="font-size:17px;font-weight:800;margin-bottom:3px">📉 Tendencia de efectividad por misión</div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:14px">% de acierto acumulado a lo largo del tiempo · parcial cuenta 50% · selecciona las misiones que quieres ver</div>
-          <div style="position:relative;height:300px"><canvas id="gc_tendencia"></canvas></div>
-        </div>
-        <div class="card" style="margin-bottom:14px">
-          <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text2)">Misiones visibles</div>
-          <div style="display:flex;flex-wrap:wrap;gap:2px">
-            <button class="btn btn-sm" style="margin-right:6px;font-size:11px" onclick="_tendenciaHidden.clear();render()">✓ Todas</button>
-            <button class="btn btn-sm" style="margin-right:10px;font-size:11px" onclick="MISSIONS.forEach(m=>_tendenciaHidden.add(m.code));render()">✕ Ninguna</button>
-            ${selectorItems}
-          </div>
-        </div>`;
-    }
-  } else if(graficasSubTab==='misiones'){
-    html+=`
-      <div class="card" style="margin-bottom:16px">
-        <div style="font-size:17px;font-weight:800;margin-bottom:3px">🎯 Efectividad por misión</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Verde = completa · Ámbar = parcial · Gris = falla · expande para ver evolución</div>
-        <div style="position:relative;height:270px"><canvas id="gc_mis_bar"></canvas></div>
-      </div>`;
-    const wd=runsFiltradas.filter(r=>r.missions);
-    MISSIONS.forEach((m,mi)=>{
-      const key='gm_'+m.code;
-      const isOpen=!!grafOpen[key];
-      let su=0,pa=0;
-      wd.forEach(r=>{const pts=mScoreFor(m,r.missions);const mx=mMaxScore(m);if(pts>=mx)su++;else if(pts>0)pa++;});
-      const total=wd.length||1;
-      const pct=Math.round(((su+pa*0.5)/total)*100);
-      const col=pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
-      html+=`<div class="coll-card" style="margin-bottom:6px">
-        <div class="coll-hdr" onclick="toggleGraf('${key}')">
-          <div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px">
-            <span class="mcode${m.amber?' am':''}" style="flex-shrink:0">${m.code}</span>
-            <span style="font-family:inherit;font-size:14px;font-weight:700;flex:1">${m.name}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-            <span style="font-family:inherit;font-size:18px;font-weight:700;color:${col}">${pct}%</span>
-            ${_arrow(key)}
-          </div>
-        </div>
-        ${isOpen?`<div class="coll-body">
-          <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Evolución acumulada de efectividad en el tiempo</div>
-          <div style="position:relative;height:190px"><canvas id="gc_m_${mi}"></canvas></div>
-        </div>`:''}
-      </div>`;
-    });
-  } else {
-    const tipo=graficasSubTab;
-    const lbl=tipo==='jugadores'?'jugador':tipo==='parejas'?'pareja':'cuadrilla';
-    const items=_buildItems(tipo);
-    if(!items.length){html=`<div class="empty">Sin datos de ${lbl}s para este usuario.</div>`;}
-    else{
-      html+=`
-        <div class="card" style="margin-bottom:16px">
-          <div style="font-size:17px;font-weight:800;margin-bottom:3px">📊 Comparativa por ${lbl}</div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Oscuro = mejor · Claro = promedio · expande para ver evolución</div>
-          <div style="position:relative;height:230px"><canvas id="gc_ent_bar"></canvas></div>
-        </div>`;
-      items.forEach((item,ei)=>{
-        const key='ge_'+tipo+'_'+ei;
-        const isOpen=!!grafOpen[key];
-        const bv=Math.max.apply(null,item.scores);
-        const av=Math.round(item.scores.reduce((a,b)=>a+b,0)/item.scores.length);
-        const eRuns=_entityRuns(tipo,item).sort((a,b)=>a.ts-b.ts);
-        let subInfo='';
-        if(tipo==='jugadores'){const p=players.find(x=>x.id===item.id);const prs=pairs.filter(pr=>p&&(pr.p1===p.id||pr.p2===p.id));if(prs.length)subInfo=prs.map(pr=>pr.name).join(', ');}
-        else if(tipo==='parejas'){const pr=pairs.find(x=>x.id===item.id);if(pr){const p1=getPlayer(pr.p1);const p2=getPlayer(pr.p2);subInfo=[p1?.name,p2?.name].filter(Boolean).join(' & ');}}
-        else{const az=getPair(eRuns[0]?.azulPairId);const ro=getPair(eRuns[0]?.rojaPairId);subInfo=[az?.name,ro?.name].filter(Boolean).join(' + ');}
-        html+=`<div class="coll-card" style="margin-bottom:6px">
-          <div class="coll-hdr" onclick="toggleGraf('${key}')">
-            <div style="flex:1;min-width:0">
-              <div style="font-family:inherit;font-size:15px;font-weight:700">${item.name}</div>
-              ${subInfo?`<div style="font-size:11px;color:var(--text3);margin-top:1px">${subInfo}</div>`:''}
-              <div style="font-size:12px;color:var(--text3);margin-top:2px">${eRuns.length} lanzada${eRuns.length!==1?'s':''} · Mejor: <strong style="color:var(--green)">${bv}</strong> · Prom: <strong>${av}</strong></div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-              <div style="text-align:right">
-                <div style="font-family:inherit;font-size:22px;font-weight:700;color:var(--green);line-height:1">${bv}</div>
-                <div style="font-size:10px;color:var(--text3)">mejor</div>
-              </div>
-              ${_arrow(key)}
-            </div>
-          </div>
-          ${isOpen?`<div class="coll-body">
-            <div class="metric-grid" style="margin-bottom:12px">
-              <div class="metric-box"><div class="lbl">Lanzadas</div><div class="val">${eRuns.length}</div></div>
-              <div class="metric-box"><div class="lbl">Mejor</div><div class="val good">${bv}</div></div>
-              <div class="metric-box"><div class="lbl">Promedio</div><div class="val">${av}</div></div>
-            </div>
-            <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Evolución de puntajes en el tiempo</div>
-            <div style="position:relative;height:190px"><canvas id="gc_ent_${ei}"></canvas></div>
-          </div>`:''}
-        </div>`;
-      });
-    }
-  }
-  setTimeout(drawGraficas,0);
-  return nav+html;
-}
-
 /* ── Called after DOM is ready — draws all visible charts ── */
 let _activeCharts=[];
-let _tendenciaHidden=new Set(); // set of mission codes hidden in tendencia chart
 
 // Función dinámica para leer los colores CSS actuales vía JavaScript:
 function _getChartColors() {
@@ -5010,10 +4657,6 @@ function _getChartColors() {
   };
 }
 
-function _tendenciaToggle(code){
-  if(_tendenciaHidden.has(code)) _tendenciaHidden.delete(code);
-  else _tendenciaHidden.add(code);
-}
 function _destroyCharts(){_activeCharts.forEach(c=>{try{c.destroy();}catch(e){}});_activeCharts=[];}
 function _mkChart(id,cfg){
   const el=document.getElementById(id);if(!el)return;
@@ -5023,8 +4666,6 @@ function _mkChart(id,cfg){
   cfg.options.maintainAspectRatio=false;
   const c=new Chart(el.getContext('2d'),cfg);_activeCharts.push(c);
 }
-
-const _PAL=['#0D6E8A','#F5A623','#00C2D4','#C0392B','#5A3A9A','#0D8A6A','#7A4800','#9A2878'];
 
 function _baseOpts(extra){
   const colors = _getChartColors(); // Aplicando colores JS dinámicos
@@ -5042,235 +4683,26 @@ function _baseOpts(extra){
 }
 
 function drawGraficas(){
-  if(tab!=='graficas' && tab!=='analisis')return;
+  if(tab!=='analisis')return;
   _destroyCharts();
   const colors = _getChartColors();
 
-  if(graficasSubTab==='evolucion'){
-    const sorted=_filtrarPorRango([...runsFiltradas]).sort((a,b)=>a.ts-b.ts);
-    if(!sorted.length) return;
-    const labels=sorted.map(r=>fmtTs(r.ts));
-    const scores=sorted.map(r=>r.score);
-    const avgs=scores.map((_,i)=>{const w=scores.slice(Math.max(0,i-9),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
-    
-    // Con muchas rondas, puntos grandes + todas las fechas rotadas se vuelven
-    // ilegibles — achicamos los puntos y limitamos cuántas fechas se muestran.
-    const dense=scores.length>40;
-    _mkChart('gc_evol',{type:'line',data:{labels,datasets:[
-      {label:'Puntaje',data:scores,borderColor:'#0D6E8A',backgroundColor:'rgba(13,110,138,0.15)',tension:.4,pointRadius:dense?1.5:5,pointBackgroundColor:'#0D6E8A',pointBorderColor:'#fff',pointBorderWidth:dense?0.5:2,fill:true,borderWidth:2.5},
-      {label:'Promedio móvil (10)',data:avgs,borderColor:'#B85C00',borderDash:[6,4],tension:.4,pointRadius:0,fill:false,borderWidth:2}
-    ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
-      scales:{y:{suggestedMin:0,max:545,ticks:{color:colors.tick,font:{size:11}},grid:{color:colors.grid},border:{display:false}},
-              x:{ticks:{color:colors.tick,maxRotation:40,font:{size:10},autoSkip:true,maxTicksLimit:dense?10:20},grid:{display:false},border:{display:false}}}})});
-  
-  } else if(graficasSubTab==='tendencia'){
-    const wd=runsFiltradas.filter(r=>r.missions).sort((a,b)=>a.ts-b.ts);
-    if(!wd.length) return;
-    const labels=wd.map(r=>fmtTs(r.ts));
-    const datasets=MISSIONS.map((m,mi)=>{
-      if(_tendenciaHidden.has(m.code)) return null;
-      let acc=0,tot=0;
-      const pts=wd.map(r=>{
-        tot++;
-        const s=mScoreFor(m,r.missions);
-        const mx=mMaxScore(m);
-        if(s>=mx) acc++;
-        else if(s>0) acc+=0.5;
-        return Math.round((acc/tot)*100);
-      });
-      const col=_PAL[mi%_PAL.length];
-      return{
-        label:m.code,
-        data:pts,
-        borderColor:col,
-        backgroundColor:'transparent',
-        borderWidth:2.5,
-        pointRadius:wd.length<=15?5:3,
-        pointBackgroundColor:col,
-        pointBorderColor:'#fff',
-        pointBorderWidth:2,
-        tension:0.35,
-        fill:false
-      };
-    }).filter(Boolean);
-    
-    if(!datasets.length) return;
-    _mkChart('gc_tendencia',{type:'line',data:{labels,datasets},options:_baseOpts({
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{
-          labels:{color:colors.txt,font:{size:11,family:'inherit'},padding:10,
-            generateLabels(chart){
-              return chart.data.datasets.map((ds,i)=>({
-                text:ds.label,fillStyle:ds.borderColor,strokeStyle:ds.borderColor,
-                lineWidth:2,hidden:false,datasetIndex:i,fontColor:colors.txt
-              }));
-            }
-          },
-          position:'bottom',maxHeight:80
-        },
-        tooltip:{
-          callbacks:{
-            title:items=>`Ronda ${items[0].dataIndex+1} · ${items[0].label}`,
-            label:item=>`${item.dataset.label}: ${item.raw}%`
-          }
-        }
-      },
-      scales:{
-        y:{min:0,max:100,
-          ticks:{color:colors.tick,callback:v=>v+'%',font:{size:11}},
-          grid:{color:colors.grid},border:{display:false},
-          title:{display:true,text:'% acierto acumulado',color:colors.tick,font:{size:11}}
-        },
-        x:{ticks:{color:colors.tick,maxRotation:40,font:{size:9},autoSkip:true,maxTicksLimit:15},grid:{display:false},border:{display:false}}
-      }
-    })});
+  const sorted=_filtrarPorRango([...runsFiltradas]).sort((a,b)=>a.ts-b.ts);
+  if(!sorted.length) return;
+  const labels=sorted.map(r=>fmtTs(r.ts));
+  const scores=sorted.map(r=>r.score);
+  const avgs=scores.map((_,i)=>{const w=scores.slice(Math.max(0,i-9),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
 
-  } else if(graficasSubTab==='misiones'){
-    const wd=runsFiltradas.filter(r=>r.missions);if(!wd.length)return;
-    const total=wd.length;
-    const mData=MISSIONS.map(m=>{
-      let su=0,pa=0;
-      wd.forEach(r=>{const pts=mScoreFor(m,r.missions);const mx=mMaxScore(m);if(pts>=mx)su++;else if(pts>0)pa++;});
-      return{code:m.code,s:Math.round(su/total*100),p:Math.round(pa/total*100),f:Math.round((total-su-pa)/total*100)};
-    });
-    
-    _mkChart('gc_mis_bar',{type:'bar',data:{labels:mData.map(x=>x.code),datasets:[
-      {label:'✓ Completa',data:mData.map(x=>x.s),backgroundColor:'#2A6F38',stack:'s',borderRadius:0},
-      {label:'◑ Parcial', data:mData.map(x=>x.p),backgroundColor:'#B85C00',stack:'s',borderRadius:0},
-      {label:'✗ Falla',   data:mData.map(x=>x.f),backgroundColor:'#DEDAD2',stack:'s',borderRadius:{topLeft:4,topRight:4}}
-    ]},options:_baseOpts({
-      scales:{x:{stacked:true,ticks:{color:colors.tick,font:{size:10}},grid:{display:false},border:{display:false}},
-              y:{stacked:true,max:100,ticks:{color:colors.tick,callback:v=>v+'%',font:{size:11}},grid:{color:colors.grid},border:{display:false}}},
-      plugins:{legend:{labels:{color:colors.txt,font:{size:11}},position:'bottom'},
-               tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw+'%'}}}})});
-    
-    MISSIONS.forEach((m,mi)=>{
-      if(!grafOpen['gm_'+m.code])return;
-      const wdS=wd.slice().sort((a,b)=>a.ts-b.ts);
-      let suAcc=0,paAcc=0,tot2=0;
-      const lbs=[],spct=[],ppct=[],fpct=[];
-      wdS.forEach(r=>{
-        tot2++;
-        const pts=mScoreFor(m,r.missions);const mx=mMaxScore(m);
-        if(pts>=mx)suAcc++;else if(pts>0)paAcc++;
-        lbs.push(fmtTs(r.ts));
-        spct.push(Math.round(suAcc/tot2*100));
-        ppct.push(Math.round(paAcc/tot2*100));
-        fpct.push(Math.round((tot2-suAcc-paAcc)/tot2*100));
-      });
-      _mkChart('gc_m_'+mi,{type:'line',data:{labels:lbs,datasets:[
-        {label:'Completa %',data:spct,borderColor:'#3B6D11',backgroundColor:'rgba(59,109,17,.15)',tension:.3,pointRadius:4,pointBackgroundColor:'#3B6D11',pointBorderColor:'#fff',fill:true},
-        {label:'Parcial %', data:ppct,borderColor:'#854F0B',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#854F0B',pointBorderColor:'#fff',borderDash:[3,2],fill:false},
-        {label:'Falla %',   data:fpct,borderColor:'#A32D2D',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#A32D2D',pointBorderColor:'#fff',borderDash:[5,3],fill:false}
-      ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
-        scales:{y:{min:0,max:100,ticks:{color:colors.tick,callback:v=>v+'%'},grid:{color:colors.grid}},
-                x:{ticks:{color:colors.tick,maxRotation:45,font:{size:9}},grid:{display:false}}}})});
-    });
-  
-  } else {
-    const tipo=graficasSubTab;
-    const items=_buildItems(tipo);if(!items.length)return;
-    const lbls=items.map(x=>x.name.length>14?x.name.slice(0,12)+'...':x.name);
-    const bests=items.map(x=>Math.max.apply(null,x.scores));
-    const avgsV=items.map(x=>Math.round(x.scores.reduce((a,b)=>a+b,0)/x.scores.length));
-    const cols=items.map((_,i)=>_PAL[i%_PAL.length]);
-    const colsA=items.map((_,i)=>_PAL[i%_PAL.length]+'99');
-    
-    _mkChart('gc_ent_bar',{type:'bar',data:{labels:lbls,datasets:[
-      {label:'🏆 Mejor',   data:bests,backgroundColor:cols,borderRadius:6,borderSkipped:false},
-      {label:'⊘ Promedio',data:avgsV,backgroundColor:colsA,borderRadius:6,borderSkipped:false}
-    ]},options:_baseOpts({
-      scales:{y:{suggestedMin:0,max:545,ticks:{color:colors.tick,font:{size:11}},grid:{color:colors.grid},border:{display:false}},
-              x:{ticks:{color:colors.tick,font:{size:11}},grid:{display:false},border:{display:false}}}})});
-    
-    items.forEach((item,ei)=>{
-      if(!grafOpen['ge_'+tipo+'_'+ei])return;
-      const eRuns=_entityRuns(tipo,item).sort((a,b)=>a.ts-b.ts);
-      if(!eRuns.length)return;
-      const lbs=eRuns.map(r=>fmtTs(r.ts));
-      const sc=eRuns.map(r=>r.score);
-      const avgL=sc.map((_,i)=>{const w=sc.slice(Math.max(0,i-9),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
-      const col=_PAL[ei%_PAL.length];
-      
-      _mkChart('gc_ent_'+ei,{type:'line',data:{labels:lbs,datasets:[
-        {label:'Puntaje',data:sc,borderColor:col,backgroundColor:col+'22',tension:.3,pointRadius:5,pointBackgroundColor:col,pointBorderColor:'#fff',fill:true},
-        {label:'Promedio móvil (10)',data:avgL,borderColor:'#854F0B',borderDash:[5,3],tension:.4,pointRadius:0,fill:false}
-      ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
-        scales:{y:{beginAtZero:true,max:545,ticks:{color:colors.tick},grid:{color:colors.grid}},
-                x:{ticks:{color:colors.tick,maxRotation:45,font:{size:9}},grid:{display:false}}}})});
-    });
-  }
+  // Con muchas rondas, puntos grandes + todas las fechas rotadas se vuelven
+  // ilegibles — achicamos los puntos y limitamos cuántas fechas se muestran.
+  const dense=scores.length>40;
+  _mkChart('gc_evol',{type:'line',data:{labels,datasets:[
+    {label:'Puntaje',data:scores,borderColor:'#0D6E8A',backgroundColor:'rgba(13,110,138,0.15)',tension:.4,pointRadius:dense?1.5:5,pointBackgroundColor:'#0D6E8A',pointBorderColor:'#fff',pointBorderWidth:dense?0.5:2,fill:true,borderWidth:2.5},
+    {label:'Promedio móvil (10)',data:avgs,borderColor:'#B85C00',borderDash:[6,4],tension:.4,pointRadius:0,fill:false,borderWidth:2}
+  ]},options:_baseOpts({interaction:{mode:'index',intersect:false},
+    scales:{y:{suggestedMin:0,max:545,ticks:{color:colors.tick,font:{size:11}},grid:{color:colors.grid},border:{display:false}},
+            x:{ticks:{color:colors.tick,maxRotation:40,font:{size:10},autoSkip:true,maxTicksLimit:dense?10:20},grid:{display:false},border:{display:false}}}})});
 }
-
-/* ── BUILD ITEMS (CON FILTRADO ESTRICTO DE USUARIO) ── */
-function _buildItems(tipo){
-  const items=[];
-  if(tipo==='jugadores'){
-    players.forEach(p=>{
-      if (!checkEsUsuario(p.id)) return; // <-- FILTRO ESTRICTO AL USUARIO
-      const sc=[];
-      runsFiltradas.forEach(r=>{
-        const add=pid=>{const pr=getPair(pid);if(pr&&(pr.p1===p.id||pr.p2===p.id))sc.push(r.score);};
-        add(r.azulPairId);add(r.rojaPairId);
-      });
-      if(sc.length)items.push({name:p.name,id:p.id,scores:sc});
-    });
-  } else if(tipo==='parejas'){
-    pairs.forEach(pr=>{
-      if (!checkEsUsuario(pr.p1) && !checkEsUsuario(pr.p2)) return; // <-- FILTRO ESTRICTO A PAREJAS DEL USUARIO
-      const sc=runsFiltradas.filter(r=>r.azulPairId===pr.id||r.rojaPairId===pr.id).map(r=>r.score);
-      if(sc.length)items.push({name:pr.name,id:pr.id,scores:sc});
-    });
-  } else {
-    const groups={};
-    runsFiltradas.forEach(r=>{
-      const az = getPair(r.azulPairId);
-      const ro = getPair(r.rojaPairId);
-      
-      // Validar si el usuario actual está en esta cuadrilla (para jugadores)
-      const inAzul = az && (checkEsUsuario(az.p1) || checkEsUsuario(az.p2));
-      const inRoja = ro && (checkEsUsuario(ro.p1) || checkEsUsuario(ro.p2));
-      if (!inAzul && !inRoja && usuarioActual && usuarioActual.rol === 'jugador') return; // <-- FILTRO ESTRICTO
-
-      const cuaRaw=(r.cuadrillaName||'').trim();
-      const norm=_normStr(cuaRaw);
-      const pk=[r.azulPairId||'',r.rojaPairId||''].sort().join('||');
-      if(!r.azulPairId&&!r.rojaPairId)return;
-      const gk=norm?('n:'+norm):('p:'+pk);
-      if(!groups[gk])groups[gk]={name:cuaRaw||pk,pk,norm,scores:[]};
-      if(cuaRaw&&_bestName([groups[gk].name,cuaRaw])===cuaRaw)groups[gk].name=cuaRaw;
-      groups[gk].scores.push(r.score);
-    });
-    Object.values(groups).forEach(g=>{if(g.scores.length)items.push(g);});
-  }
-  return items.sort((a,b)=>Math.max.apply(null,b.scores)-Math.max.apply(null,a.scores));
-}
-
-function _entityRuns(tipo,item){
-  if(tipo==='jugadores'){
-    const p=players.find(x=>x.id===item.id||x.name===item.name);
-    if(!p)return[];
-    return runsFiltradas.filter(r=>{
-      const az=getPair(r.azulPairId);const ro=getPair(r.rojaPairId);
-      // AHORA BUSCA DIRECTO AL JUGADOR, AUNQUE NO HAYA PAREJA
-      return (r.azulP1===p.id || r.azulP2===p.id || r.rojaP1===p.id || r.rojaP2===p.id) ||
-             (az&&(az.p1===p.id||az.p2===p.id)) ||
-             (ro&&(ro.p1===p.id||ro.p2===p.id));
-    });
-  } else if(tipo==='parejas'){
-    const pr=pairs.find(x=>x.id===item.id||x.name===item.name);
-    if(!pr)return[];
-    return runsFiltradas.filter(r=>r.azulPairId===pr.id||r.rojaPairId===pr.id);
-  } else {
-    return runsFiltradas.filter(r=>{
-      const cuaRaw=(r.cuadrillaName||'').trim();
-      const norm=_normStr(cuaRaw);
-      return norm===item.norm||(!cuaRaw&&[r.azulPairId||'',r.rojaPairId||''].sort().join('||')===item.pk);
-    });
-  }
-}
-
 
 /* ════════════════════════════════════════════════════════════
    MODULO COMPLETO DE EFECTIVIDAD (ADAPTADO A JUGADOR/ADMIN Y TEMAS VISUALES)
@@ -5505,7 +4937,6 @@ function renderAnalisisResumen(){
     </div>`;
   }
 
-  graficasSubTab='evolucion';
   return `
     <div class="metric-grid" style="margin-bottom:16px">
       <div class="metric-box"><div class="lbl">Rondas totales</div><div class="val">${total}</div></div>
@@ -5524,37 +4955,6 @@ function renderAnalisisResumen(){
       <button class="btn btn-cyan" style="flex:1;min-width:150px" onclick="switchAnalisisSub('parejas')">🤝 Ver parejas y cuadrillas →</button>
       <button class="btn btn-cyan" style="flex:1;min-width:150px" onclick="switchAnalisisSub('estrategia')">🧭 Ver estrategia →</button>
     </div>`;
-}
-
-/* ── 1. ENRUTADOR PRINCIPAL DE EFECTIVIDAD (heredado, aún usado por Análisis) ── */
-function renderEfectividad() {
-  if (showLanzadaForm && esAdminActual()) return renderLanzadaForm();
-  if (lanzadaDetalle) return renderSubPaginaLanzada(runsFiltradas, lanzadaDetalle);
-  if (jugadorDetalle) return renderSubPaginaJugador(runsFiltradas, jugadorDetalle);
-  if (parejaDetalle) return renderSubPaginaPareja(runsFiltradas, parejaDetalle);
-  
-  if (!['misiones', 'estrategia', 'jugadores', 'parejas'].includes(effSubTab)) effSubTab = 'misiones';
-  
-  const bgActive = (t) => effSubTab === t ? 'var(--navy)' : 'var(--surface)';
-  const txtActive = (t) => effSubTab === t ? '#fff' : 'var(--text3)';
-  const brdActive = (t) => effSubTab === t ? 'var(--navy)' : 'var(--border2)';
-
-  return `
-    <div style="animation: fadeIn 0.3s ease;">
-      <div style="display:flex; gap:6px; margin-bottom:20px; overflow-x:auto; padding-bottom:5px;">
-        <button onclick="effSubTab='misiones'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${brdActive('misiones')}; font-weight:800; cursor:pointer; background:${bgActive('misiones')}; color:${txtActive('misiones')}; transition:var(--transition); box-shadow:var(--shadow-xs);">MISIONES</button>
-        <button onclick="effSubTab='estrategia'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${brdActive('estrategia')}; font-weight:800; cursor:pointer; background:${bgActive('estrategia')}; color:${txtActive('estrategia')}; transition:var(--transition); box-shadow:var(--shadow-xs);">ESTRATEGIA</button>
-        <button onclick="effSubTab='jugadores'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${brdActive('jugadores')}; font-weight:800; cursor:pointer; background:${bgActive('jugadores')}; color:${txtActive('jugadores')}; transition:var(--transition); box-shadow:var(--shadow-xs);">JUGADORES</button>
-        <button onclick="effSubTab='parejas'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${brdActive('parejas')}; font-weight:800; cursor:pointer; background:${bgActive('parejas')}; color:${txtActive('parejas')}; transition:var(--transition); box-shadow:var(--shadow-xs);">PAREJAS</button>
-      </div>
-      <div id="efectividad-content">
-        ${effSubTab === 'misiones' ? renderEfectividadMisiones() : 
-          effSubTab === 'estrategia' ? renderEfectividadEstrategia(runsFiltradas) : 
-          effSubTab === 'jugadores' ? renderEfectividadJugadores(runsFiltradas) : 
-          renderEfectividadParejas(runsFiltradas)}
-      </div>
-    </div>
-  `;
 }
 
 /* ── 2. PESTAÑA: MISIONES ── */
