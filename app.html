@@ -5047,7 +5047,8 @@ function drawGraficas(){
   const colors = _getChartColors();
 
   if(graficasSubTab==='evolucion'){
-    const sorted=[...runsFiltradas].sort((a,b)=>a.ts-b.ts);
+    const sorted=_filtrarPorRango([...runsFiltradas]).sort((a,b)=>a.ts-b.ts);
+    if(!sorted.length) return;
     const labels=sorted.map(r=>fmtTs(r.ts));
     const scores=sorted.map(r=>r.score);
     const avgs=scores.map((_,i)=>{const w=scores.slice(Math.max(0,i-9),i+1);return Math.round(w.reduce((a,b)=>a+b,0)/w.length);});
@@ -5514,8 +5515,9 @@ function renderAnalisisResumen(){
     ${bestBlock}
     <div class="card" style="margin-bottom:16px">
       <div style="font-size:15px;font-weight:800;margin-bottom:3px">📈 Evolución de puntajes</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:14px">Cronológico · punteado = promedio móvil (10 rondas)</div>
-      <div style="position:relative;height:230px"><canvas id="gc_evol"></canvas></div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Cronológico · punteado = promedio móvil (10 rondas)</div>
+      ${_rangoSelectorHTML()}
+      ${_filtrarPorRango(runsFiltradas).length ? `<div style="position:relative;height:230px"><canvas id="gc_evol"></canvas></div>` : `<div class="empty">Sin rondas en este rango.</div>`}
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-cyan" style="flex:1;min-width:150px" onclick="switchAnalisisSub('jugadores')">👤 Ver jugadores →</button>
@@ -6124,7 +6126,8 @@ function renderSubPaginaLanzada(wd, id) {
   }
 
   let labels=[], ptsHist=[], tooltipsData=[];
-  
+  const rondasEnRango = new Set(_filtrarPorRango(rondasValidas));
+
   let htmlRegistros = rondasValidas.map((r, i) => {
     let pts = 0; let mDetailsHTML = ''; let ttLines = [];
     
@@ -6152,7 +6155,8 @@ function renderSubPaginaLanzada(wd, id) {
         });
     }
     
-    pts = Math.min(pts, 545); labels.unshift(runLabel(r, runs.indexOf(r))); ptsHist.unshift(pts); tooltipsData.unshift(ttLines);
+    pts = Math.min(pts, 545);
+    if(rondasEnRango.has(r)){ labels.unshift(runLabel(r, runs.indexOf(r))); ptsHist.unshift(pts); tooltipsData.unshift(ttLines); }
     const getP = (pid) => { const p = players.find(x => x.id === pid); return p ? lastName(p.name) : '---'; };
     
     let equipoHTML = '';
@@ -6175,7 +6179,7 @@ function renderSubPaginaLanzada(wd, id) {
   if (!rondasValidas.length) htmlRegistros = `<div class="empty">No has participado en ninguna ronda bajo esta estrategia.</div>`;
 
   // Asegurar color Hex para Chart.js
-  if(lanzadaDetalleTab==='graficas' && rondasValidas.length > 0) dibujarGrafica('chartLanzada', 'line', labels, ptsHist, colorTemaHex, 'Puntos', tooltipsData);
+  if(lanzadaDetalleTab==='graficas' && ptsHist.length > 0) dibujarGrafica('chartLanzada', 'line', labels, ptsHist, colorTemaHex, 'Puntos', tooltipsData);
 
   return `
     <div style="animation: fadeIn 0.3s ease;">
@@ -6191,7 +6195,7 @@ function renderSubPaginaLanzada(wd, id) {
         <button onclick="lanzadaDetalleTab='estadisticas'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${lanzadaDetalleTab==='estadisticas'?colorTemaCSS:'var(--border)'}; font-weight:800; cursor:pointer; background:${lanzadaDetalleTab==='estadisticas'?colorTemaCSS:'var(--surface)'}; color:${lanzadaDetalleTab==='estadisticas'?'#fff':'var(--text3)'}; transition:var(--transition);">ESTADÍSTICAS</button>
         <button onclick="lanzadaDetalleTab='graficas'; render();" style="flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${lanzadaDetalleTab==='graficas'?colorTemaCSS:'var(--border)'}; font-weight:800; cursor:pointer; background:${lanzadaDetalleTab==='graficas'?colorTemaCSS:'var(--surface)'}; color:${lanzadaDetalleTab==='graficas'?'#fff':'var(--text3)'}; transition:var(--transition);">GRÁFICAS</button>
       </div>
-      ${lanzadaDetalleTab==='estadisticas' ? `<div>${htmlRegistros}</div>` : `<div style="background:var(--surface); padding:20px; border-radius:var(--r); height:300px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartLanzada"></canvas></div>`}
+      ${lanzadaDetalleTab==='estadisticas' ? `<div>${htmlRegistros}</div>` : `${_rangoSelectorHTML()}${ptsHist.length > 0 ? `<div style="background:var(--surface); padding:20px; border-radius:var(--r); height:300px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartLanzada"></canvas></div>` : `<div class="empty">Sin rondas en este rango.</div>`}`}
     </div>`;
 }
 
