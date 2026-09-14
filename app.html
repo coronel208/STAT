@@ -255,6 +255,30 @@ body{
   box-shadow:var(--shadow-sm);
 }
 
+/* ══ ANÁLISIS — NAV EN CARDS (mobile-first) ══ */
+.an-nav{margin-bottom:18px;}
+.an-group-lbl{
+  font-size:0.62rem;font-weight:800;color:var(--text3);text-transform:uppercase;
+  letter-spacing:0.7px;margin:14px 2px 7px;
+}
+.an-nav-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.an-navcard{
+  background:var(--surface);border:2px solid var(--navy);border-radius:var(--rs);
+  padding:12px 6px;text-align:center;cursor:pointer;box-shadow:var(--shadow-xs);
+  transition:all 0.12s;display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.an-navcard:hover{box-shadow:var(--shadow-sm);transform:translate(-1px,-1px);}
+.an-navcard:active{transform:translate(1px,1px);box-shadow:none;}
+.an-navicon{font-size:1.4rem;line-height:1;}
+.an-navlbl{font-size:0.64rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px;}
+.an-navcard.active{background:var(--navy);border-color:var(--navy);box-shadow:var(--shadow-sm);}
+.an-navcard.active .an-navlbl{color:#fff;}
+.an-navcard-wide{
+  flex-direction:row;justify-content:center;padding:14px;margin-bottom:4px;
+}
+.an-navcard-wide .an-navicon{font-size:1.3rem;}
+.an-navcard-wide .an-navlbl{font-size:0.85rem;}
+
 /* ══ INPUTS ══ */
 input[type=text],input[type=number],select,textarea{
   border-radius:var(--rs);border:2px solid var(--border2);
@@ -4868,20 +4892,22 @@ function renderAnalisis(){
 
   if(!runsFiltradas.length) return `<div class="empty">Guarda lanzadas para ver el análisis del equipo.</div>`;
 
-  const pill=(k,l)=>`<button class="sub-tbtn ${analisisSubTab===k?'active':''}" onclick="switchAnalisisSub('${k}')">${l}</button>`;
-  const nav=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
-    ${pill('resumen','📊 Resumen')}
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <span style="font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;padding-left:2px">Participantes</span>
-      <div style="display:flex;gap:4px;flex-wrap:wrap">
-        ${pill('jugadores','👤 Jugadores')}
-        ${pill('parejas','🤝 Parejas')}
-        ${pill('cuadrillas','🚚 Cuadrillas')}
-      </div>
+  const navcard=(k,icon,lbl,wide)=>`<div class="an-navcard${wide?' an-navcard-wide':''}${analisisSubTab===k?' active':''}" onclick="switchAnalisisSub('${k}')">
+    <span class="an-navicon">${icon}</span><span class="an-navlbl">${lbl}</span>
+  </div>`;
+  const nav=`<div class="an-nav">
+    ${navcard('resumen','📊','Resumen',true)}
+    <div class="an-group-lbl">Participantes</div>
+    <div class="an-nav-grid">
+      ${navcard('jugadores','👤','Jugadores')}
+      ${navcard('parejas','🤝','Parejas')}
+      ${navcard('cuadrillas','🚚','Cuadrillas')}
     </div>
-    ${pill('misiones','🎯 Misiones')}
-    ${pill('estrategia','🧭 Estrategia')}
-    ${pill('entrenamientos','📋 Entrenamientos')}
+    <div class="an-nav-grid" style="margin-top:8px">
+      ${navcard('misiones','🎯','Misiones')}
+      ${navcard('estrategia','🧭','Estrategia')}
+      ${navcard('entrenamientos','📋','Entrenamientos')}
+    </div>
   </div>`;
 
   let body='';
@@ -4895,6 +4921,77 @@ function renderAnalisis(){
 
   if(analisisSubTab==='resumen') setTimeout(drawGraficas,0);
   return nav+body;
+}
+
+/* ── Tarjetas de reconocimientos (MVP, más lanzado, pareja más fiel, cuadrilla galáctica) ── */
+function _awardCard(emoji,title,name,sub,color,onclick){
+  return `<div class="card" style="flex:1;min-width:150px;padding:14px;${onclick?'cursor:pointer':''}"${onclick?` onclick="${onclick}"`:''}>
+    <div style="font-size:24px;line-height:1">${emoji}</div>
+    <div style="font-size:10px;color:var(--text3);font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-top:7px">${title}</div>
+    <div style="font-size:15px;font-weight:900;color:${color};margin-top:2px;overflow-wrap:anywhere">${name}</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:2px">${sub}</div>
+  </div>`;
+}
+function _computeAwards(){
+  const playerStats=players.map(p=>{
+    if(!checkEsUsuario(p.id)) return null;
+    const scores=[]; let rounds=0;
+    runsFiltradas.forEach(r=>{
+      if(r.rojaP1===p.id||r.rojaP2===p.id||r.azulP1===p.id||r.azulP2===p.id){ rounds++; scores.push(Number(r.score)||0); }
+    });
+    if(!rounds) return null;
+    return {p, rounds, avg:avg(scores)};
+  }).filter(Boolean);
+  const mvp = playerStats.length ? playerStats.reduce((a,x)=>x.avg>a.avg?x:a) : null;
+  const masLanzado = playerStats.length ? playerStats.reduce((a,x)=>x.rounds>a.rounds?x:a) : null;
+
+  const pairMap={};
+  runsFiltradas.forEach(r=>{
+    const add=(p1,p2)=>{
+      if(!p1||!p2) return;
+      const id=[p1,p2].sort().join('-');
+      if(!pairMap[id]) pairMap[id]={id,p1,p2,rounds:0,scores:[]};
+      pairMap[id].rounds++; pairMap[id].scores.push(Number(r.score)||0);
+    };
+    add(r.rojaP1,r.rojaP2); add(r.azulP1,r.azulP2);
+  });
+  const pairArr=Object.values(pairMap).filter(x=>checkEsUsuario(x.p1)||checkEsUsuario(x.p2));
+  const parejaFiel = pairArr.length ? pairArr.reduce((a,x)=>x.rounds>a.rounds?x:a) : null;
+
+  const cuaMap={};
+  runsFiltradas.forEach(r=>{
+    const [az1,az2]=_runBasePlayers(r,'azul'); const [ro1,ro2]=_runBasePlayers(r,'roja');
+    if(usuarioActual && usuarioActual.rol==='jugador' && !checkEsUsuario(az1) && !checkEsUsuario(az2) && !checkEsUsuario(ro1) && !checkEsUsuario(ro2)) return;
+    const cuaRaw=(r.cuadrillaName||'').trim();
+    const norm=_normStr(cuaRaw);
+    const pk=[r.azulPairId||'',r.rojaPairId||'',az1||'',ro1||''].sort().join('||');
+    const gk=norm?'n:'+norm:'p:'+pk;
+    if(!cuaMap[gk]) cuaMap[gk]={names:[],scores:[]};
+    if(cuaRaw) cuaMap[gk].names.push(cuaRaw);
+    cuaMap[gk].scores.push(Number(r.score)||0);
+  });
+  let cuaBest=null;
+  Object.values(cuaMap).forEach(g=>{
+    if(g.scores.length<2) return; // al menos 2 rondas juntos para que el promedio diga algo
+    const a=avg(g.scores);
+    if(!cuaBest || a>cuaBest.avg) cuaBest={name:_bestName(g.names)||'Cuadrilla sin nombre', avg:a, rounds:g.scores.length};
+  });
+
+  return {mvp, masLanzado, parejaFiel, cuaBest};
+}
+function _renderAwardsBlock(){
+  const {mvp, masLanzado, parejaFiel, cuaBest} = _computeAwards();
+  if(!mvp && !masLanzado && !parejaFiel && !cuaBest) return '';
+  const getP=(pid)=>{ const p=players.find(x=>x.id===pid); return p?p.name:'---'; };
+  return `<div style="margin-bottom:16px">
+    <div class="an-group-lbl" style="margin-top:0">🏅 Reconocimientos</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${mvp?_awardCard('🏆','Jugador Más Valioso',mvp.p.name,`Promedio ${mvp.avg} pts · ${mvp.rounds} ronda${mvp.rounds!==1?'s':''}`,'var(--gold)',`jugadorDetalle='${mvp.p.id}';jugadorDetalleTab='base';render();`):''}
+      ${masLanzado?_awardCard('🚀','El Más Lanzado',masLanzado.p.name,`${masLanzado.rounds} ronda${masLanzado.rounds!==1?'s':''} jugada${masLanzado.rounds!==1?'s':''}`,'var(--teal)',`jugadorDetalle='${masLanzado.p.id}';jugadorDetalleTab='base';render();`):''}
+      ${parejaFiel?_awardCard('💞','La Pareja Más Fiel',`${getP(parejaFiel.p1)} &amp; ${getP(parejaFiel.p2)}`,`${parejaFiel.rounds} ronda${parejaFiel.rounds!==1?'s':''} juntos`,'var(--red)',`parejaDetalle='${parejaFiel.id}';parejaDetalleTab='base';render();`):''}
+      ${cuaBest?_awardCard('🌌','La Cuadrilla Galáctica',cuaBest.name,`Promedio ${cuaBest.avg} pts · ${cuaBest.rounds} rondas`,'var(--cyan)',null):''}
+    </div>
+  </div>`;
 }
 
 /* ── RESUMEN: lo importante de un vistazo ── */
@@ -4943,6 +5040,7 @@ function renderAnalisisResumen(){
       <div class="metric-box"><div class="lbl">Promedio</div><div class="val good">${avgAll}</div></div>
       <div class="metric-box"><div class="lbl">Mejor puntaje</div><div class="val good">${bestAll}</div></div>
     </div>
+    ${_renderAwardsBlock()}
     ${bestBlock}
     <div class="card" style="margin-bottom:16px">
       <div style="font-size:15px;font-weight:800;margin-bottom:3px">📈 Evolución de puntajes</div>
