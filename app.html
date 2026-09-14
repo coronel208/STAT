@@ -5291,6 +5291,25 @@ let parejaDetalleInner = 'stats';
 let showLanzadaForm = false;
 let editandoLanzadaId = null;
 
+/* Rango de tiempo para las gráficas de misiones/lanzadas — filtra las
+   rondas por fecha (r.ts) antes de graficarlas. 'todo' = sin filtro. */
+let graficaRango = 'todo';
+function _setGraficaRango(v){ graficaRango = v; render(); }
+function _filtrarPorRango(rounds){
+  if(graficaRango === 'todo') return rounds;
+  const msPorRango = { dia:86400000, semana:7*86400000, dosSemanas:14*86400000, mes:30*86400000 };
+  const ms = msPorRango[graficaRango];
+  if(!ms) return rounds;
+  const limite = Date.now() - ms;
+  return rounds.filter(r => (r.ts||0) >= limite);
+}
+function _rangoSelectorHTML(){
+  const opts = [['todo','Todo'],['dia','1 día'],['semana','1 semana'],['dosSemanas','2 semanas'],['mes','1 mes']];
+  return `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
+    ${opts.map(([v,l])=>`<button class="btn btn-sm" onclick="_setGraficaRango('${v}')" style="${graficaRango===v?'background:var(--teal);border-color:var(--teal);color:#fff':''}">${l}</button>`).join('')}
+  </div>`;
+}
+
 let lanzadasConfiguradas = [];
 function saveLanzadas() { save(); }
 
@@ -5388,6 +5407,7 @@ function dibujarGrafica(canvasId, type, labels, data, colorHex, labelText, custo
           responsive: true,
           maintainAspectRatio: false,
           animation: { duration: 500 },
+          interaction: { mode: 'index', intersect: false },
           plugins: { legend: { display: false }, tooltip: tooltipOptions },
           scales: {
             y: { beginAtZero: true, grid: { color: chartColors.grid }, ticks: { color: chartColors.tick, font:{size:11} }, border:{display:false} },
@@ -6123,8 +6143,9 @@ function renderSubPaginaLanzada(wd, id) {
                pts += mPts;
                
                const c = mPts >= target && target > 0 ? 'var(--green)' : (mPts > 0 ? 'var(--amber)' : 'var(--red)');
-               mDetailsHTML += `<div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; padding:6px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--rs);">
-                 <span style="color:var(--text2); font-weight:600;">${mc} - ${mo.name}</span><span style="color:${c}; font-weight:800;">${mPts}/${target} pts</span>
+               mDetailsHTML += `<div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-bottom:4px; padding:6px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--rs);">
+                 <span style="color:var(--text2); font-weight:600;">${mc} - ${mo.name}</span>
+                 <span style="display:flex; align-items:center; gap:6px;"><span style="color:${c}; font-weight:800;">${mPts}/${target} pts</span><button class="btn btn-sm" onclick="event.stopPropagation(); _irAMisionDesdeGrafica('${mc}')" style="padding:2px 8px;font-size:10px;">Ver misión →</button></span>
                </div>`;
                ttLines.push(`${mc}: ${mPts}/${target} pts`);
            }
@@ -6363,8 +6384,10 @@ function renderEfectividadJugadores(wd) {
    duplicar las estadísticas de misión ahí también. Funciona tanto desde el
    detalle de un jugador como el de una pareja. */
 function _irAMisionDesdeGrafica(code){
+  lanzadaDetalle = null;
   if(jugadorDetalle){ jugadorDetalleTab='porMision'; jugadorDetalleInner='stats'; }
   else if(parejaDetalle){ parejaDetalleTab='porMision'; parejaDetalleInner='stats'; }
+  else { analisisSubTab='misiones'; misionesSubTab='global'; }
   render();
   setTimeout(()=>{ const el=document.getElementById('effcard_'+code); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); }, 60);
 }
@@ -6377,8 +6400,8 @@ function _irAMisionDesdeGrafica(code){
    rondas nada más) — así siempre es la misma gráfica, solo cambia el filtro
    de rondas que se le pasa. */
 function _renderGraficasPorMisionDetallada(rounds, idPrefix){
-  const ordenadas = [...rounds].filter(r=>r.missions).sort((a,b)=>(a.ts||0)-(b.ts||0));
-  if(!ordenadas.length) return `<div class="empty">Sin rondas registradas.</div>`;
+  const ordenadas = _filtrarPorRango([...rounds].filter(r=>r.missions)).sort((a,b)=>(a.ts||0)-(b.ts||0));
+  if(!ordenadas.length) return `${_rangoSelectorHTML()}<div class="empty">Sin rondas registradas en este rango.</div>`;
   const dense = ordenadas.length > 30;
   const labels = ordenadas.map((r,i)=>String(i+1));
 
@@ -6401,10 +6424,12 @@ function _renderGraficasPorMisionDetallada(rounds, idPrefix){
           }]},
           options:{
             responsive:true, maintainAspectRatio:false, animation:{duration:300},
+            interaction:{mode:'index', intersect:false},
             plugins:{legend:{display:false}, tooltip:{callbacks:{
               title:(c)=>'Ronda #'+c[0].label,
-              label:(c)=>c.raw+'% de '+m.code
+              label:(c)=>c.raw+'% del puntaje máximo de '+m.code+' logrado en esa ronda'
             }}},
+            elements:{point:{hitRadius:10}},
             scales:{
               y:{min:0,max:100,ticks:{stepSize:50,color:chartColors.tick,font:{size:9}},grid:{color:chartColors.grid}},
               x:{ticks:{display:false},grid:{display:false}}
@@ -6422,7 +6447,7 @@ function _renderGraficasPorMisionDetallada(rounds, idPrefix){
     </div>`;
   }).join('');
 
-  return `<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Cada punto es una ronda jugada, en orden — así se ve si una misión mejora o empeora con el tiempo (${ordenadas.length} ronda${ordenadas.length!==1?'s':''})</div>${cards}`;
+  return `${_rangoSelectorHTML()}<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Cada punto es una ronda jugada, en orden — así se ve si una misión mejora o empeora con el tiempo (${ordenadas.length} ronda${ordenadas.length!==1?'s':''}). <b>El 100% es % del puntaje máximo de la misión</b> logrado en esa ronda, no si se "completó" sí o no.</div>${cards}`;
 }
 
 /* GRÁFICAS — "POR LANZADA": una barra por CADA LANZADA configurada (no por
@@ -6430,6 +6455,7 @@ function _renderGraficasPorMisionDetallada(rounds, idPrefix){
    Debajo, un link por lanzada para saltar a las misiones que la componen
    sin repetir esas estadísticas acá mismo. */
 function _renderGraficasPorLanzada(rRoja, rAzul, idPrefix){
+  rRoja = _filtrarPorRango(rRoja); rAzul = _filtrarPorRango(rAzul);
   const buildData = (base, subset) => {
     const lzs = lanzadasConfiguradas.filter(lz=>lz.base===base);
     const labels = lzs.map(lz=>lz.name);
@@ -6447,24 +6473,25 @@ function _renderGraficasPorLanzada(rRoja, rAzul, idPrefix){
   };
   const cRoja=buildData('Roja',rRoja), cAzul=buildData('Azul',rAzul);
   const idR=idPrefix+'LzRoja', idA=idPrefix+'LzAzul';
-  dibujarGrafica(idR, 'bar', cRoja.labels, cRoja.data, '#EF4444', '% Completada', null, cRoja.colors);
-  dibujarGrafica(idA, 'bar', cAzul.labels, cAzul.data, '#3B82F6', '% Completada', null, cAzul.colors);
+  dibujarGrafica(idR, 'bar', cRoja.labels, cRoja.data, '#EF4444', '% de rondas al máximo', null, cRoja.colors);
+  dibujarGrafica(idA, 'bar', cAzul.labels, cAzul.data, '#3B82F6', '% de rondas al máximo', null, cAzul.colors);
   const linksHtml = (info) => info.lzs.length ? `<div style="display:flex;flex-direction:column;gap:5px;margin-top:10px">
     ${info.lzs.map(lz=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:var(--text2)">
       <span>${lz.name} <span style="color:var(--text3)">(${lz.missions.join(', ')})</span></span>
-      <button class="btn btn-sm" onclick="_irAMisionDesdeGrafica('${lz.missions[0]}')">Ver misiones →</button>
+      <button class="btn btn-sm" onclick="lanzadaDetalle='${lz.id}'; lanzadaDetalleTab='estadisticas'; render();">Ver lanzada →</button>
     </div>`).join('')}
   </div>` : '';
   return `
+    ${_rangoSelectorHTML()}
     <div style="margin-bottom:20px;">
        <h3 style="color:var(--red); margin-bottom:4px; font-size:14px; font-weight:800;">% COMPLETADA POR LANZADA — BASE ROJA</h3>
-       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Solo el resultado global de cada estrategia — sin repetir el detalle de misiones</div>
+       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Solo el resultado global de cada estrategia — sin repetir el detalle de misiones. <b>100% = la lanzada se logró al puntaje máximo en TODAS las rondas</b>; la barra es % de rondas donde eso pasó, no el puntaje promedio.</div>
        ${cRoja.lzs.length?`<div style="background:var(--surface); padding:15px; border-radius:var(--r); height:220px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idR}"></canvas></div>`:`<div class="empty">Sin lanzadas configuradas en Base Roja.</div>`}
        ${linksHtml(cRoja)}
     </div>
     <div>
        <h3 style="color:var(--blue); margin-bottom:4px; font-size:14px; font-weight:800;">% COMPLETADA POR LANZADA — BASE AZUL</h3>
-       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Solo el resultado global de cada estrategia — sin repetir el detalle de misiones</div>
+       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Solo el resultado global de cada estrategia — sin repetir el detalle de misiones. <b>100% = la lanzada se logró al puntaje máximo en TODAS las rondas</b>; la barra es % de rondas donde eso pasó, no el puntaje promedio.</div>
        ${cAzul.lzs.length?`<div style="background:var(--surface); padding:15px; border-radius:var(--r); height:220px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idA}"></canvas></div>`:`<div class="empty">Sin lanzadas configuradas en Base Azul.</div>`}
        ${linksHtml(cAzul)}
     </div>`;
