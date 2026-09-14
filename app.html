@@ -4706,8 +4706,15 @@ function _cuadrillasSection(subset,prefix){
         <button class="btn btn-green" style="width:100%;font-weight:700;margin-bottom:12px" onclick="(function(){_buscarFilter={..._emptyBuscarFilter(),cuadrillaText:'${displayName.replace(/'/g,String.fromCharCode(92,39)).replace(/"/g,'&quot;')}'};tab='buscar';document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab==='buscar'));render();})()">
           🔍 Ver rondas de ${displayName} →
         </button>
-        ${renderDesgloseMisiones(refs.map(x=>x.r), 'Roja', 'var(--red)')}
-        ${renderDesgloseMisiones(refs.map(x=>x.r), 'Azul', 'var(--blue)')}
+        <div style="display:flex;gap:6px;margin-bottom:12px">
+          <button onclick="_setDesgloseSub('lanzada')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${_desgloseSub==='lanzada'?'var(--teal)':'var(--border2)'};background:${_desgloseSub==='lanzada'?'var(--teal)':'var(--surface)'};color:${_desgloseSub==='lanzada'?'#fff':'var(--text2)'};cursor:pointer">Por lanzada</button>
+          <button onclick="_setDesgloseSub('mision')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${_desgloseSub==='mision'?'var(--teal)':'var(--border2)'};background:${_desgloseSub==='mision'?'var(--teal)':'var(--surface)'};color:${_desgloseSub==='mision'?'#fff':'var(--text2)'};cursor:pointer">Por misión</button>
+          <button onclick="toggleOpen('${key}_graf')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${statsOpen[key+'_graf']?'var(--teal)':'var(--border2)'};background:${statsOpen[key+'_graf']?'var(--teal)':'var(--surface)'};color:${statsOpen[key+'_graf']?'#fff':'var(--text2)'};cursor:pointer">📈 Gráficas</button>
+        </div>
+        ${statsOpen[key+'_graf'] ? _renderGraficasPorMisionDetallada(refs.map(x=>x.r), 'chartCua_'+ci) :
+          (_desgloseSub==='mision'
+            ? effTable(refs.map(x=>x.r), 'Todas las misiones')
+            : `${renderDesgloseMisiones(refs.map(x=>x.r), 'Roja', 'var(--red)')}${renderDesgloseMisiones(refs.map(x=>x.r), 'Azul', 'var(--blue)')}`)}
       </div>`:''}
     </div>`;
   }).join('');
@@ -5540,11 +5547,13 @@ function renderEfectividadMisiones() {
         <button onclick="misionesSubTab='global'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('global')}; font-weight:800; cursor:pointer; background:${bgActive('global')}; color:${txtActive('global')}; font-size:12px; transition:var(--transition);">GLOBAL</button>
         <button onclick="misionesSubTab='sueltas'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('sueltas')}; font-weight:800; cursor:pointer; background:${bgActive('sueltas')}; color:${txtActive('sueltas')}; font-size:12px; transition:var(--transition);">SUELTAS</button>
         <button onclick="misionesSubTab='entrenamientos'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('entrenamientos')}; font-weight:800; cursor:pointer; background:${bgActive('entrenamientos')}; color:${txtActive('entrenamientos')}; font-size:12px; transition:var(--transition);">ENTRENAMIENTOS</button>
+        <button onclick="misionesSubTab='graficas'; render();" style="flex:1; padding:8px; border-radius:var(--rs); border:2px solid ${brdActive('graficas')}; font-weight:800; cursor:pointer; background:${bgActive('graficas')}; color:${txtActive('graficas')}; font-size:12px; transition:var(--transition);">📈 GRÁFICAS</button>
       </div>
       <div>
         ${misionesSubTab === 'global' ? effTable(runsFiltradas, 'Efectividad Global de Misiones') : ''}
         ${misionesSubTab === 'sueltas' ? effBySueltas() : ''}
         ${misionesSubTab === 'entrenamientos' ? effByTraining() : ''}
+        ${misionesSubTab === 'graficas' ? _renderGraficasPorMisionDetallada(runsFiltradas, 'chartAM') : ''}
       </div>
     </div>
   `;
@@ -5717,12 +5726,17 @@ function effTable(subset, label, customTargets = null){
     return { code: m.code, name: m.name, full, partial, fail, total, maxPts, pctFull, pctPartial, pctFail, pctAny, rawFull, rawPartial, rawFail, fullRounds, partialRounds, failRounds, parts };
   });
 
-  // 🛑 LÓGICA DE ORDENAMIENTO REPARADA (M01->M15 y M15->M01)
+  // Ordenamiento: por posición fija (M01->M15), por % completitud total
+  // (completa+parcial), o por completa/parcial cada una por su cuenta —
+  // se piden separadas porque una misión puede tener mucho % parcial y
+  // poco % completa, y agrupado en un solo número eso se pierde de vista.
   mStats.sort((a, b) => {
-    if(effSortBy.startsWith('morder')) { 
-      const mo = x => x.code === 'INS' ? -1 : x.code === 'FP' ? 999 : parseInt(x.code.replace('M', '')) || 0; 
-      return effSortBy === 'morder_desc' ? mo(b) - mo(a) : mo(a) - mo(b); 
+    if(effSortBy.startsWith('morder')) {
+      const mo = x => x.code === 'INS' ? -1 : x.code === 'FP' ? 999 : parseInt(x.code.replace('M', '')) || 0;
+      return effSortBy === 'morder_desc' ? mo(b) - mo(a) : mo(a) - mo(b);
     }
+    if(effSortBy.startsWith('full')) return effSortBy==='full_asc' ? a.pctFull-b.pctFull : b.pctFull-a.pctFull;
+    if(effSortBy.startsWith('partial')) return effSortBy==='partial_asc' ? a.pctPartial-b.pctPartial : b.pctPartial-a.pctPartial;
     return effSortBy === 'score_asc' ? a.pctAny - b.pctAny : b.pctAny - a.pctAny;
   });
 
@@ -5795,16 +5809,20 @@ function effTable(subset, label, customTargets = null){
     </div>`;
   }).join('');
   
-  // 🛑 BOTONES DE ORDENAMIENTO CORREGIDOS
+  // 🛑 BOTONES DE ORDENAMIENTO
   const isMorder = effSortBy.startsWith('morder');
-  const _effBtnLabel = effSortBy === 'score_asc' ? 'Efect. ↑ menor' : 'Efect. ↓ mayor';
-  const _ordBtnLabel = effSortBy === 'morder_desc' ? 'M15 → M01' : 'M01 → M15';
-  
+  const isFullSort = effSortBy.startsWith('full');
+  const isPartialSort = effSortBy.startsWith('partial');
+  const isScoreSort = !isMorder && !isFullSort && !isPartialSort;
+  const _sortBtn = (active, label, nextVal) => `<button onclick="effSortBy='${nextVal}'; render();" style="padding:4px 12px; font-size:11px; font-weight:800; border:2px solid ${active?'var(--teal)':'var(--border2)'}; border-radius:12px; background:${active?'var(--teal)':'var(--surface2)'}; color:${active?'#fff':'var(--text2)'}; cursor:pointer; transition:var(--transition); white-space:nowrap;">${label}</button>`;
+
   const effBar = `
   <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:15px; align-items:center;">
     <span style="font-size:11px; color:var(--text3); font-weight:800;">ORDENAR POR:</span>
-    <button onclick="effSortBy='${effSortBy==='score_asc'?'score_desc':'score_asc'}'; render();" style="padding:4px 12px; font-size:11px; font-weight:800; border:2px solid ${!isMorder?'var(--teal)':'var(--border2)'}; border-radius:12px; background:${!isMorder?'var(--teal)':'var(--surface2)'}; color:${!isMorder?'#fff':'var(--text2)'}; cursor:pointer; transition:var(--transition);">${_effBtnLabel}</button>
-    <button onclick="effSortBy='${effSortBy==='morder_asc'?'morder_desc':'morder_asc'}'; render();" style="padding:4px 12px; font-size:11px; font-weight:800; border:2px solid ${isMorder?'var(--teal)':'var(--border2)'}; border-radius:12px; background:${isMorder?'var(--teal)':'var(--surface2)'}; color:${isMorder?'#fff':'var(--text2)'}; cursor:pointer; transition:var(--transition);">${_ordBtnLabel}</button>
+    ${_sortBtn(isMorder, effSortBy==='morder_desc'?'M15 → M01':'M01 → M15', effSortBy==='morder_asc'?'morder_desc':'morder_asc')}
+    ${_sortBtn(isScoreSort, effSortBy==='score_asc'?'Completitud ↑ menor':'Completitud ↓ mayor', effSortBy==='score_asc'?'score_desc':'score_asc')}
+    ${_sortBtn(isFullSort, effSortBy==='full_asc'?'Completa ↑ menor':'Completa ↓ mayor', effSortBy==='full_asc'?'full_desc':'full_asc')}
+    ${_sortBtn(isPartialSort, effSortBy==='partial_asc'?'Parcial ↑ menor':'Parcial ↓ mayor', effSortBy==='partial_asc'?'partial_desc':'partial_asc')}
   </div>`;
   
   return `<div class="card" style="margin-bottom:15px;"><div class="sec-lbl">${label}</div>${summary}</div>${effBar}${cards}`;
@@ -6173,11 +6191,11 @@ function _showLzRounds(key){
   openModal(`🎯 ${info.name}`, body);
 }
 
-/* ── FUNCIÓN REUTILIZABLE: RENDERIZAR MISIONES AGRUPADAS Y CONTADORES ──
-   mode: 'lanzada'|'mision' — si se omite, muestra su propio toggle interno
-   (uso embebido, ej. cuadrillas). Jugador/pareja pasan el mode fijo porque
-   ya tienen sus propias pestañas "POR MISIÓN"/"POR LANZADA" arriba. */
-function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS, mode) {
+/* ── FUNCIÓN REUTILIZABLE: desglose "POR LANZADA" agrupado por base ──
+   Para "POR MISIÓN" no se usa esta función — se llama effTable directo con
+   las rondas de ambas bases juntas, sin separar por Roja/Azul (ver los 3
+   lugares que llaman a effTable([...rRoja,...rAzul], ...)). */
+function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS) {
   if(!rondasBase.length) return `<div class="empty">Sin rondas jugadas en Base ${baseNombre}.</div>`;
   const lzBase = lanzadasConfiguradas.filter(lz => lz.base === baseNombre);
   let maxBase = 0; lzBase.forEach(lz => maxBase += lz.max);
@@ -6223,16 +6241,7 @@ function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS, mode) {
        </div>
        <div style="padding:15px; background:var(--surface2);">
   `;
-  const effMode = mode || _desgloseSub;
-  if(!mode){
-    html += `<div style="display:flex;gap:6px;margin-bottom:14px">
-      <button onclick="_setDesgloseSub('lanzada')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${effMode==='lanzada'?colorCSS:'var(--border2)'};background:${effMode==='lanzada'?colorCSS:'var(--surface)'};color:${effMode==='lanzada'?'#fff':'var(--text2)'};cursor:pointer">Por lanzada</button>
-      <button onclick="_setDesgloseSub('mision')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${effMode==='mision'?colorCSS:'var(--border2)'};background:${effMode==='mision'?colorCSS:'var(--surface)'};color:${effMode==='mision'?'#fff':'var(--text2)'};cursor:pointer">Por misión</button>
-    </div>`;
-  }
-  if(effMode==='mision'){
-    html += effTable(rondasBase, `Todas las misiones — Base ${baseNombre}`);
-  } else if(!lzBase.length) {
+  if(!lzBase.length) {
     html += `<div class="empty">No hay lanzadas configuradas para esta base.</div>`;
   } else {
     lzBase.forEach(lz => {
@@ -6360,37 +6369,60 @@ function _irAMisionDesdeGrafica(code){
   setTimeout(()=>{ const el=document.getElementById('effcard_'+code); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); }, 60);
 }
 
-/* GRÁFICAS — "POR MISIÓN": una barra por cada una de las 16 misiones, en su
-   orden fijo de siempre (INS, M01..M15, FP — "de la inspección a las
-   fichas"), un solo color. A propósito NO se agrupan por lanzada — esa
-   agrupación es exactamente lo que hace la gráfica de "POR LANZADA", y
-   mostrar lo mismo dos veces era el problema. */
-function _renderGraficasPorMision(rRoja, rAzul, idPrefix){
-  const buildData = (subset) => {
-    const labels = MISSIONS.map(m=>m.code);
-    const tooltips = MISSIONS.map(m=>[m.name]);
-    const data = MISSIONS.map(m => {
-      if(!subset.length) return 0;
-      let f=0; subset.forEach(r=>{ if(mScoreFor(m,r.missions) >= mMaxScore(m)) f++; });
-      return Math.round((f/subset.length)*100);
-    });
-    return {labels, data, tooltips};
-  };
-  const cRoja=buildData(rRoja), cAzul=buildData(rAzul);
-  const idR=idPrefix+'Roja', idA=idPrefix+'Azul';
-  dibujarGrafica(idR, 'bar', cRoja.labels, cRoja.data, '#C0392B', '% Completa', cRoja.tooltips);
-  dibujarGrafica(idA, 'bar', cAzul.labels, cAzul.data, '#1A5C9A', '% Completa', cAzul.tooltips);
-  return `
-    <div style="margin-bottom:20px;">
-       <h3 style="color:var(--red); margin-bottom:4px; font-size:14px; font-weight:800;">% COMPLETA POR MISIÓN — BASE ROJA</h3>
-       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">De Inspección a Fichas, todas las misiones en orden</div>
-       <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idR}"></canvas></div>
-    </div>
-    <div>
-       <h3 style="color:var(--blue); margin-bottom:4px; font-size:14px; font-weight:800;">% COMPLETA POR MISIÓN — BASE AZUL</h3>
-       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">De Inspección a Fichas, todas las misiones en orden</div>
-       <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idA}"></canvas></div>
+/* GRÁFICAS POR MISIÓN — una gráfica pequeña POR CADA UNA de las 16 misiones
+   (en su orden fijo, de Inspección a Fichas), mostrando la evolución de esa
+   misión a lo largo de TODAS las rondas dadas (ronda a ronda, en orden
+   cronológico). Es la misma función para Análisis > Misiones (con todas las
+   rondas del equipo) y para jugador/pareja/cuadrilla (con sus propias
+   rondas nada más) — así siempre es la misma gráfica, solo cambia el filtro
+   de rondas que se le pasa. */
+function _renderGraficasPorMisionDetallada(rounds, idPrefix){
+  const ordenadas = [...rounds].filter(r=>r.missions).sort((a,b)=>(a.ts||0)-(b.ts||0));
+  if(!ordenadas.length) return `<div class="empty">Sin rondas registradas.</div>`;
+  const dense = ordenadas.length > 30;
+  const labels = ordenadas.map((r,i)=>String(i+1));
+
+  const cards = MISSIONS.map(m => {
+    const max = mMaxScore(m);
+    const data = ordenadas.map(r => max>0 ? Math.round((mScoreFor(m,r.missions)/max)*100) : 0);
+    const vecesCompleta = data.filter(v=>v>=100).length;
+    const id = idPrefix+'_m_'+m.code;
+    setTimeout(()=>{
+      try{
+        const ctx=document.getElementById(id); if(!ctx) return;
+        if(window['chart_'+id]) window['chart_'+id].destroy();
+        const chartColors=_getChartColors();
+        window['chart_'+id]=new Chart(ctx,{
+          type:'line',
+          data:{labels, datasets:[{
+            data, borderColor:'#0D6E8A', backgroundColor:'rgba(13,110,138,0.15)',
+            borderWidth:dense?1.5:2, pointRadius:dense?0:3, pointBackgroundColor:'#0D6E8A',
+            fill:true, tension:0.25
+          }]},
+          options:{
+            responsive:true, maintainAspectRatio:false, animation:{duration:300},
+            plugins:{legend:{display:false}, tooltip:{callbacks:{
+              title:(c)=>'Ronda #'+c[0].label,
+              label:(c)=>c.raw+'% de '+m.code
+            }}},
+            scales:{
+              y:{min:0,max:100,ticks:{stepSize:50,color:chartColors.tick,font:{size:9}},grid:{color:chartColors.grid}},
+              x:{ticks:{display:false},grid:{display:false}}
+            }
+          }
+        });
+      }catch(e){ console.error('Error gráfica '+id, e); }
+    }, 0);
+    return `<div class="card" style="padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:6px"><span class="mcode${m.amber?' am':''}">${m.code}</span><span class="mtitle" style="font-size:12px">${m.name}</span></div>
+        <span style="font-size:10px;color:var(--text3);font-weight:700">✓${vecesCompleta}/${ordenadas.length}</span>
+      </div>
+      <div style="height:90px"><canvas id="${id}"></canvas></div>
     </div>`;
+  }).join('');
+
+  return `<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Cada punto es una ronda jugada, en orden — así se ve si una misión mejora o empeora con el tiempo (${ordenadas.length} ronda${ordenadas.length!==1?'s':''})</div>${cards}`;
 }
 
 /* GRÁFICAS — "POR LANZADA": una barra por CADA LANZADA configurada (no por
@@ -6466,10 +6498,12 @@ function renderSubPaginaJugador(wd, id) {
     if(jugadorDetalleInner === 'graficas'){
       contentHTML = jugadorDetalleTab === 'porLanzada'
         ? _renderGraficasPorLanzada(rRoja, rAzul, 'chartJM')
-        : _renderGraficasPorMision(rRoja, rAzul, 'chartJM');
+        : _renderGraficasPorMisionDetallada([...rRoja, ...rAzul], 'chartJM');
+    } else if(jugadorDetalleTab === 'porMision'){
+      // Sin separar por base — una sola lista de misiones en orden, sin nada más encima.
+      contentHTML = effTable([...rRoja, ...rAzul], 'Todas las misiones');
     } else {
-      const mode = jugadorDetalleTab === 'porLanzada' ? 'lanzada' : 'mision';
-      contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)', mode)}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)', mode)}`;
+      contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)')}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)')}`;
     }
   } else {
     const rolCount=(subset,base)=>{
@@ -6559,10 +6593,11 @@ function renderSubPaginaPareja(wd, id) {
     if(parejaDetalleInner === 'graficas'){
       contentHTML = parejaDetalleTab === 'porLanzada'
         ? _renderGraficasPorLanzada(rRoja, rAzul, 'chartPM')
-        : _renderGraficasPorMision(rRoja, rAzul, 'chartPM');
+        : _renderGraficasPorMisionDetallada([...rRoja, ...rAzul], 'chartPM');
+    } else if(parejaDetalleTab === 'porMision'){
+      contentHTML = effTable([...rRoja, ...rAzul], 'Todas las misiones');
     } else {
-      const mode = parejaDetalleTab === 'porLanzada' ? 'lanzada' : 'mision';
-      contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)', mode)}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)', mode)}`;
+      contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)')}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)')}`;
     }
   } else {
     const allScores=[...rRoja,...rAzul].map(r=>Number(r.score));
