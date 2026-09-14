@@ -104,18 +104,18 @@ body{
    línea de siempre. */
 .hdr{
   background:var(--navy);
-  padding:8px 12px;
+  padding:12px 14px;
   min-height:56px;
   border-bottom:3px solid var(--teal);
   box-shadow:0 3px 0 rgba(0,194,212,0.15);
   display:flex;align-items:center;justify-content:center;
   flex-wrap:wrap;
-  row-gap:6px; column-gap:10px;
+  row-gap:10px; column-gap:10px;
   position:sticky;top:0;z-index:200;
 }
 .hdr-left,.hdr-right{
   display:flex;align-items:center;flex-wrap:wrap;
-  row-gap:6px; column-gap:8px;
+  row-gap:8px; column-gap:8px;
   justify-content:center;
 }
 @media(min-width:641px){
@@ -126,8 +126,11 @@ body{
 @media(max-width:640px){
   #hdr-temporada, #hdr-divider{display:none;}
   #hdr-user{display:none;}
-  #hdr-team{max-width:110px;font-size:10px !important;}
+  #hdr-team{max-width:120px;font-size:11px !important;padding:5px 12px !important;}
   .hdr-logo-text{font-size:18px !important;}
+  #btn-admin-panel{padding:6px 12px !important;font-size:12px !important;}
+  #header-badge-container span{padding:6px 12px !important;font-size:11px !important;}
+  .hdr-right a, #hdr-logout{padding:6px 14px !important;font-size:12px !important;}
 }
 .hdr-logo-img{
   height:28px;width:auto;
@@ -164,6 +167,21 @@ body{
    en el aire; se deja sin sticky ahí. */
 @media(min-width:641px){
   .tabs{position:sticky;top:56px;}
+}
+/* En mobile, 5 pestañas envueltas dejaban una sola huérfana en su propia
+   fila (4+1), que se veía desbalanceado. Una sola fila con scroll
+   horizontal PROPIO (no de la página) es el patrón normal en apps de
+   celular y se ve más ordenado que el wrap. */
+@media(max-width:640px){
+  .tabs{
+    flex-wrap:nowrap !important;
+    overflow-x:auto !important;
+    justify-content:flex-start;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .tabs::-webkit-scrollbar{display:none;}
+  .tbtn{flex:0 0 auto !important;padding:12px 14px !important;}
 }
 .tbtn{
   font-weight:700;font-size:0.75rem;padding:12px 12px !important;
@@ -5745,7 +5763,7 @@ function effTable(subset, label, customTargets = null){
         }).join('')}
       </div>` : '';
     return `
-    <div class="card" style="padding:12px; margin-bottom:10px; display:block;">
+    <div id="effcard_${ms.code}" class="card" style="padding:12px; margin-bottom:10px; display:block;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div style="display:flex; align-items:center; gap:6px;">
            <span class="mcode${ms.amber?' am':''}">${ms.code}</span>
@@ -6331,38 +6349,92 @@ function renderEfectividadJugadores(wd) {
    la separación entre esas dos pestañas es sobre las ESTADÍSTICAS, no hace
    falta duplicar la gráfica. idPrefix evita choques de <canvas id> cuando
    hay varias páginas de detalle en juego (jugador vs pareja vs cuadrilla). */
-function _renderGraficasMisiones(rRoja, rAzul, idPrefix){
-  const buildChartData = (base) => {
-      const info=[], legend=[]; let cIdx=0;
-      lanzadasConfiguradas.filter(lz=>lz.base===base).forEach(lz => {
-         const col = CHART_PALETTE[cIdx%CHART_PALETTE.length]; cIdx++;
-         legend.push(`<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2); font-weight:600;"><div style="width:10px;height:10px;background:${col};border-radius:2px;"></div>${lz.name}</div>`);
-         lz.missions.forEach(mc => info.push({code:mc, target:lz.targetPts[mc], color:col}));
-      });
-      const labels = info.map(i=>i.code); const colors = info.map(i=>i.color);
-      const data = info.map(i => {
-         const mo=MISSIONS.find(m=>m.code===i.code); let f=0;
-         (base==='Roja'?rRoja:rAzul).forEach(r => { if(Math.min(mScoreFor(mo, r.missions), i.target)>=i.target && i.target>0) f++; });
-         return Math.round((f/((base==='Roja'?rRoja.length:rAzul.length)||1))*100);
-      });
-      return {labels, data, colors, legendHTML: legend.join('')};
+/* Salta a la tarjeta de una misión específica dentro de "POR MISIÓN →
+   Estadísticas" — se usa desde la gráfica "POR LANZADA" para no tener que
+   duplicar las estadísticas de misión ahí también. Funciona tanto desde el
+   detalle de un jugador como el de una pareja. */
+function _irAMisionDesdeGrafica(code){
+  if(jugadorDetalle){ jugadorDetalleTab='porMision'; jugadorDetalleInner='stats'; }
+  else if(parejaDetalle){ parejaDetalleTab='porMision'; parejaDetalleInner='stats'; }
+  render();
+  setTimeout(()=>{ const el=document.getElementById('effcard_'+code); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); }, 60);
+}
+
+/* GRÁFICAS — "POR MISIÓN": una barra por cada una de las 16 misiones, en su
+   orden fijo de siempre (INS, M01..M15, FP — "de la inspección a las
+   fichas"), un solo color. A propósito NO se agrupan por lanzada — esa
+   agrupación es exactamente lo que hace la gráfica de "POR LANZADA", y
+   mostrar lo mismo dos veces era el problema. */
+function _renderGraficasPorMision(rRoja, rAzul, idPrefix){
+  const buildData = (subset) => {
+    const labels = MISSIONS.map(m=>m.code);
+    const tooltips = MISSIONS.map(m=>[m.name]);
+    const data = MISSIONS.map(m => {
+      if(!subset.length) return 0;
+      let f=0; subset.forEach(r=>{ if(mScoreFor(m,r.missions) >= mMaxScore(m)) f++; });
+      return Math.round((f/subset.length)*100);
+    });
+    return {labels, data, tooltips};
   };
-
-  const cRoja = buildChartData('Roja'); const cAzul = buildChartData('Azul');
-  const idR = idPrefix+'Roja', idA = idPrefix+'Azul';
-  dibujarGrafica(idR, 'bar', cRoja.labels, cRoja.data, '#EF4444', '% Éxito', null, cRoja.colors);
-  dibujarGrafica(idA, 'bar', cAzul.labels, cAzul.data, '#3B82F6', '% Éxito', null, cAzul.colors);
-
+  const cRoja=buildData(rRoja), cAzul=buildData(rAzul);
+  const idR=idPrefix+'Roja', idA=idPrefix+'Azul';
+  dibujarGrafica(idR, 'bar', cRoja.labels, cRoja.data, '#C0392B', '% Completa', cRoja.tooltips);
+  dibujarGrafica(idA, 'bar', cAzul.labels, cAzul.data, '#1A5C9A', '% Completa', cAzul.tooltips);
   return `
     <div style="margin-bottom:20px;">
-       <h3 style="color:var(--red); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD - BASE ROJA</h3>
-       <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idR}"></canvas></div>
-       <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cRoja.legendHTML}</div>
+       <h3 style="color:var(--red); margin-bottom:4px; font-size:14px; font-weight:800;">% COMPLETA POR MISIÓN — BASE ROJA</h3>
+       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">De Inspección a Fichas, todas las misiones en orden</div>
+       <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idR}"></canvas></div>
     </div>
     <div>
-       <h3 style="color:var(--blue); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD - BASE AZUL</h3>
-       <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idA}"></canvas></div>
-       <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cAzul.legendHTML}</div>
+       <h3 style="color:var(--blue); margin-bottom:4px; font-size:14px; font-weight:800;">% COMPLETA POR MISIÓN — BASE AZUL</h3>
+       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">De Inspección a Fichas, todas las misiones en orden</div>
+       <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idA}"></canvas></div>
+    </div>`;
+}
+
+/* GRÁFICAS — "POR LANZADA": una barra por CADA LANZADA configurada (no por
+   misión) — el % de rondas en que esa lanzada se completó por completo.
+   Debajo, un link por lanzada para saltar a las misiones que la componen
+   sin repetir esas estadísticas acá mismo. */
+function _renderGraficasPorLanzada(rRoja, rAzul, idPrefix){
+  const buildData = (base, subset) => {
+    const lzs = lanzadasConfiguradas.filter(lz=>lz.base===base);
+    const labels = lzs.map(lz=>lz.name);
+    const colors = lzs.map((_,i)=>CHART_PALETTE[i%CHART_PALETTE.length]);
+    const data = lzs.map(lz => {
+      if(!subset.length || !lz.max) return 0;
+      let full=0;
+      subset.forEach(r=>{
+        let pts=0; lz.missions.forEach(mc=>{ const mo=MISSIONS.find(m=>m.code===mc); if(mo) pts+=Math.min(mScoreFor(mo,r.missions), lz.targetPts[mc]||0); });
+        if(pts>=lz.max) full++;
+      });
+      return Math.round((full/subset.length)*100);
+    });
+    return {lzs, labels, data, colors};
+  };
+  const cRoja=buildData('Roja',rRoja), cAzul=buildData('Azul',rAzul);
+  const idR=idPrefix+'LzRoja', idA=idPrefix+'LzAzul';
+  dibujarGrafica(idR, 'bar', cRoja.labels, cRoja.data, '#EF4444', '% Completada', null, cRoja.colors);
+  dibujarGrafica(idA, 'bar', cAzul.labels, cAzul.data, '#3B82F6', '% Completada', null, cAzul.colors);
+  const linksHtml = (info) => info.lzs.length ? `<div style="display:flex;flex-direction:column;gap:5px;margin-top:10px">
+    ${info.lzs.map(lz=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:var(--text2)">
+      <span>${lz.name} <span style="color:var(--text3)">(${lz.missions.join(', ')})</span></span>
+      <button class="btn btn-sm" onclick="_irAMisionDesdeGrafica('${lz.missions[0]}')">Ver misiones →</button>
+    </div>`).join('')}
+  </div>` : '';
+  return `
+    <div style="margin-bottom:20px;">
+       <h3 style="color:var(--red); margin-bottom:4px; font-size:14px; font-weight:800;">% COMPLETADA POR LANZADA — BASE ROJA</h3>
+       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Solo el resultado global de cada estrategia — sin repetir el detalle de misiones</div>
+       ${cRoja.lzs.length?`<div style="background:var(--surface); padding:15px; border-radius:var(--r); height:220px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idR}"></canvas></div>`:`<div class="empty">Sin lanzadas configuradas en Base Roja.</div>`}
+       ${linksHtml(cRoja)}
+    </div>
+    <div>
+       <h3 style="color:var(--blue); margin-bottom:4px; font-size:14px; font-weight:800;">% COMPLETADA POR LANZADA — BASE AZUL</h3>
+       <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Solo el resultado global de cada estrategia — sin repetir el detalle de misiones</div>
+       ${cAzul.lzs.length?`<div style="background:var(--surface); padding:15px; border-radius:var(--r); height:220px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idA}"></canvas></div>`:`<div class="empty">Sin lanzadas configuradas en Base Azul.</div>`}
+       ${linksHtml(cAzul)}
     </div>`;
 }
 
@@ -6392,7 +6464,9 @@ function renderSubPaginaJugador(wd, id) {
   let contentHTML = '';
   if (jugadorDetalleTab === 'porMision' || jugadorDetalleTab === 'porLanzada') {
     if(jugadorDetalleInner === 'graficas'){
-      contentHTML = _renderGraficasMisiones(rRoja, rAzul, 'chartJM');
+      contentHTML = jugadorDetalleTab === 'porLanzada'
+        ? _renderGraficasPorLanzada(rRoja, rAzul, 'chartJM')
+        : _renderGraficasPorMision(rRoja, rAzul, 'chartJM');
     } else {
       const mode = jugadorDetalleTab === 'porLanzada' ? 'lanzada' : 'mision';
       contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)', mode)}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)', mode)}`;
@@ -6483,7 +6557,9 @@ function renderSubPaginaPareja(wd, id) {
   let contentHTML = '';
   if (parejaDetalleTab === 'porMision' || parejaDetalleTab === 'porLanzada') {
     if(parejaDetalleInner === 'graficas'){
-      contentHTML = _renderGraficasMisiones(rRoja, rAzul, 'chartPM');
+      contentHTML = parejaDetalleTab === 'porLanzada'
+        ? _renderGraficasPorLanzada(rRoja, rAzul, 'chartPM')
+        : _renderGraficasPorMision(rRoja, rAzul, 'chartPM');
     } else {
       const mode = parejaDetalleTab === 'porLanzada' ? 'lanzada' : 'mision';
       contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)', mode)}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)', mode)}`;
