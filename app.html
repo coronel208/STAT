@@ -487,6 +487,13 @@ input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--te
 .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--cyan);display:inline-block;margin-left:5px;animation:pulse 1.5s ease-in-out infinite;}
 @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
 
+/* ══ MODAL GENÉRICO ══ */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,20,35,0.6);backdrop-filter:blur(2px);z-index:800;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn 0.15s ease;}
+.modal-box{background:var(--surface);border-radius:var(--r);width:100%;max-width:440px;max-height:82vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);border:2px solid var(--border2);}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px;border-bottom:2px solid var(--border);flex-shrink:0;}
+.modal-title{font-size:14px;font-weight:800;color:var(--heading);}
+.modal-body{padding:16px 18px;overflow-y:auto;}
+
 /* ══ RESPONSIVE ══ */
 @media(max-width:640px){
   .bases-grid,.metric-grid{grid-template-columns:1fr;}
@@ -669,6 +676,13 @@ body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6
 
   </div>
 </div>
+<div id="conn-indicator" style="position:fixed;left:10px;bottom:10px;z-index:600;display:flex;align-items:center;gap:7px;background:rgba(14,31,53,0.92);backdrop-filter:blur(6px);padding:6px 12px;border-radius:20px;box-shadow:var(--shadow-sm);border:1px solid rgba(255,255,255,0.15)" title="Estado de conexión">
+  <span style="display:inline-flex;align-items:center;gap:4px">
+    <span id="dot-net" title="Internet: conectado" style="width:7px;height:7px;border-radius:50%;background:#2BD99A;display:inline-block;transition:background .25s;box-shadow:0 0 4px currentColor"></span>
+    <span id="dot-db" title="Base de datos: conectado" style="width:7px;height:7px;border-radius:50%;background:#2BD99A;display:inline-block;transition:background .25s;box-shadow:0 0 4px currentColor"></span>
+  </span>
+  <span id="hdr-sync-txt" style="font-size:10px;font-weight:700;color:#fff;letter-spacing:.2px">En línea</span>
+</div>
 <header class="hdr">
   <div style="display:flex;align-items:center;gap:12px">
     <div style="display:flex;align-items:center;gap:8px;">
@@ -693,13 +707,6 @@ body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6
 
     <span id="hdr-invite" style="display:none; font-size:10px; font-weight:900; color:#0e1f35; background:#ffb400; padding:3px 8px; border-radius:6px; letter-spacing:1px;"></span>
 
-    <span class="pill" id="hdr-sync" style="display:inline-flex;align-items:center;gap:7px" title="Estado de conexión">
-      <span style="display:inline-flex;align-items:center;gap:4px">
-        <span id="dot-net" title="Internet: conectado" style="width:7px;height:7px;border-radius:50%;background:#2BD99A;display:inline-block;transition:background .25s;box-shadow:0 0 4px currentColor"></span>
-        <span id="dot-db" title="Base de datos: conectado" style="width:7px;height:7px;border-radius:50%;background:#2BD99A;display:inline-block;transition:background .25s;box-shadow:0 0 4px currentColor"></span>
-      </span>
-      <span id="hdr-sync-txt">En línea</span>
-    </span>
     <a href="index.html" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 10px;font-size:11px;text-decoration:none;font-weight:600;letter-spacing:.3px;margin-right:2px">← Inicio</a>
     <button id="hdr-logout" onclick="doLogout()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:none;letter-spacing:0.3px;">Salir</button>
   </div>
@@ -715,6 +722,7 @@ body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6
   <button class="tbtn"        data-tab="admin"          onclick="switchTab('admin')" id="tb-admin" style="display:none; color: var(--gold); border-bottom-color: var(--gold);">⚙️ <span id="txt-tab-admin">Admin</span></button>
 </div>
 <div class="main" id="main"></div>
+<div id="modal-root"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1342,6 +1350,28 @@ function showToast(msg){
   const el=document.getElementById('toast');
   el.textContent=msg;el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'),2400);
+}
+
+/* ── Modal genérico — vive en #modal-root, fuera de #main, para no
+   depender del render() de la pestaña actual ni perderse al cambiar de
+   vista. Úsalo para listas largas (rondas, detalles) que no deben quedar
+   siempre visibles empujando el resto del contenido hacia abajo. ── */
+function openModal(title, bodyHtml){
+  const root=document.getElementById('modal-root');
+  if(!root) return;
+  root.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title">${title}</div>
+        <button class="btn btn-sm" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">${bodyHtml}</div>
+    </div>
+  </div>`;
+}
+function closeModal(){
+  const root=document.getElementById('modal-root');
+  if(root) root.innerHTML='';
 }
 function defaultMState(){
   const s={};
@@ -5194,10 +5224,12 @@ let effSortBy = 'morder_asc'; // <-- Empezamos ordenando M01 -> M15 por defecto
 let lanzadaDetalleTab = 'estadisticas';
 
 let jugadorDetalle = null;
-let jugadorDetalleTab = 'base';
+let jugadorDetalleTab = 'base'; // 'base'|'porMision'|'porLanzada'
+let jugadorDetalleInner = 'stats'; // 'stats'|'graficas' — compartido por porMision/porLanzada
 
 let parejaDetalle = null;
 let parejaDetalleTab = 'base';
+let parejaDetalleInner = 'stats';
 
 let showLanzadaForm = false;
 let editandoLanzadaId = null;
@@ -5552,6 +5584,29 @@ function effByTraining(){
   return groups.map(({label,sub})=>`<div style="font-size:16px;font-weight:900; color:var(--heading); margin-bottom:8px;margin-top:20px;display:flex;align-items:center;gap:10px">${label}<span style="flex:1;height:2px;background:var(--border); display:inline-block"></span></div>${effTable(sub,label)}`).join('');
 }
 
+// Guarda los datos completos de cada mission-card de effTable para poder
+// mostrar el modal de "Ver rondas" sin tener que recalcular ni serializar
+// listas largas dentro de un atributo onclick.
+let _effRoundsCache = {};
+function _showEffRounds(key){
+  const ms = _effRoundsCache[key];
+  if(!ms) return;
+  const chipSection = (title, arr, color) => arr.length ? `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:800;color:${color};margin-bottom:6px">${title} (${arr.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${arr.map(lbl=>`<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;background:${color}22;color:${color};border:1px solid ${color}">${lbl}</span>`).join('')}</div>
+    </div>` : '';
+  const partialSection = ms.partialRounds.length ? `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:800;color:var(--amber);margin-bottom:6px">◑ PARCIALES (${ms.partialRounds.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${ms.partialRounds.map(x=>`<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;background:var(--amber-l);color:var(--amber);border:1px solid var(--amber-b)">${x.lbl} (${x.pts}/${x.maxPts})</span>`).join('')}</div>
+    </div>` : '';
+  const body = chipSection('✓ COMPLETAS AL 100%', ms.fullRounds, 'var(--green)')
+    + partialSection
+    + chipSection('✗ FALLÓ COMPLETAMENTE', ms.failRounds, 'var(--red)');
+  openModal(`${ms.code} · ${ms.name}`, body || '<div class="empty">Sin rondas.</div>');
+}
+
 function effTable(subset, label, customTargets = null){
   if(!subset.length) return `<div class="empty">Sin datos registrados.</div>`;
   const total = subset.length;
@@ -5635,25 +5690,25 @@ function effTable(subset, label, customTargets = null){
     const col = ms.pctFull >= 80 ? 'var(--green)' : ms.pctFull >= 50 ? 'var(--amber)' : 'var(--red)';
     const dKey = 'eff_'+label.replace(/[^a-zA-Z0-9]+/g,'_')+'_'+ms.code;
     const dOpen = !!statsOpen[dKey];
-    // Desglose por parte: fila compacta con mini-barra + % logrado/fallido.
-    // Usamos % (no el conteo crudo) porque con cientos de rondas un número
-    // como "312" no dice nada de un vistazo y además se ve enorme.
+    _effRoundsCache[dKey] = ms;
+    // Desglose por parte: conteo real (✓N ✗N) — no %, porque con datos
+    // recién configurados un solo caso real entre cientos de rondas viejas
+    // redondea a 0% y desaparece. La mini-barra sí es proporcional (ok vs
+    // bad dentro de lo que SÍ se intentó) solo como apoyo visual.
     const detalle = ms.parts.length ? `
       <div style="border-top:1px solid var(--border); padding-top:8px; margin-top:6px;">
         ${ms.parts.map(p=>{
-          const pTotal=p.ok+p.bad+p.sin;
-          const pctOk=pTotal?Math.round((p.ok/pTotal)*100):0;
-          const pctBad=pTotal?Math.round((p.bad/pTotal)*100):0;
-          const rawOk=pTotal?(p.ok/pTotal)*100:0, rawBad=pTotal?(p.bad/pTotal)*100:0;
+          const attempts=p.ok+p.bad;
+          const rawOk=attempts?(p.ok/attempts)*100:0, rawBad=attempts?(p.bad/attempts)*100:0;
           return `<div style="margin-bottom:7px">
             <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:3px">
               <span style="font-size:10.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.bonus?'<span class="btag" style="font-size:8px">BONO</span> ':''}${p.label}</span>
-              <span style="font-size:10.5px;font-weight:800;white-space:nowrap;color:var(--text3)"><span style="color:var(--green)">${pctOk}%✓</span> <span style="color:var(--red)">${pctBad}%✗</span></span>
+              <span style="font-size:10.5px;font-weight:800;white-space:nowrap"><span style="color:var(--green)">✓${p.ok}</span> <span style="color:var(--red)">✗${p.bad}</span></span>
             </div>
-            <div style="display:flex;height:5px;border-radius:3px;overflow:hidden;background:var(--surface3)">
+            ${attempts?`<div style="display:flex;height:5px;border-radius:3px;overflow:hidden;background:var(--surface3)">
               ${rawOk>0?`<div style="width:${rawOk}%;background:var(--green)"></div>`:''}
               ${rawBad>0?`<div style="width:${rawBad}%;background:var(--red)"></div>`:''}
-            </div>
+            </div>`:''}
           </div>`;
         }).join('')}
       </div>` : '';
@@ -5682,9 +5737,11 @@ function effTable(subset, label, customTargets = null){
         <div><span style="color:var(--red); font-weight:800;">${ms.fail}</span> fallidas</div>
       </div>
 
-      ${ms.parts.length ? `
-      <button class="btn btn-sm" style="width:100%;margin-top:2px" onclick="toggleOpen('${dKey}')">${dOpen?'▲ Ocultar desglose por parte':'▾ Ver desglose por parte'}</button>
-      ${dOpen?detalle:''}` : ''}
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" style="flex:1" onclick="_showEffRounds('${dKey}')">👁 Ver rondas</button>
+        ${ms.parts.length ? `<button class="btn btn-sm" style="flex:1" onclick="toggleOpen('${dKey}')">${dOpen?'▲ Ocultar por parte':'▾ Por parte'}</button>` : ''}
+      </div>
+      ${dOpen?detalle:''}
     </div>`;
   }).join('');
   
@@ -6049,13 +6106,28 @@ function renderSubPaginaLanzada(wd, id) {
     </div>`;
 }
 
-/* Toggle "por lanzada" vs "por misión" dentro del desglose de un jugador/
-   pareja/cuadrilla — compartido entre Roja y Azul, no hace falta uno por base. */
+/* Toggle "por lanzada" vs "por misión" — solo se usa cuando renderDesgloseMisiones
+   se llama SIN mode explícito (hoy: la tarjeta embebida de cuadrillas). Jugador
+   y pareja tienen sus propias pestañas de arriba y pasan el mode directo. */
 let _desgloseSub = 'lanzada';
 function _setDesgloseSub(v){ _desgloseSub=v; render(); }
 
-/* ── FUNCIÓN REUTILIZABLE: RENDERIZAR MISIONES AGRUPADAS Y CONTADORES ── */
-function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS) {
+let _lzRoundsCache = {};
+function _showLzRounds(key){
+  const info = _lzRoundsCache[key];
+  if(!info) return;
+  const chip=(lbl,pts,max)=>`<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;background:var(--green-l);color:var(--green-d);border:1px solid var(--green-b)">${lbl} (${pts}/${max})</span>`;
+  const body = info.rounds.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:5px">${info.rounds.map(r=>chip(r.lbl,r.pts,r.max)).join('')}</div>`
+    : '<div class="empty">Todavía no se ha completado por completo.</div>';
+  openModal(`🎯 ${info.name}`, body);
+}
+
+/* ── FUNCIÓN REUTILIZABLE: RENDERIZAR MISIONES AGRUPADAS Y CONTADORES ──
+   mode: 'lanzada'|'mision' — si se omite, muestra su propio toggle interno
+   (uso embebido, ej. cuadrillas). Jugador/pareja pasan el mode fijo porque
+   ya tienen sus propias pestañas "POR MISIÓN"/"POR LANZADA" arriba. */
+function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS, mode) {
   if(!rondasBase.length) return `<div class="empty">Sin rondas jugadas en Base ${baseNombre}.</div>`;
   const lzBase = lanzadasConfiguradas.filter(lz => lz.base === baseNombre);
   let maxBase = 0; lzBase.forEach(lz => maxBase += lz.max);
@@ -6100,24 +6172,32 @@ function renderDesgloseMisiones(rondasBase, baseNombre, colorCSS) {
           </div>
        </div>
        <div style="padding:15px; background:var(--surface2);">
-       <div style="display:flex;gap:6px;margin-bottom:14px">
-         <button onclick="_setDesgloseSub('lanzada')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${_desgloseSub==='lanzada'?colorCSS:'var(--border2)'};background:${_desgloseSub==='lanzada'?colorCSS:'var(--surface)'};color:${_desgloseSub==='lanzada'?'#fff':'var(--text2)'};cursor:pointer">Por lanzada</button>
-         <button onclick="_setDesgloseSub('mision')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${_desgloseSub==='mision'?colorCSS:'var(--border2)'};background:${_desgloseSub==='mision'?colorCSS:'var(--surface)'};color:${_desgloseSub==='mision'?'#fff':'var(--text2)'};cursor:pointer">Por misión</button>
-       </div>
   `;
-  if(_desgloseSub==='mision'){
+  const effMode = mode || _desgloseSub;
+  if(!mode){
+    html += `<div style="display:flex;gap:6px;margin-bottom:14px">
+      <button onclick="_setDesgloseSub('lanzada')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${effMode==='lanzada'?colorCSS:'var(--border2)'};background:${effMode==='lanzada'?colorCSS:'var(--surface)'};color:${effMode==='lanzada'?'#fff':'var(--text2)'};cursor:pointer">Por lanzada</button>
+      <button onclick="_setDesgloseSub('mision')" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${effMode==='mision'?colorCSS:'var(--border2)'};background:${effMode==='mision'?colorCSS:'var(--surface)'};color:${effMode==='mision'?'#fff':'var(--text2)'};cursor:pointer">Por misión</button>
+    </div>`;
+  }
+  if(effMode==='mision'){
     html += effTable(rondasBase, `Todas las misiones — Base ${baseNombre}`);
   } else if(!lzBase.length) {
     html += `<div class="empty">No hay lanzadas configuradas para esta base.</div>`;
   } else {
     lzBase.forEach(lz => {
-      let lzFullCount=0;
+      const lzKey = 'lzrounds_'+baseNombre+'_'+lz.id;
+      const fullRounds=[];
       rondasBase.forEach(r=>{
         let pts=0;
         lz.missions.forEach(mc=>{ const mo=MISSIONS.find(m=>m.code===mc); if(mo) pts+=Math.min(mScoreFor(mo,r.missions), lz.targetPts[mc]||0); });
-        if(lz.max>0 && pts>=lz.max) lzFullCount++;
+        if(lz.max>0 && pts>=lz.max) fullRounds.push({lbl:runLabel(r,runs.indexOf(r)), pts, max:lz.max});
       });
-      html += `<div style="font-size:11px;font-weight:800;color:${colorCSS};margin-bottom:6px">🎯 "${lz.name}" completada por completo: ${lzFullCount} ${lzFullCount===1?'vez':'veces'}</div>`;
+      _lzRoundsCache[lzKey] = {name:lz.name, rounds:fullRounds};
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:800;color:${colorCSS}">🎯 "${lz.name}" completada por completo: ${fullRounds.length} ${fullRounds.length===1?'vez':'veces'}</span>
+        ${fullRounds.length?`<button class="btn btn-sm" onclick="_showLzRounds('${lzKey}')">👁 Ver</button>`:''}
+      </div>`;
       html += effTable(rondasBase, `LANZADA: ${lz.name}`, lz.targetPts);
     });
   }
@@ -6214,7 +6294,63 @@ function renderEfectividadJugadores(wd) {
   return `<div style="animation: fadeIn 0.3s ease;">${bar}${stats}</div>`;
 }
 
-/* ── 5.1 DETALLE JUGADOR (CON COLORES CHARTJS ARREGLADOS) ── */
+/* Gráficas de % de éxito por misión (agrupadas por lanzada, con leyenda de
+   colores) — se reutiliza igual en la pestaña "Por misión" y "Por lanzada",
+   la separación entre esas dos pestañas es sobre las ESTADÍSTICAS, no hace
+   falta duplicar la gráfica. idPrefix evita choques de <canvas id> cuando
+   hay varias páginas de detalle en juego (jugador vs pareja vs cuadrilla). */
+function _renderGraficasMisiones(rRoja, rAzul, idPrefix){
+  const buildChartData = (base) => {
+      const info=[], legend=[]; let cIdx=0;
+      lanzadasConfiguradas.filter(lz=>lz.base===base).forEach(lz => {
+         const col = CHART_PALETTE[cIdx%CHART_PALETTE.length]; cIdx++;
+         legend.push(`<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2); font-weight:600;"><div style="width:10px;height:10px;background:${col};border-radius:2px;"></div>${lz.name}</div>`);
+         lz.missions.forEach(mc => info.push({code:mc, target:lz.targetPts[mc], color:col}));
+      });
+      const labels = info.map(i=>i.code); const colors = info.map(i=>i.color);
+      const data = info.map(i => {
+         const mo=MISSIONS.find(m=>m.code===i.code); let f=0;
+         (base==='Roja'?rRoja:rAzul).forEach(r => { if(Math.min(mScoreFor(mo, r.missions), i.target)>=i.target && i.target>0) f++; });
+         return Math.round((f/((base==='Roja'?rRoja.length:rAzul.length)||1))*100);
+      });
+      return {labels, data, colors, legendHTML: legend.join('')};
+  };
+
+  const cRoja = buildChartData('Roja'); const cAzul = buildChartData('Azul');
+  const idR = idPrefix+'Roja', idA = idPrefix+'Azul';
+  dibujarGrafica(idR, 'bar', cRoja.labels, cRoja.data, '#EF4444', '% Éxito', null, cRoja.colors);
+  dibujarGrafica(idA, 'bar', cAzul.labels, cAzul.data, '#3B82F6', '% Éxito', null, cAzul.colors);
+
+  return `
+    <div style="margin-bottom:20px;">
+       <h3 style="color:var(--red); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD - BASE ROJA</h3>
+       <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idR}"></canvas></div>
+       <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cRoja.legendHTML}</div>
+    </div>
+    <div>
+       <h3 style="color:var(--blue); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD - BASE AZUL</h3>
+       <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="${idA}"></canvas></div>
+       <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cAzul.legendHTML}</div>
+    </div>`;
+}
+
+/* Barra de pestañas RESUMEN / POR MISIÓN / POR LANZADA + su sub-pestaña
+   interna Estadísticas/Gráficas (solo aplica dentro de las dos últimas). */
+function _renderDetalleTabs(tabVal, innerVal, setTab, setInner){
+  const btnStyle = (t) => `flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${tabVal===t?'var(--teal)':'var(--border2)'}; font-weight:800; cursor:pointer; background:${tabVal===t?'var(--teal)':'var(--surface)'}; color:${tabVal===t?'#fff':'var(--text3)'}; transition:var(--transition); font-size:12px;`;
+  const innerBtn = (t,lbl) => `<button onclick="${setInner}('${t}'); render();" style="flex:1;padding:7px;font-size:11px;font-weight:800;border-radius:var(--rs);border:1.5px solid ${innerVal===t?'var(--teal)':'var(--border2)'};background:${innerVal===t?'var(--teal)':'var(--surface)'};color:${innerVal===t?'#fff':'var(--text2)'};cursor:pointer">${lbl}</button>`;
+  const showInner = tabVal==='porMision' || tabVal==='porLanzada';
+  return `
+    <div style="display:flex; gap:8px; margin-bottom:${showInner?'12px':'20px'}; flex-wrap:wrap;">
+      <button onclick="${setTab}('base'); render();" style="${btnStyle('base')}">RESUMEN</button>
+      <button onclick="${setTab}('porMision'); render();" style="${btnStyle('porMision')}">POR MISIÓN</button>
+      <button onclick="${setTab}('porLanzada'); render();" style="${btnStyle('porLanzada')}">POR LANZADA</button>
+    </div>
+    ${showInner?`<div style="display:flex;gap:6px;margin-bottom:20px">${innerBtn('stats','📊 Estadísticas')}${innerBtn('graficas','📈 Gráficas')}</div>`:''}
+  `;
+}
+
+/* ── 5.1 DETALLE JUGADOR ── */
 function renderSubPaginaJugador(wd, id) {
   const p = players.find(x => x.id === id);
   if (!p) { jugadorDetalle = null; return ''; }
@@ -6222,40 +6358,13 @@ function renderSubPaginaJugador(wd, id) {
   const rAzul = wd.filter(r => r.azulP1 === p.id || r.azulP2 === p.id);
 
   let contentHTML = '';
-  if (jugadorDetalleTab === 'mision') {
-    contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)')}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)')}`;
-  } else if (jugadorDetalleTab === 'graficas') {
-    const buildChartData = (base) => {
-        const info=[], legend=[]; let cIdx=0;
-        lanzadasConfiguradas.filter(lz=>lz.base===base).forEach(lz => {
-           const col = CHART_PALETTE[cIdx%CHART_PALETTE.length]; cIdx++;
-           legend.push(`<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2); font-weight:600;"><div style="width:10px;height:10px;background:${col};border-radius:2px;"></div>${lz.name}</div>`);
-           lz.missions.forEach(mc => info.push({code:mc, target:lz.targetPts[mc], color:col}));
-        });
-        const labels = info.map(i=>i.code); const colors = info.map(i=>i.color);
-        const data = info.map(i => {
-           const mo=MISSIONS.find(m=>m.code===i.code); let f=0;
-           (base==='Roja'?rRoja:rAzul).forEach(r => { if(Math.min(mScoreFor(mo, r.missions), i.target)>=i.target && i.target>0) f++; });
-           return Math.round((f/((base==='Roja'?rRoja.length:rAzul.length)||1))*100);
-        });
-        return {labels, data, colors, legendHTML: legend.join('')};
-    };
-
-    const cRoja = buildChartData('Roja'); const cAzul = buildChartData('Azul');
-    dibujarGrafica('chartJMRoja', 'bar', cRoja.labels, cRoja.data, '#EF4444', '% Éxito', null, cRoja.colors);
-    dibujarGrafica('chartJMAzul', 'bar', cAzul.labels, cAzul.data, '#3B82F6', '% Éxito', null, cAzul.colors);
-    
-    contentHTML = `
-      <div style="margin-bottom:20px;">
-         <h3 style="color:var(--red); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD - BASE ROJA</h3>
-         <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartJMRoja"></canvas></div>
-         <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cRoja.legendHTML}</div>
-      </div>
-      <div>
-         <h3 style="color:var(--blue); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD - BASE AZUL</h3>
-         <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartJMAzul"></canvas></div>
-         <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cAzul.legendHTML}</div>
-      </div>`;
+  if (jugadorDetalleTab === 'porMision' || jugadorDetalleTab === 'porLanzada') {
+    if(jugadorDetalleInner === 'graficas'){
+      contentHTML = _renderGraficasMisiones(rRoja, rAzul, 'chartJM');
+    } else {
+      const mode = jugadorDetalleTab === 'porLanzada' ? 'lanzada' : 'mision';
+      contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)', mode)}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)', mode)}`;
+    }
   } else {
     const rolCount=(subset,base)=>{
       const lz=subset.filter(r=>r[base+'LanzadorId']===p.id).length;
@@ -6271,13 +6380,13 @@ function renderSubPaginaJugador(wd, id) {
       </div>` : '';
     contentHTML = `
       ${summaryBlock}
-      <div style="display:flex; gap:15px;">
-         <div style="flex:1; background:var(--red-l); padding:20px; border-radius:var(--r); border:2px solid var(--red-b); text-align:center;">
+      <div style="display:flex; gap:15px; flex-wrap:wrap;">
+         <div style="flex:1; min-width:160px; background:var(--red-l); padding:20px; border-radius:var(--r); border:2px solid var(--red-b); text-align:center;">
            <h3 style="color:var(--red); margin:0; font-weight:800;">BASE ROJA</h3>
            <div style="font-size:14px; color:var(--text2); margin-top:5px; font-weight:600;">${rRoja.length} Rondas Jugadas</div>
            ${rolCount(rRoja,'roja')}
          </div>
-         <div style="flex:1; background:var(--blue-l); padding:20px; border-radius:var(--r); border:2px solid var(--blue-b); text-align:center;">
+         <div style="flex:1; min-width:160px; background:var(--blue-l); padding:20px; border-radius:var(--r); border:2px solid var(--blue-b); text-align:center;">
            <h3 style="color:var(--blue); margin:0; font-weight:800;">BASE AZUL</h3>
            <div style="font-size:14px; color:var(--text2); margin-top:5px; font-weight:600;">${rAzul.length} Rondas Jugadas</div>
            ${rolCount(rAzul,'azul')}
@@ -6285,18 +6394,16 @@ function renderSubPaginaJugador(wd, id) {
       </div>`;
   }
 
-  const btnStyle = (t) => `flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${jugadorDetalleTab===t?'var(--teal)':'var(--border2)'}; font-weight:800; cursor:pointer; background:${jugadorDetalleTab===t?'var(--teal)':'var(--surface)'}; color:${jugadorDetalleTab===t?'#fff':'var(--text3)'}; transition:var(--transition);`;
   return `
     <div style="animation: fadeIn 0.3s ease;">
       <button onclick="jugadorDetalle=null; render();" class="btn btn-sm" style="margin-bottom:15px;">← VOLVER</button>
       <h1 style="color:var(--heading); margin:0 0 20px 0; font-size:24px; font-weight:800;">👤 ${p.name}</h1>
-      <div style="display:flex; gap:10px; margin-bottom:20px;">
-        <button onclick="jugadorDetalleTab='base'; render();" style="${btnStyle('base')}">RESUMEN</button>
-        <button onclick="jugadorDetalleTab='mision'; render();" style="${btnStyle('mision')}">ESTADÍSTICA POR MISIÓN</button>
-        <button onclick="jugadorDetalleTab='graficas'; render();" style="${btnStyle('graficas')}">GRÁFICAS DE MISIONES</button>
-      </div>${contentHTML}
+      ${_renderDetalleTabs(jugadorDetalleTab, jugadorDetalleInner, '_setJugadorDetalleTab', '_setJugadorDetalleInner')}
+      ${contentHTML}
     </div>`;
 }
+function _setJugadorDetalleTab(t){ jugadorDetalleTab=t; }
+function _setJugadorDetalleInner(t){ jugadorDetalleInner=t; }
 
 /* ── 6. EFECTIVIDAD PAREJAS ── */
 function renderEfectividadParejas(wd) {
@@ -6342,40 +6449,13 @@ function renderSubPaginaPareja(wd, id) {
   const rAzul = wd.filter(r => [r.azulP1, r.azulP2].sort().join('-') === id);
 
   let contentHTML = '';
-  if (parejaDetalleTab === 'mision') {
-    contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)')}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)')}`;
-  } else if (parejaDetalleTab === 'graficas') {
-    const buildChartData = (base) => {
-        const info=[], legend=[]; let cIdx=0;
-        lanzadasConfiguradas.filter(lz=>lz.base===base).forEach(lz => {
-           const col = CHART_PALETTE[cIdx%CHART_PALETTE.length]; cIdx++;
-           legend.push(`<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2); font-weight:600;"><div style="width:10px;height:10px;background:${col};border-radius:2px;"></div>${lz.name}</div>`);
-           lz.missions.forEach(mc => info.push({code:mc, target:lz.targetPts[mc], color:col}));
-        });
-        const labels = info.map(i=>i.code); const colors = info.map(i=>i.color);
-        const data = info.map(i => {
-           const mo=MISSIONS.find(m=>m.code===i.code); let f=0;
-           (base==='Roja'?rRoja:rAzul).forEach(r => { if(Math.min(mScoreFor(mo, r.missions), i.target)>=i.target && i.target>0) f++; });
-           return Math.round((f/((base==='Roja'?rRoja.length:rAzul.length)||1))*100);
-        });
-        return {labels, data, colors, legendHTML: legend.join('')};
-    };
-
-    const cRoja = buildChartData('Roja'); const cAzul = buildChartData('Azul');
-    dibujarGrafica('chartPMRoja', 'bar', cRoja.labels, cRoja.data, '#EF4444', '% Éxito', null, cRoja.colors);
-    dibujarGrafica('chartPMAzul', 'bar', cAzul.labels, cAzul.data, '#3B82F6', '% Éxito', null, cAzul.colors);
-    
-    contentHTML = `
-      <div style="margin-bottom:20px;">
-         <h3 style="color:var(--red); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD COMO PAREJA - BASE ROJA</h3>
-         <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartPMRoja"></canvas></div>
-         <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cRoja.legendHTML}</div>
-      </div>
-      <div>
-         <h3 style="color:var(--blue); margin-bottom:10px; font-size:14px; font-weight:800;">% DE COMPLETITUD COMO PAREJA - BASE AZUL</h3>
-         <div style="background:var(--surface); padding:15px; border-radius:var(--r); height:250px; margin-bottom:10px; border:2px solid var(--border); box-shadow:var(--shadow-sm);"><canvas id="chartPMAzul"></canvas></div>
-         <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;">${cAzul.legendHTML}</div>
-      </div>`;
+  if (parejaDetalleTab === 'porMision' || parejaDetalleTab === 'porLanzada') {
+    if(parejaDetalleInner === 'graficas'){
+      contentHTML = _renderGraficasMisiones(rRoja, rAzul, 'chartPM');
+    } else {
+      const mode = parejaDetalleTab === 'porLanzada' ? 'lanzada' : 'mision';
+      contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)', mode)}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)', mode)}`;
+    }
   } else {
     const allScores=[...rRoja,...rAzul].map(r=>Number(r.score));
     const summaryBlock = allScores.length ? `
@@ -6393,13 +6473,13 @@ function renderSubPaginaPareja(wd, id) {
     };
     contentHTML = `
       ${summaryBlock}
-      <div style="display:flex; gap:15px;">
-         <div style="flex:1; background:var(--red-l); padding:20px; border-radius:var(--r); border:2px solid var(--red-b); text-align:center;">
+      <div style="display:flex; gap:15px; flex-wrap:wrap;">
+         <div style="flex:1; min-width:160px; background:var(--red-l); padding:20px; border-radius:var(--r); border:2px solid var(--red-b); text-align:center;">
            <h3 style="color:var(--red); margin:0; font-weight:800;">BASE ROJA</h3>
            <div style="font-size:14px; color:var(--text2); margin-top:5px; font-weight:600;">${rRoja.length} Rondas Jugadas Juntos</div>
            ${rolCount(rRoja,'roja')}
          </div>
-         <div style="flex:1; background:var(--blue-l); padding:20px; border-radius:var(--r); border:2px solid var(--blue-b); text-align:center;">
+         <div style="flex:1; min-width:160px; background:var(--blue-l); padding:20px; border-radius:var(--r); border:2px solid var(--blue-b); text-align:center;">
            <h3 style="color:var(--blue); margin:0; font-weight:800;">BASE AZUL</h3>
            <div style="font-size:14px; color:var(--text2); margin-top:5px; font-weight:600;">${rAzul.length} Rondas Jugadas Juntos</div>
            ${rolCount(rAzul,'azul')}
@@ -6407,18 +6487,16 @@ function renderSubPaginaPareja(wd, id) {
       </div>`;
   }
 
-  const btnStyle = (t) => `flex:1; padding:10px; border-radius:var(--rs); border:2px solid ${parejaDetalleTab===t?'var(--teal)':'var(--border2)'}; font-weight:800; cursor:pointer; background:${parejaDetalleTab===t?'var(--teal)':'var(--surface)'}; color:${parejaDetalleTab===t?'#fff':'var(--text3)'}; transition:var(--transition);`;
   return `
     <div style="animation: fadeIn 0.3s ease;">
       <button onclick="parejaDetalle=null; render();" class="btn btn-sm" style="margin-bottom:15px;">← VOLVER</button>
       <h1 style="color:var(--heading); margin:0 0 20px 0; font-size:24px; font-weight:800;">👥 ${getP(pIds[0])} & ${getP(pIds[1])}</h1>
-      <div style="display:flex; gap:10px; margin-bottom:20px;">
-        <button onclick="parejaDetalleTab='base'; render();" style="${btnStyle('base')}">RESUMEN</button>
-        <button onclick="parejaDetalleTab='mision'; render();" style="${btnStyle('mision')}">ESTADÍSTICA POR MISIÓN</button>
-        <button onclick="parejaDetalleTab='graficas'; render();" style="${btnStyle('graficas')}">GRÁFICAS DE MISIONES</button>
-      </div>${contentHTML}
+      ${_renderDetalleTabs(parejaDetalleTab, parejaDetalleInner, '_setParejaDetalleTab', '_setParejaDetalleInner')}
+      ${contentHTML}
     </div>`;
 }
+function _setParejaDetalleTab(t){ parejaDetalleTab=t; }
+function _setParejaDetalleInner(t){ parejaDetalleInner=t; }
 /* ═══════════════════════════════════════════
    ACTIONS
 ═══════════════════════════════════════════ */
