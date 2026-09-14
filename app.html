@@ -4960,15 +4960,52 @@ function _computeAwards(){
 
   const playerStats=players.map(p=>{
     if(!checkEsUsuario(p.id)) return null;
-    const scores=[]; let rounds=0;
+    const entries=[];
     roundBases.forEach(({r,ro,az})=>{
-      if(ro[0]===p.id||ro[1]===p.id||az[0]===p.id||az[1]===p.id){ rounds++; scores.push(Number(r.score)||0); }
+      if(ro[0]===p.id||ro[1]===p.id||az[0]===p.id||az[1]===p.id) entries.push({ts:r.ts||0, score:Number(r.score)||0});
     });
-    if(!rounds) return null;
-    return {p, rounds, avg:avg(scores)};
+    if(!entries.length) return null;
+    const scores=entries.map(e=>e.score);
+    return {p, rounds:entries.length, avg:avg(scores), scores, entries};
   }).filter(Boolean);
   const mvp = playerStats.length ? playerStats.reduce((a,x)=>x.avg>a.avg?x:a) : null;
   const masLanzado = playerStats.length ? playerStats.reduce((a,x)=>x.rounds>a.rounds?x:a) : null;
+
+  // El Más Mejorado: compara el promedio de la primera mitad de SUS rondas
+  // (en orden cronológico) contra la segunda mitad — necesita al menos 4
+  // rondas para que la comparación diga algo.
+  let masMejorado=null;
+  playerStats.forEach(x=>{
+    if(x.rounds<4) return;
+    const sorted=[...x.entries].sort((a,b)=>a.ts-b.ts);
+    const mid=Math.floor(sorted.length/2);
+    const firstAvg=avg(sorted.slice(0,mid).map(e=>e.score));
+    const secondAvg=avg(sorted.slice(mid).map(e=>e.score));
+    const delta=secondAvg-firstAvg;
+    if(delta>0 && (!masMejorado || delta>masMejorado.delta)) masMejorado={p:x.p, delta:Math.round(delta), firstAvg, secondAvg};
+  });
+
+  // El Más Constante: menor desviación estándar de puntaje, con al menos
+  // 3 rondas para que "constante" tenga sentido.
+  let masConstante=null;
+  playerStats.forEach(x=>{
+    if(x.rounds<3) return;
+    const m=x.avg;
+    const variance=x.scores.reduce((a,s)=>a+(s-m)*(s-m),0)/x.scores.length;
+    const sd=Math.round(Math.sqrt(variance));
+    if(!masConstante || sd<masConstante.sd) masConstante={p:x.p, sd, avg:x.avg, rounds:x.rounds};
+  });
+
+  // La Promesa: mejor promedio entre quienes han jugado pocas rondas todavía
+  // (hasta 40% de las rondas de quien más ha jugado) — resalta talento nuevo.
+  let promesa=null;
+  if(playerStats.length>=2){
+    const maxRounds=Math.max(...playerStats.map(x=>x.rounds));
+    const cutoff=Math.max(1, Math.ceil(maxRounds*0.4));
+    playerStats.filter(x=>x.rounds<=cutoff).forEach(x=>{
+      if(!promesa || x.avg>promesa.avg) promesa={p:x.p, avg:x.avg, rounds:x.rounds};
+    });
+  }
 
   const pairMap={};
   roundBases.forEach(({r,ro,az})=>{
@@ -4982,6 +5019,14 @@ function _computeAwards(){
   });
   const pairArr=Object.values(pairMap).filter(x=>checkEsUsuario(x.p1)||checkEsUsuario(x.p2));
   const parejaFiel = pairArr.length ? pairArr.reduce((a,x)=>x.rounds>a.rounds?x:a) : null;
+
+  // La Dupla Dorada: mejor promedio en pareja (no la más frecuente, la más efectiva).
+  let duplaDorada=null;
+  pairArr.forEach(x=>{
+    if(x.rounds<2) return;
+    const a=avg(x.scores);
+    if(!duplaDorada || a>duplaDorada.avg) duplaDorada={...x, avg:a};
+  });
 
   const cuaMap={};
   roundBases.forEach(({r,ro,az})=>{
@@ -5001,19 +5046,24 @@ function _computeAwards(){
     if(!cuaBest || a>cuaBest.avg) cuaBest={name:_bestName(g.names)||'Cuadrilla sin nombre', avg:a, rounds:g.scores.length};
   });
 
-  return {mvp, masLanzado, parejaFiel, cuaBest};
+  return {mvp, masLanzado, parejaFiel, cuaBest, masMejorado, masConstante, promesa, duplaDorada};
 }
 function _renderAwardsBlock(){
-  const {mvp, masLanzado, parejaFiel, cuaBest} = _computeAwards();
-  if(!mvp && !masLanzado && !parejaFiel && !cuaBest) return '';
+  const {mvp, masLanzado, parejaFiel, cuaBest, masMejorado, masConstante, promesa, duplaDorada} = _computeAwards();
+  if(!mvp && !masLanzado && !parejaFiel && !cuaBest && !masMejorado && !masConstante && !promesa && !duplaDorada) return '';
   const getP=(pid)=>{ const p=players.find(x=>x.id===pid); return p?p.name:'---'; };
+  const irJugador=(pid)=>`jugadorDetalle='${pid}';jugadorDetalleTab='base';render();`;
   return `<div style="margin-bottom:16px">
     <div style="font-size:11px;color:var(--text3);font-weight:700;margin-bottom:8px">🏅 Reconocimientos — desliza para ver más</div>
     <div class="awards-slider">
-      ${mvp?_awardCard('🏆','Jugador Más Valioso',mvp.p.name,`Promedio ${mvp.avg} pts · ${mvp.rounds} ronda${mvp.rounds!==1?'s':''}`,'var(--gold)',`jugadorDetalle='${mvp.p.id}';jugadorDetalleTab='base';render();`):''}
-      ${masLanzado?_awardCard('🚀','El Más Lanzado',masLanzado.p.name,`${masLanzado.rounds} ronda${masLanzado.rounds!==1?'s':''} jugada${masLanzado.rounds!==1?'s':''}`,'var(--teal)',`jugadorDetalle='${masLanzado.p.id}';jugadorDetalleTab='base';render();`):''}
+      ${mvp?_awardCard('🏆','Jugador Más Valioso',mvp.p.name,`Promedio ${mvp.avg} pts · ${mvp.rounds} ronda${mvp.rounds!==1?'s':''}`,'var(--gold)',irJugador(mvp.p.id)):''}
+      ${masLanzado?_awardCard('🚀','El Más Lanzado',masLanzado.p.name,`${masLanzado.rounds} ronda${masLanzado.rounds!==1?'s':''} jugada${masLanzado.rounds!==1?'s':''}`,'var(--teal)',irJugador(masLanzado.p.id)):''}
       ${parejaFiel?_awardCard('💞','La Pareja Más Fiel',`${getP(parejaFiel.p1)} &amp; ${getP(parejaFiel.p2)}`,`${parejaFiel.rounds} ronda${parejaFiel.rounds!==1?'s':''} juntos`,'var(--red)',`parejaDetalle='${parejaFiel.id}';parejaDetalleTab='base';render();`):''}
       ${cuaBest?_awardCard('🌌','La Cuadrilla Galáctica',cuaBest.name,`Promedio ${cuaBest.avg} pts · ${cuaBest.rounds} rondas`,'var(--cyan)',null):''}
+      ${duplaDorada?_awardCard('🌟','La Dupla Dorada',`${getP(duplaDorada.p1)} &amp; ${getP(duplaDorada.p2)}`,`Promedio ${duplaDorada.avg} pts · ${duplaDorada.rounds} rondas`,'var(--amber)',`parejaDetalle='${duplaDorada.id}';parejaDetalleTab='base';render();`):''}
+      ${masMejorado?_awardCard('📈','El Más Mejorado',masMejorado.p.name,`${masMejorado.firstAvg}→${masMejorado.secondAvg} pts (+${masMejorado.delta})`,'var(--green)',irJugador(masMejorado.p.id)):''}
+      ${masConstante?_awardCard('🎯','El Más Constante',masConstante.p.name,`±${masConstante.sd} pts · ${masConstante.rounds} rondas`,'var(--blue)',irJugador(masConstante.p.id)):''}
+      ${promesa?_awardCard('🐣','La Promesa',promesa.p.name,`Promedio ${promesa.avg} pts en ${promesa.rounds} ronda${promesa.rounds!==1?'s':''}`,'#EC4899',irJugador(promesa.p.id)):''}
     </div>
   </div>`;
 }
