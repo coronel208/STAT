@@ -4958,11 +4958,16 @@ function _computeAwards(){
   // viejas guardadas solo por pareja quedaban sub-contados.
   const roundBases = runsFiltradas.map(r=>({r, ro:_runBasePlayers(r,'roja'), az:_runBasePlayers(r,'azul')}));
 
+  // Igual que renderEfectividadJugadores/renderSubPaginaJugador: si la misma
+  // persona quedó anotada en AMBAS bases del mismo registro de ronda, cuenta
+  // como 2 lanzadas (una por base), no como 1 — así "Rondas" siempre coincide
+  // con lo que ya muestra el resto de la app (base roja + base azul).
   const playerStats=players.map(p=>{
     if(!checkEsUsuario(p.id)) return null;
     const entries=[];
     roundBases.forEach(({r,ro,az})=>{
-      if(ro[0]===p.id||ro[1]===p.id||az[0]===p.id||az[1]===p.id) entries.push({ts:r.ts||0, score:Number(r.score)||0});
+      if(ro[0]===p.id||ro[1]===p.id) entries.push({ts:r.ts||0, score:Number(r.score)||0});
+      if(az[0]===p.id||az[1]===p.id) entries.push({ts:r.ts||0, score:Number(r.score)||0});
     });
     if(!entries.length) return null;
     const scores=entries.map(e=>e.score);
