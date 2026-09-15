@@ -1197,7 +1197,10 @@ function save() {
         [`${seasonPath}/trainings`]: trainings,
         [`${seasonPath}/runs`]: runs,
         [`${seasonPath}/lanzadas`]: lanzadasConfiguradas,
-        [`${seasonPath}/missionOverrides`]: missionOverrides
+        [`${seasonPath}/missionOverrides`]: missionOverrides,
+        [`${seasonPath}/perfTests`]: perfTests,
+        [`${seasonPath}/perfAttempts`]: perfAttempts,
+        [`${seasonPath}/adjustments`]: adjustments
       };
 
       await db.ref().update(updates);
@@ -1257,6 +1260,9 @@ function _aplicarDatosTemporada(seasonObj){
   runs = d.runs || [];
   lanzadasConfiguradas = d.lanzadas || [];
   missionOverrides = d.missionOverrides || {};
+  perfTests = d.perfTests || [];
+  perfAttempts = d.perfAttempts || [];
+  adjustments = d.adjustments || [];
   const key = (seasonObj && seasonObj.meta && seasonObj.meta.missionSetKey) || 'unearthed';
   MISSIONS = MISSIONS_BY_SEASON[key] || MISSIONS_UNEARTHED;
   currentMissionSetKey = key;
@@ -1405,6 +1411,9 @@ function startRealtimeSync(){
       runs     = d.runs      || [];
       lanzadasConfiguradas = d.lanzadas || [];
       missionOverrides = d.missionOverrides || {};
+      perfTests = d.perfTests || [];
+      perfAttempts = d.perfAttempts || [];
+      adjustments = d.adjustments || [];
       if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
       render();
     }
@@ -2147,11 +2156,160 @@ function renderHomeMenu(){
 }
 
 /* ── Módulo "Pruebas de Rendimiento" — llega en la Fase 4 ── */
+/* ── Módulo "Pruebas de Rendimiento" (Fase 4) ──
+   Igual de scoped a la temporada activa que runs/trainings: el robot se
+   rediseña cada temporada, así que no tiene sentido comparar pruebas de
+   robots distintos. Reusa a propósito los mismos componentes visuales que
+   el resto de la app (.card/.coll-card, openModal, dibujarGrafica, _arrow,
+   toggleOpen) en vez de inventar nada nuevo. */
+let rendimientoSubTab = 'pruebas'; // 'pruebas' | 'bitacora'
+function _setRendimientoSubTab(t){ rendimientoSubTab = t; render(); }
+
 function renderRendimiento(){
+  const esAdmin = esAdminActual();
+  const bar = (k,l)=>`<button class="sub-tbtn ${rendimientoSubTab===k?'active':''}" onclick="_setRendimientoSubTab('${k}')">${l}</button>`;
+  const body = rendimientoSubTab==='bitacora' ? _renderBitacora(esAdmin) : _renderPruebasList(esAdmin);
   return `<div style="animation:fadeIn 0.3s ease">
     <button onclick="_irAlModulo('menu')" class="btn btn-sm" style="margin-bottom:15px">← Menú principal</button>
-    <div class="empty">🚧 Pruebas de Rendimiento llega en el siguiente paso.</div>
+    <h1 style="margin:0 0 16px;font-size:22px;font-weight:800;color:var(--heading)">🧪 Pruebas de Rendimiento</h1>
+    <div class="sub-tabs">
+      ${bar('pruebas','🧪 Pruebas')}
+      ${bar('bitacora','🔧 Bitácora de ajustes')}
+    </div>
+    ${body}
   </div>`;
+}
+
+function _renderPruebasList(esAdmin){
+  const addBtn = esAdmin ? `<button class="btn btn-cyan" style="width:100%;margin-bottom:14px" onclick="_abrirFormPrueba()">＋ Nueva prueba</button>` : '';
+  if(!perfTests.length) return addBtn + `<div class="empty">Todavía no hay pruebas registradas.</div>`;
+
+  const cards = perfTests.map(t=>{
+    const attempts = perfAttempts.filter(a=>a.testId===t.id).sort((a,b)=>a.ts-b.ts);
+    const key = 'perf_'+t.id;
+    const isOpen = !!statsOpen[key];
+    const last = attempts[attempts.length-1];
+    const chartId = 'chartPerf_'+t.id;
+    return `<div class="coll-card" style="margin-bottom:10px">
+      <div class="coll-hdr" onclick="toggleOpen('${key}')">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700">${t.name}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${t.metric}${t.unit?' ('+t.unit+')':''} · ${attempts.length} intento${attempts.length!==1?'s':''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          ${last?`<div style="text-align:right"><div style="font-size:18px;font-weight:900;color:var(--teal)">${last.value}</div><div style="font-size:9px;color:var(--text3)">último</div></div>`:''}
+          ${_arrow(key)}
+        </div>
+      </div>
+      ${isOpen?`<div class="coll-body">
+        ${attempts.length>1?`<div style="height:130px;margin-bottom:12px"><canvas id="${chartId}"></canvas></div>`:''}
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="btn btn-cyan btn-sm" onclick="_abrirFormIntento('${t.id}')">＋ Registrar intento</button>
+          ${esAdmin?`<button class="btn btn-sm" style="color:var(--red)" onclick="_borrarPrueba('${t.id}')">Borrar prueba</button>`:''}
+        </div>
+        ${attempts.length?attempts.slice().reverse().map(a=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="min-width:0">
+              <div style="font-size:13px;font-weight:700">${a.value}${t.unit?' '+t.unit:''}</div>
+              <div style="font-size:10px;color:var(--text3)">📅 ${fmtTs(a.ts)}${a.notes?' · '+a.notes:''}</div>
+            </div>
+            ${esAdmin?`<button class="btn btn-sm" style="color:var(--red);flex-shrink:0" onclick="_borrarIntento('${t.id}','${a.id}')">✕</button>`:''}
+          </div>`).join(''):'<div class="empty">Sin intentos todavía.</div>'}
+      </div>`:''}
+    </div>`;
+  }).join('');
+
+  // Gráficas de las pruebas abiertas con 2+ intentos (mismo patrón que dibujarGrafica en el resto de la app).
+  perfTests.forEach(t=>{
+    if(!statsOpen['perf_'+t.id]) return;
+    const attempts = perfAttempts.filter(a=>a.testId===t.id).sort((a,b)=>a.ts-b.ts);
+    if(attempts.length>1){
+      dibujarGrafica('chartPerf_'+t.id, 'line', attempts.map((_,i)=>String(i+1)), attempts.map(a=>Number(a.value)||0), '#0D6E8A', t.metric);
+    }
+  });
+
+  return addBtn + cards;
+}
+
+function _renderBitacora(esAdmin){
+  const addBtn = esAdmin ? `<button class="btn btn-cyan" style="width:100%;margin-bottom:14px" onclick="_abrirFormAjuste()">＋ Nuevo ajuste</button>` : '';
+  if(!adjustments.length) return addBtn + `<div class="empty">Todavía no hay ajustes registrados.</div>`;
+  const items = [...adjustments].sort((a,b)=>b.ts-a.ts).map(a=>`
+    <div class="card" style="padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:700;white-space:pre-wrap">${a.description}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:4px">📅 ${fmtTs(a.ts)}</div>
+        </div>
+        ${esAdmin?`<button class="btn btn-sm" style="color:var(--red);flex-shrink:0" onclick="_borrarAjuste('${a.id}')">✕</button>`:''}
+      </div>
+    </div>`).join('');
+  return addBtn + items;
+}
+
+/* ── Formularios (modal genérico ya existente) ── */
+function _abrirFormPrueba(){
+  openModal('🧪 Nueva prueba', `
+    <div class="fg"><div class="field-lbl">Nombre</div><input type="text" id="pf-name" placeholder="ej. Precisión línea negra"></div>
+    <div class="fg"><div class="field-lbl">Qué se mide</div><input type="text" id="pf-metric" placeholder="ej. % de éxito, cm de error, segundos"></div>
+    <div class="fg"><div class="field-lbl">Unidad (opcional)</div><input type="text" id="pf-unit" placeholder="ej. %, cm, s"></div>
+    <button class="btn btn-cyan" style="width:100%" onclick="_crearPrueba()">Crear prueba</button>
+  `);
+}
+function _crearPrueba(){
+  const name = document.getElementById('pf-name').value.trim();
+  const metric = document.getElementById('pf-metric').value.trim();
+  const unit = document.getElementById('pf-unit').value.trim();
+  if(!name || !metric){ alert('Completa el nombre y qué se mide.'); return; }
+  perfTests.push({id:uid(), name, metric, unit, createdAt:Date.now()});
+  save(); closeModal(); render();
+}
+function _borrarPrueba(testId){
+  if(!confirm('¿Borrar esta prueba y todos sus intentos?')) return;
+  perfTests = perfTests.filter(t=>t.id!==testId);
+  perfAttempts = perfAttempts.filter(a=>a.testId!==testId);
+  save(); render();
+}
+
+function _abrirFormIntento(testId){
+  const t = perfTests.find(x=>x.id===testId);
+  if(!t) return;
+  openModal('📝 Registrar intento — '+t.name, `
+    <input type="hidden" id="pf-testid" value="${testId}">
+    <div class="fg"><div class="field-lbl">Valor (${t.metric}${t.unit?' en '+t.unit:''})</div><input type="number" id="pf-value" step="any"></div>
+    <div class="fg"><div class="field-lbl">Notas (opcional)</div><input type="text" id="pf-notes" placeholder="ej. cambié la rueda izquierda"></div>
+    <button class="btn btn-cyan" style="width:100%" onclick="_registrarIntento()">Guardar intento</button>
+  `);
+}
+function _registrarIntento(){
+  const testId = document.getElementById('pf-testid').value;
+  const value = document.getElementById('pf-value').value;
+  const notes = document.getElementById('pf-notes').value.trim();
+  if(value===''){ alert('Ingresa un valor.'); return; }
+  perfAttempts.push({id:uid(), testId, ts:Date.now(), value:Number(value), notes, savedBy: usuarioActual?usuarioActual.username:''});
+  save(); closeModal(); render();
+}
+function _borrarIntento(testId, attemptId){
+  perfAttempts = perfAttempts.filter(a=>a.id!==attemptId);
+  save(); render();
+}
+
+function _abrirFormAjuste(){
+  openModal('🔧 Nuevo ajuste al robot', `
+    <div class="fg"><div class="field-lbl">¿Qué cambiaste?</div><textarea id="pf-adj-desc" rows="3" placeholder="ej. Cambié el engranaje de la garra por uno de mayor torque"></textarea></div>
+    <button class="btn btn-cyan" style="width:100%" onclick="_crearAjuste()">Guardar ajuste</button>
+  `);
+}
+function _crearAjuste(){
+  const desc = document.getElementById('pf-adj-desc').value.trim();
+  if(!desc){ alert('Describe el ajuste.'); return; }
+  adjustments.push({id:uid(), ts:Date.now(), description:desc});
+  save(); closeModal(); render();
+}
+function _borrarAjuste(id){
+  if(!confirm('¿Borrar este ajuste?')) return;
+  adjustments = adjustments.filter(a=>a.id!==id);
+  save(); render();
 }
 
 /* ═══════════════════════════════════════════
@@ -5218,6 +5376,11 @@ function saveLanzadas() { save(); }
    Un array vacío o ausente = comportamiento de contador genérico (por defecto). */
 let missionOverrides = {};
 function saveMissionOverrides(){ save(); }
+
+/* ── Módulo Pruebas de Rendimiento (Fase 4) — datos de la temporada activa ── */
+let perfTests = [];      // {id, name, metric, unit, createdAt}
+let perfAttempts = [];   // {id, testId, ts, value, notes, savedBy}
+let adjustments = [];    // {id, ts, description}
 function _overrideNames(mCode, pid){
   const arr = (missionOverrides[mCode] && missionOverrides[mCode][pid]) || null;
   return (arr && arr.length) ? arr : null;
