@@ -852,7 +852,7 @@ body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6
    CONSTANTS
 ═══════════════════════════════════════════ */
 const TOKEN_SCORES={6:50,5:50,4:35,3:25,2:15,1:10,0:0};
-const MAX_SCORE=545;
+let MAX_SCORE=545; // se recalcula por temporada en _aplicarDatosTemporada()
 const TIMER_TOTAL=150; // 2:30 in seconds
 const CIRC=+(2*Math.PI*110).toFixed(2); // r=110
 
@@ -901,15 +901,77 @@ const MISSIONS_UNEARTHED=[
     {id:'fp_tok',label:'Fichas restantes al final de la partida',pts:0,type:'token'}]},
 ];
 
+/* Temporada BIOGLOW (2026-27) — puntos y conteos sacados del Robot Game
+   Rulebook oficial y de la Software Scoresheet oficial (esta última trae
+   los conteos exactos que el rulebook no siempre dice en texto plano, ej.
+   cuántas semillas/fragmentos hay). Algunas misiones dejan elegir "solo una"
+   opción entre varias (M05, el dock de M15) — la app no fuerza esa regla,
+   igual que hoy no fuerza otras reglas oficiales: se confía en quien anota
+   el resultado, como con el resto de la app. */
+const MISSIONS_BIOGLOW=[
+  {code:'INS',name:'Inspección de Equipo',amber:true,params:[
+    {id:'ins_ok',label:'Equipo y accesorios caben en una sola área de lanzamiento y bajo el límite de altura',pts:20,type:'check'}]},
+  {code:'M01',name:'Drone Survey',params:[
+    {id:'m01_drone',label:'El dron ya no toca el tapete',pts:20,type:'check'},
+    {id:'m01_bonus',label:'Bono: mapa LiDAR completamente volteado, con el marcador de escaneo al menos parcialmente en el área de estudio',pts:10,type:'check',bonus:true,requires:'m01_drone'}]},
+  {code:'M02',name:'Exploding Seeds',params:[
+    {id:'m02_seeds',label:'Semillas que ya no tocan el tallo',pts:10,type:'counter',max:3,perItem:'10 c/u'}]},
+  {code:'M03',name:'Flip the Rock',params:[
+    {id:'m03_flag',label:'La bandera de investigación está abajo',pts:20,type:'check'},
+    {id:'m03_bonus',label:'Bono: la roca fue devuelta a su posición original',pts:10,type:'check',bonus:true,requires:'m03_flag'}]},
+  {code:'M04',name:'Lucky Leaves',params:[
+    {id:'m04_leaves',label:'Hojas completamente removidas, ya no tocan el nido',pts:10,type:'counter',max:2,perItem:'10 c/u'},
+    {id:'m04_katydid',label:'El katydid está al menos parcialmente en el hábitat de hojas (si no, la misión vale 0)',pts:0,type:'check'},
+    {id:'m04_bonus',label:'Bono: el katydid quedó en su posición original y no salió del hábitat durante toda la partida',pts:20,type:'check',bonus:true,requires:'m04_katydid'}]},
+  {code:'M05',name:'Reaching Roots',params:[
+    {id:'m05_partial',label:'La raíz está parcialmente extendida (solo una opción posible)',pts:10,type:'check'},
+    {id:'m05_complete',label:'La raíz está completamente extendida (solo una opción posible)',pts:20,type:'check'}]},
+  {code:'M06',name:'Leafcutter Frenzy',params:[
+    {id:'m06_ant',label:'La hormiga toca el nido (requisito para los fragmentos)',pts:0,type:'check'},
+    {id:'m06_frag',label:'Fragmentos de hoja contenidos en el nido',pts:10,type:'counter',max:4,perItem:'10 c/u',requires:'m06_ant'}]},
+  {code:'M07',name:'Humongous Fungus',params:[
+    {id:'m07_myc',label:'El micelio está completamente extendido',pts:20,type:'check'},
+    {id:'m07_bonus',label:'Bono: conexiones formadas entre tu micelio extendido y la raíz completamente extendida del oponente',pts:10,type:'counter',max:2,perItem:'10 c/u',bonus:true,requires:'m07_myc'}]},
+  {code:'M08',name:'Tangled',params:[
+    {id:'m08_vine',label:'La vid toca el tapete',pts:30,type:'check'}]},
+  {code:'M09',name:'Research Platform',params:[
+    {id:'m09_platform',label:'La plataforma de investigación está levantada',pts:10,type:'check'},
+    {id:'m09_camera',label:'La trampa de cámara está desplegada',pts:10,type:'check'},
+    {id:'m09_seed',label:'La semilla ya no toca el árbol',pts:10,type:'check'}]},
+  {code:'M10',name:'Fragile Microhabitats',params:[
+    {id:'m10_spider',label:'El hábitat de la araña está en su posición original',pts:10,type:'check'},
+    {id:'m10_snail',label:'El hábitat del caracol está en su posición original',pts:10,type:'check'}]},
+  {code:'M11',name:'Window to the Past',params:[
+    {id:'m11_root',label:'La cubierta de raíces está abajo, tocando el tapete',pts:20,type:'check'}]},
+  {code:'M12',name:'Forest Elder',params:[
+    {id:'m12_cane',label:'El bastón está completamente levantado, tocando el árbol',pts:20,type:'check'},
+    {id:'m12_tie',label:'La atadura de soporte está alrededor del poste',pts:10,type:'check'}]},
+  {code:'M13',name:'Keystone Species',params:[
+    {id:'m13_combo',label:'Tu especie clave está en la plataforma de restauración Y los árboles jóvenes están levantados',pts:30,type:'check'}]},
+  {code:'M14',name:'Seeds of Renewal',params:[
+    {id:'m14_seeds',label:'Semillas contenidas en la estación de replantación',pts:5,type:'counter',max:4,perItem:'5 c/u'},
+    {id:'m14_bonus',label:'Bono: esas semillas también tocan el tapete',pts:5,type:'counter',max:4,perItem:'5 c/u',bonus:true,requires:'m14_seeds'}]},
+  {code:'M15',name:'Biocentric Architecture',params:[
+    {id:'m15_canopy',label:'El dosel de anidación está levantado',pts:10,type:'check'},
+    {id:'m15_skylight',label:'El tragaluz del jardín está completamente adentro',pts:10,type:'check'},
+    {id:'m15_compost',label:'La compuerta de composta está completamente abierta, tocando el tapete',pts:10,type:'check'},
+    {id:'m15_mine',label:'Bono ambiental — dock de Mina (dosel de anidación)',pts:10,type:'check',bonus:true},
+    {id:'m15_city',label:'Bono ambiental — dock de Ciudad (tragaluz del jardín)',pts:10,type:'check',bonus:true},
+    {id:'m15_farm',label:'Bono ambiental — dock de Granja (compuerta de composta)',pts:10,type:'check',bonus:true}]},
+  {code:'FP',name:'Fichas de precisión',amber:true,params:[
+    {id:'fp_tok',label:'Fichas restantes al final de la partida',pts:0,type:'token'}]},
+];
+
 /* Cada temporada de FLL trae sus propias 15 misiones — este mapa es lo que
    permite tener varias temporadas guardadas sin pisarse entre sí. MISSIONS
    (abajo) es la que está activa; cambia cuando se cambia de temporada
-   (ver _cargarTemporada). Por ahora solo existe 'unearthed'; las próximas
-   temporadas (ej. 'bioglow') se agregan aquí cuando estén listas. */
+   (ver _cargarTemporada). */
 const MISSIONS_BY_SEASON = {
-  unearthed: MISSIONS_UNEARTHED
+  unearthed: MISSIONS_UNEARTHED,
+  bioglow: MISSIONS_BIOGLOW
 };
 let MISSIONS = MISSIONS_UNEARTHED;
+let currentMissionSetKey = 'unearthed';
 
 /* Cada objeto del Foro (M14) sale de completar otra misión primero — no tiene
    sentido dejar poder marcarlo logrado si esa misión de origen no se hizo
@@ -1191,7 +1253,18 @@ function _aplicarDatosTemporada(seasonObj){
   missionOverrides = d.missionOverrides || {};
   const key = (seasonObj && seasonObj.meta && seasonObj.meta.missionSetKey) || 'unearthed';
   MISSIONS = MISSIONS_BY_SEASON[key] || MISSIONS_UNEARTHED;
+  currentMissionSetKey = key;
+  MAX_SCORE = MISSIONS.reduce((s,m)=>s+mMaxScore(m),0);
 }
+
+/* Temporadas oficiales soportadas por la app — NO se crean a mano desde la
+   UI, salen directo de qué conjuntos de misiones existen en el código. Para
+   agregar una temporada nueva más adelante: agregar su MISSIONS_BY_SEASON
+   y una entrada aquí, nada más. */
+const OFFICIAL_SEASONS = {
+  unearthed_2025_26: {name:'Unearthed', yearLabel:'2025-26', missionSetKey:'unearthed'},
+  bioglow_2026_27: {name:'BioGlow', yearLabel:'2026-27', missionSetKey:'bioglow'}
+};
 
 /* ── Load team data from Firebase ── */
 async function loadTeamData(){
@@ -1201,28 +1274,41 @@ async function loadTeamData(){
   players = oldData.players || [];
   pairs   = oldData.pairs   || [];
 
-  let seasons = root.seasons || null;
-  if(!seasons){
+  let seasons = root.seasons || {};
+  const huboMigracionLegacy = !root.seasons;
+  const updates = {};
+
+  if(huboMigracionLegacy){
     // MIGRACIÓN ÚNICA (una sola vez por equipo): la estructura vieja tenía
     // runs/trainings/lanzadas/missionOverrides bajo /data junto con
-    // players/pairs. Se copian a la temporada "Unearthed" SIN TOCAR NI
-    // BORRAR /data — queda intacto de respaldo para siempre.
-    const seasonId = 'unearthed_2025_26';
+    // players/pairs. Se copian a "Unearthed" SIN TOCAR NI BORRAR /data —
+    // queda intacto de respaldo para siempre.
     const legacyData = {
       runs: oldData.runs || [],
       trainings: oldData.trainings || [],
       lanzadas: oldData.lanzadas || [],
       missionOverrides: oldData.missionOverrides || {}
     };
-    const meta = {name:'Unearthed', yearLabel:'2025-26', missionSetKey:'unearthed', createdAt:Date.now()};
-    await db.ref().update({
-      [`teams/${currentTeamId}/seasons/${seasonId}/meta`]: meta,
-      [`teams/${currentTeamId}/seasons/${seasonId}/data`]: legacyData,
-      [`teams/${currentTeamId}/currentSeasonId`]: seasonId
-    });
-    seasons = { [seasonId]: { meta, data: legacyData } };
-    root.currentSeasonId = seasonId;
+    const meta = {...OFFICIAL_SEASONS.unearthed_2025_26, createdAt:Date.now()};
+    updates[`teams/${currentTeamId}/seasons/unearthed_2025_26/meta`] = meta;
+    updates[`teams/${currentTeamId}/seasons/unearthed_2025_26/data`] = legacyData;
+    updates[`teams/${currentTeamId}/currentSeasonId`] = 'unearthed_2025_26';
+    seasons = { unearthed_2025_26: { meta, data: legacyData } };
+    root.currentSeasonId = 'unearthed_2025_26';
   }
+
+  // Asegurar que TODAS las temporadas oficiales existan para este equipo
+  // (vacías si son nuevas) — así aparecen solas en el selector apenas se
+  // agregan al código, sin que nadie tenga que "crearlas".
+  Object.entries(OFFICIAL_SEASONS).forEach(([id, base])=>{
+    if(!seasons[id]){
+      const meta = {...base, createdAt:Date.now()};
+      updates[`teams/${currentTeamId}/seasons/${id}/meta`] = meta;
+      seasons[id] = { meta, data:{} };
+    }
+  });
+
+  if(Object.keys(updates).length) await db.ref().update(updates);
   seasonsIndex = seasons;
 
   let saved = null;
@@ -1242,8 +1328,8 @@ async function loadTeamData(){
   if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
 }
 
-/* Cambia a otra temporada ya existente (o recién creada) y reinicia el
-   listener en vivo para que apunte a su propio nodo de datos. */
+/* Cambia a otra temporada oficial ya provisionada y reinicia el listener en
+   vivo para que apunte a su propio nodo de datos. */
 async function _cambiarTemporada(seasonId){
   if(!seasonsIndex[seasonId] || seasonId===currentSeasonId){ closeModal(); return; }
   currentSeasonId = seasonId;
@@ -1256,25 +1342,7 @@ async function _cambiarTemporada(seasonId){
   render();
 }
 
-/* Crea una temporada nueva vacía y se cambia a ella. Por ahora el único
-   conjunto de misiones disponible es 'unearthed' — cuando exista otro
-   (ej. BioGlow) esto debe dejar elegir cuál usar. */
-async function _crearTemporada(){
-  const name = prompt('Nombre de la nueva temporada (ej. BioGlow):');
-  if(!name || !name.trim()) return;
-  const yearLabel = prompt('Años de la temporada (ej. 2026-27):') || '';
-  const seasonId = _normStr(name).replace(/\s+/g,'_') + '_' + Date.now().toString(36);
-  const meta = {name:name.trim(), yearLabel:yearLabel.trim(), missionSetKey:'unearthed', createdAt:Date.now()};
-  try{
-    await db.ref('teams/'+currentTeamId+'/seasons/'+seasonId+'/meta').set(meta);
-    seasonsIndex[seasonId] = {meta, data:{}};
-    await _cambiarTemporada(seasonId);
-    if(typeof showToast==='function') showToast('✓ Temporada "'+meta.name+'" creada');
-  }catch(e){ alert('Error al crear la temporada: '+e.message); }
-}
-
 function _abrirSelectorTemporada(){
-  const esAdmin = esAdminActual();
   const items = Object.entries(seasonsIndex).map(([id,s])=>{
     const activo = id===currentSeasonId;
     return `<div class="card" style="padding:12px 14px;margin-bottom:8px;${activo?'border-color:var(--teal)':''};cursor:pointer" onclick="_cambiarTemporada('${id}')">
@@ -1284,8 +1352,7 @@ function _abrirSelectorTemporada(){
       </div>
     </div>`;
   }).join('');
-  const addBtn = esAdmin ? `<button class="btn btn-cyan" style="width:100%;margin-top:4px" onclick="closeModal();_crearTemporada();">＋ Nueva temporada</button>` : '';
-  openModal('📅 Temporadas', items + addBtn);
+  openModal('📅 Temporadas', items);
 }
 
 function _actualizarBadgeTemporada(){
@@ -1296,13 +1363,21 @@ function _actualizarBadgeTemporada(){
   el.style.display = (usuarioActual && usuarioActual.rol !== 'jugador') ? 'inline-flex' : 'none';
 }
 
-/* ── Real-time listener: update if another device saves ── */
-let realtimeListener = null;
-let realtimeSeasonListener = null;
+/* ── Real-time listener: update if another device saves ──
+   OJO: ref.on('value',cb) devuelve el mismo cb, NO una función para
+   desuscribirse — hay que guardar ref+callback y llamar ref.off() con
+   ambos. (Antes de las temporadas esto nunca se notaba porque
+   startRealtimeSync() solo se llamaba una vez por sesión; al cambiar de
+   temporada ahora se vuelve a llamar, y "desuscribirse" invocando el
+   callback viejo directo revienta porque queda sin su snapshot.) */
+let realtimeListenerRef = null, realtimeListenerCb = null;
+let realtimeSeasonListenerRef = null, realtimeSeasonListenerCb = null;
 function startRealtimeSync(){
-  if(realtimeListener) realtimeListener();
-  if(realtimeSeasonListener) realtimeSeasonListener();
-  realtimeListener = db.ref('teams/'+currentTeamId+'/data').on('value', snap=>{
+  if(realtimeListenerRef) realtimeListenerRef.off('value', realtimeListenerCb);
+  if(realtimeSeasonListenerRef) realtimeSeasonListenerRef.off('value', realtimeSeasonListenerCb);
+
+  realtimeListenerRef = db.ref('teams/'+currentTeamId+'/data');
+  realtimeListenerCb = snap=>{
     // Only update if we're not mid-edit (no pending save)
     if(syncTimeout) return;
     if(snap.exists()){
@@ -1312,8 +1387,11 @@ function startRealtimeSync(){
       if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
       render();
     }
-  });
-  realtimeSeasonListener = db.ref('teams/'+currentTeamId+'/seasons/'+currentSeasonId+'/data').on('value', snap=>{
+  };
+  realtimeListenerRef.on('value', realtimeListenerCb);
+
+  realtimeSeasonListenerRef = db.ref('teams/'+currentTeamId+'/seasons/'+currentSeasonId+'/data');
+  realtimeSeasonListenerCb = snap=>{
     if(syncTimeout) return;
     if(snap.exists()){
       const d = snap.val();
@@ -1324,7 +1402,8 @@ function startRealtimeSync(){
       if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
       render();
     }
-  });
+  };
+  realtimeSeasonListenerRef.on('value', realtimeSeasonListenerCb);
 }
 
 /* ═══════════════════════════════════════════
@@ -1617,7 +1696,7 @@ function defaultMState(){
     // check: null = sin marcar, true = logrado, false = marcado como fallido
     if(p.type==='check')s[p.id]=null;
     else if(p.type==='counter'){
-      const names=_overrideNames(m.code,p.id) || (m.code==='M14'?FORO_ITEM_NAMES:null);
+      const names=_overrideNames(m.code,p.id) || (currentMissionSetKey==='unearthed' && m.code==='M14'?FORO_ITEM_NAMES:null);
       // Con sub-acciones nombradas, cada unidad es un check independiente
       // (tri-state); sin nombrar, sigue siendo un contador simple 0..max.
       s[p.id]=names ? new Array(names.length).fill(null) : 0;
@@ -1704,7 +1783,7 @@ function _missionPartsForRun(m, ms){
       const v = ms ? ms[p.id] : undefined;
       parts.push({label:p.label, bonus:!!p.bonus, status: v===true?'ok':v===false?'bad':'sin'});
     } else if(p.type==='counter'){
-      const names=_overrideNames(m.code,p.id) || (m.code==='M14'?FORO_ITEM_NAMES:null);
+      const names=_overrideNames(m.code,p.id) || (currentMissionSetKey==='unearthed' && m.code==='M14'?FORO_ITEM_NAMES:null);
       if(names){
         const arr = _triArr(ms ? ms[p.id] : undefined);
         names.forEach((nm,idx)=>{
@@ -3305,7 +3384,7 @@ function renderMissions(){
         </div>`;
       }
       if(p.type==='counter'){
-        const isForo = m.code==='M14' && !_overrideNames(m.code,p.id);
+        const isForo = currentMissionSetKey==='unearthed' && m.code==='M14' && !_overrideNames(m.code,p.id);
         const names=_overrideNames(m.code,p.id) || (isForo?FORO_ITEM_NAMES:null);
         if(names){
           // Sub-acciones nombradas: cada una es un check independiente (✓/✗)
@@ -3423,7 +3502,7 @@ function _refreshMissions(){
           }
         }
       } else if(p.type==='counter'){
-        const isForo = m.code==='M14' && !_overrideNames(m.code,p.id);
+        const isForo = currentMissionSetKey==='unearthed' && m.code==='M14' && !_overrideNames(m.code,p.id);
         const names=_overrideNames(m.code,p.id) || (isForo?FORO_ITEM_NAMES:null);
         const triArr=_triArr(mState[p.id]);
         if(names && triArr){
@@ -5573,7 +5652,7 @@ function effTable(subset, label, customTargets = null){
         });
         parts.push({ label:p.label, bonus:!!p.bonus, ok, bad, sin });
       } else if(p.type==='counter'){
-        const names=_overrideNames(m.code,p.id) || (m.code==='M14'?FORO_ITEM_NAMES:null);
+        const names=_overrideNames(m.code,p.id) || (currentMissionSetKey==='unearthed' && m.code==='M14'?FORO_ITEM_NAMES:null);
         if(!names) return;
         names.forEach((nm,idx)=>{
           let ok=0, bad=0, sin=0;
