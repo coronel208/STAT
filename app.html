@@ -227,6 +227,15 @@ body{
 
 .main{max-width:960px;margin:0 auto;padding:20px 16px 80px;}
 
+/* ══ Pantallas de elegir temporada/módulo — se ven "perdidas" en desktop si
+   solo se centran horizontalmente dentro de .main (960px) sobre un fondo
+   negro enorme. Esto las centra también verticalmente, como el login. ══ */
+.picker-screen{
+  min-height:calc(100vh - 130px);
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+}
+.picker-card{width:100%;max-width:420px;}
+
 /* ══ PHYSICAL BLOCK MIXIN — applied to interactive elements ══ */
 .card{
   background:var(--surface);border:2px solid var(--navy);
@@ -911,47 +920,47 @@ const MISSIONS_UNEARTHED=[
 const MISSIONS_BIOGLOW=[
   {code:'INS',name:'Inspección de Equipo',amber:true,params:[
     {id:'ins_ok',label:'Equipo y accesorios caben en una sola área de lanzamiento y bajo el límite de altura',pts:20,type:'check'}]},
-  {code:'M01',name:'Drone Survey',params:[
+  {code:'M01',name:'Estudio con Dron',params:[
     {id:'m01_drone',label:'El dron ya no toca el tapete',pts:20,type:'check'},
     {id:'m01_bonus',label:'Bono: mapa LiDAR completamente volteado, con el marcador de escaneo al menos parcialmente en el área de estudio',pts:10,type:'check',bonus:true,requires:'m01_drone'}]},
-  {code:'M02',name:'Exploding Seeds',params:[
+  {code:'M02',name:'Semillas Explosivas',params:[
     {id:'m02_seeds',label:'Semillas que ya no tocan el tallo',pts:10,type:'counter',max:3,perItem:'10 c/u'}]},
-  {code:'M03',name:'Flip the Rock',params:[
+  {code:'M03',name:'Voltea la Roca',params:[
     {id:'m03_flag',label:'La bandera de investigación está abajo',pts:20,type:'check'},
     {id:'m03_bonus',label:'Bono: la roca fue devuelta a su posición original',pts:10,type:'check',bonus:true,requires:'m03_flag'}]},
-  {code:'M04',name:'Lucky Leaves',params:[
+  {code:'M04',name:'Hojas de la Suerte',params:[
     {id:'m04_leaves',label:'Hojas completamente removidas, ya no tocan el nido',pts:10,type:'counter',max:2,perItem:'10 c/u'},
     {id:'m04_katydid',label:'El katydid está al menos parcialmente en el hábitat de hojas (si no, la misión vale 0)',pts:0,type:'check'},
     {id:'m04_bonus',label:'Bono: el katydid quedó en su posición original y no salió del hábitat durante toda la partida',pts:20,type:'check',bonus:true,requires:'m04_katydid'}]},
-  {code:'M05',name:'Reaching Roots',params:[
+  {code:'M05',name:'Raíces en Expansión',params:[
     {id:'m05_partial',label:'La raíz está parcialmente extendida (solo una opción posible)',pts:10,type:'check'},
     {id:'m05_complete',label:'La raíz está completamente extendida (solo una opción posible)',pts:20,type:'check'}]},
-  {code:'M06',name:'Leafcutter Frenzy',params:[
+  {code:'M06',name:'Frenesí Cortahojas',params:[
     {id:'m06_ant',label:'La hormiga toca el nido (requisito para los fragmentos)',pts:0,type:'check'},
     {id:'m06_frag',label:'Fragmentos de hoja contenidos en el nido',pts:10,type:'counter',max:4,perItem:'10 c/u',requires:'m06_ant'}]},
-  {code:'M07',name:'Humongous Fungus',params:[
+  {code:'M07',name:'Hongo Gigante',params:[
     {id:'m07_myc',label:'El micelio está completamente extendido',pts:20,type:'check'},
     {id:'m07_bonus',label:'Bono: conexiones formadas entre tu micelio extendido y la raíz completamente extendida del oponente',pts:10,type:'counter',max:2,perItem:'10 c/u',bonus:true,requires:'m07_myc'}]},
-  {code:'M08',name:'Tangled',params:[
+  {code:'M08',name:'Enredados',params:[
     {id:'m08_vine',label:'La vid toca el tapete',pts:30,type:'check'}]},
-  {code:'M09',name:'Research Platform',params:[
+  {code:'M09',name:'Plataforma de Investigación',params:[
     {id:'m09_platform',label:'La plataforma de investigación está levantada',pts:10,type:'check'},
     {id:'m09_camera',label:'La trampa de cámara está desplegada',pts:10,type:'check'},
     {id:'m09_seed',label:'La semilla ya no toca el árbol',pts:10,type:'check'}]},
-  {code:'M10',name:'Fragile Microhabitats',params:[
+  {code:'M10',name:'Microhábitats Frágiles',params:[
     {id:'m10_spider',label:'El hábitat de la araña está en su posición original',pts:10,type:'check'},
     {id:'m10_snail',label:'El hábitat del caracol está en su posición original',pts:10,type:'check'}]},
-  {code:'M11',name:'Window to the Past',params:[
+  {code:'M11',name:'Ventana al Pasado',params:[
     {id:'m11_root',label:'La cubierta de raíces está abajo, tocando el tapete',pts:20,type:'check'}]},
-  {code:'M12',name:'Forest Elder',params:[
+  {code:'M12',name:'Árbol Ancestral',params:[
     {id:'m12_cane',label:'El bastón está completamente levantado, tocando el árbol',pts:20,type:'check'},
     {id:'m12_tie',label:'La atadura de soporte está alrededor del poste',pts:10,type:'check'}]},
-  {code:'M13',name:'Keystone Species',params:[
+  {code:'M13',name:'Especie Clave',params:[
     {id:'m13_combo',label:'Tu especie clave está en la plataforma de restauración Y los árboles jóvenes están levantados',pts:30,type:'check'}]},
-  {code:'M14',name:'Seeds of Renewal',params:[
+  {code:'M14',name:'Semillas de Renovación',params:[
     {id:'m14_seeds',label:'Semillas contenidas en la estación de replantación',pts:5,type:'counter',max:4,perItem:'5 c/u'},
     {id:'m14_bonus',label:'Bono: esas semillas también tocan el tapete',pts:5,type:'counter',max:4,perItem:'5 c/u',bonus:true,requires:'m14_seeds'}]},
-  {code:'M15',name:'Biocentric Architecture',params:[
+  {code:'M15',name:'Arquitectura Biocéntrica',params:[
     {id:'m15_canopy',label:'El dosel de anidación está levantado',pts:10,type:'check'},
     {id:'m15_skylight',label:'El tragaluz del jardín está completamente adentro',pts:10,type:'check'},
     {id:'m15_compost',label:'La compuerta de composta está completamente abierta, tocando el tapete',pts:10,type:'check'},
@@ -2155,14 +2164,16 @@ function renderTemporadaPicker(){
     </div>`;
   }).join('');
   return `
-    <div style="animation:fadeIn 0.3s ease;max-width:480px;margin:0 auto">
-      <div style="text-align:center;margin-bottom:24px">
-        <img src="images/icon_stat.png" alt="" style="height:56px;width:56px;border-radius:14px;object-fit:cover;margin-bottom:10px">
-        <h1 style="margin:0;font-size:24px;font-weight:900;color:var(--heading)">STAT</h1>
-        <div style="font-size:12px;color:var(--text3);margin-top:2px">¿Con qué temporada quieres trabajar?</div>
+    <div class="picker-screen">
+      <div class="picker-card" style="animation:fadeIn 0.3s ease">
+        <div style="text-align:center;margin-bottom:24px">
+          <img src="images/icon_stat.png" alt="" style="height:56px;width:56px;border-radius:14px;object-fit:cover;margin-bottom:10px">
+          <h1 style="margin:0;font-size:24px;font-weight:900;color:var(--heading)">STAT</h1>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">¿Con qué temporada quieres trabajar?</div>
+        </div>
+        <div class="an-nav-grid">${cards}</div>
+        <button class="btn btn-cyan" style="width:100%;margin-top:18px;padding:16px;font-size:15px;font-weight:800" onclick="_confirmarTemporada()">Continuar →</button>
       </div>
-      <div class="an-nav-grid">${cards}</div>
-      <button class="btn btn-cyan" style="width:100%;margin-top:18px;padding:16px;font-size:15px;font-weight:800" onclick="_confirmarTemporada()">Continuar →</button>
     </div>`;
 }
 
@@ -2170,25 +2181,27 @@ function renderTemporadaPicker(){
 function renderModulosMenu(){
   const s = seasonsIndex[currentSeasonId];
   return `
-    <div style="animation:fadeIn 0.3s ease;max-width:480px;margin:0 auto">
-      <div style="text-align:center;margin-bottom:24px">
-        <img src="images/icon_stat.png" alt="" style="height:56px;width:56px;border-radius:14px;object-fit:cover;margin-bottom:10px">
-        <h1 style="margin:0;font-size:24px;font-weight:900;color:var(--heading)">STAT</h1>
-        <div style="font-size:12px;color:var(--text3);margin-top:2px">📅 ${s?s.meta.name:''} · ¿Qué quieres hacer?</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
-        <div class="card" style="cursor:pointer;padding:20px" onclick="_irAlModulo('puntajes')">
-          <div style="font-size:32px;line-height:1;margin-bottom:8px">📊</div>
-          <div style="font-size:17px;font-weight:800;color:var(--heading)">Registro de Puntajes</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:4px">Rondas, entrenamientos, análisis y búsqueda</div>
+    <div class="picker-screen">
+      <div class="picker-card" style="animation:fadeIn 0.3s ease">
+        <div style="text-align:center;margin-bottom:24px">
+          <img src="images/icon_stat.png" alt="" style="height:56px;width:56px;border-radius:14px;object-fit:cover;margin-bottom:10px">
+          <h1 style="margin:0;font-size:24px;font-weight:900;color:var(--heading)">STAT</h1>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">📅 ${s?s.meta.name:''} · ¿Qué quieres hacer?</div>
         </div>
-        <div class="card" style="cursor:pointer;padding:20px" onclick="_irAlModulo('rendimiento')">
-          <div style="font-size:32px;line-height:1;margin-bottom:8px">🧪</div>
-          <div style="font-size:17px;font-weight:800;color:var(--heading)">Pruebas de Rendimiento</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:4px">Pruebas del robot y bitácora de ajustes</div>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
+          <div class="card" style="cursor:pointer;padding:20px" onclick="_irAlModulo('puntajes')">
+            <div style="font-size:32px;line-height:1;margin-bottom:8px">📊</div>
+            <div style="font-size:17px;font-weight:800;color:var(--heading)">Registro de Puntajes</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:4px">Rondas, entrenamientos, análisis y búsqueda</div>
+          </div>
+          <div class="card" style="cursor:pointer;padding:20px" onclick="_irAlModulo('rendimiento')">
+            <div style="font-size:32px;line-height:1;margin-bottom:8px">🧪</div>
+            <div style="font-size:17px;font-weight:800;color:var(--heading)">Pruebas de Rendimiento</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:4px">Pruebas del robot y bitácora de ajustes</div>
+          </div>
         </div>
+        <button class="btn btn-sm" style="width:100%;margin-top:16px" onclick="_irAlModulo('temporada')">← Cambiar de temporada</button>
       </div>
-      <button class="btn btn-sm" style="width:100%;margin-top:16px" onclick="_irAlModulo('temporada')">← Cambiar de temporada</button>
     </div>`;
 }
 
@@ -2369,25 +2382,71 @@ function _crearPruebaRobot(){
   perfTests.push({id:uid(), category:'robot', name, metric, unit, createdAt:Date.now()});
   save(); closeModal(); render();
 }
+/* La prueba de lanzada puede basarse en una lanzada YA configurada en
+   Estrategia (reusa exactamente sus misiones) o ser una rutina suelta con
+   misiones elegidas a mano — y si no existe todavía la lanzada que
+   quieres probar, hay un atajo para ir a crearla ahí mismo. */
 function _mostrarFormLanzada(){
-  const opts = MISSIONS.map(m=>`
-    <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">
-      <input type="checkbox" value="${m.code}" class="pf-lz-mission">
-      <span style="font-size:13px">${m.code} — ${m.name}</span>
-    </label>`).join('');
+  const lzOpts = lanzadasConfiguradas.map(lz=>`<option value="${lz.id}">${lz.name} (Base ${lz.base})</option>`).join('');
   document.getElementById('pf-body').innerHTML = `
-    <div class="fg"><div class="field-lbl">Nombre de la rutina</div><input type="text" id="pf-name" placeholder="ej. Rutina base roja v1"></div>
-    <div class="field-lbl">Misiones que intenta</div>
-    <div style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border2);border-radius:var(--rs);padding:6px 12px;margin-bottom:14px">${opts}</div>
-    <button class="btn btn-cyan" style="width:100%" onclick="_crearPruebaLanzada()">Crear prueba</button>
+    <div class="fg">
+      <div class="field-lbl">Basar en una lanzada ya configurada</div>
+      <select id="pf-lz-select" onchange="_onCambioLzSelect()">
+        <option value="">— Personalizada (elijo las misiones) —</option>
+        ${lzOpts}
+      </select>
+    </div>
+    <div id="pf-lz-extra"></div>
+    <button class="btn btn-sm" style="width:100%;margin-bottom:14px" onclick="_irACrearLanzada()">＋ ¿No existe? Crear una lanzada nueva</button>
   `;
+  _onCambioLzSelect();
+}
+function _onCambioLzSelect(){
+  const sel = document.getElementById('pf-lz-select').value;
+  const extra = document.getElementById('pf-lz-extra');
+  if(sel){
+    const lz = lanzadasConfiguradas.find(x=>x.id===sel);
+    extra.innerHTML = `
+      <input type="hidden" id="pf-lz-id" value="${sel}">
+      <div class="fg"><div class="field-lbl">Nombre de la prueba</div><input type="text" id="pf-name" value="${lz?lz.name:''}"></div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Misiones: ${(lz?lz.missions:[]).join(', ')}</div>
+      <button class="btn btn-cyan" style="width:100%" onclick="_crearPruebaLanzada()">Crear prueba</button>
+    `;
+  } else {
+    const opts = MISSIONS.map(m=>`
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">
+        <input type="checkbox" value="${m.code}" class="pf-lz-mission">
+        <span style="font-size:13px">${m.code} — ${m.name}</span>
+      </label>`).join('');
+    extra.innerHTML = `
+      <div class="fg"><div class="field-lbl">Nombre de la rutina</div><input type="text" id="pf-name" placeholder="ej. Rutina base roja v1"></div>
+      <div class="field-lbl">Misiones que intenta</div>
+      <div style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border2);border-radius:var(--rs);padding:6px 12px;margin-bottom:14px">${opts}</div>
+      <button class="btn btn-cyan" style="width:100%" onclick="_crearPruebaLanzada()">Crear prueba</button>
+    `;
+  }
+}
+function _irACrearLanzada(){
+  closeModal();
+  appModule = 'puntajes'; tab = 'analisis'; analisisSubTab = 'estrategia'; showLanzadaForm = true;
+  location.hash = 'puntajes';
+  render();
+  if(typeof showToast==='function') showToast('Cuando termines de crearla, vuelve a 🧪 Pruebas de Rendimiento.');
 }
 function _crearPruebaLanzada(){
   const name = document.getElementById('pf-name').value.trim();
-  const missions = [...document.querySelectorAll('.pf-lz-mission:checked')].map(el=>el.value);
-  if(!name){ alert('Ponle un nombre a la rutina.'); return; }
+  if(!name){ alert('Ponle un nombre.'); return; }
+  const lzIdEl = document.getElementById('pf-lz-id');
+  let missions, lanzadaId = null;
+  if(lzIdEl){
+    lanzadaId = lzIdEl.value;
+    const lz = lanzadasConfiguradas.find(x=>x.id===lanzadaId);
+    missions = lz ? [...lz.missions] : [];
+  } else {
+    missions = [...document.querySelectorAll('.pf-lz-mission:checked')].map(el=>el.value);
+  }
   if(!missions.length){ alert('Elige al menos una misión.'); return; }
-  perfTests.push({id:uid(), category:'lanzada', name, missions, createdAt:Date.now()});
+  perfTests.push({id:uid(), category:'lanzada', name, missions, lanzadaId, createdAt:Date.now()});
   save(); closeModal(); render();
 }
 function _borrarPrueba(testId){
