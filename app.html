@@ -805,7 +805,7 @@ body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6
 </div>
 <header class="hdr">
   <div class="hdr-left">
-    <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="_irAlModulo('menu')" title="Menú principal">
+    <div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="_irAlModulo('modulos')" title="Menú principal">
       <img src="images/icon_stat.png" alt="" style="height:28px;width:28px;border-radius:6px;object-fit:cover;flex-shrink:0" title="">
       <span class="hdr-logo-text" style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:1px;line-height:1;">STAT</span>
     </div>
@@ -823,13 +823,13 @@ body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6
 
     <span id="hdr-team" style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.88);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,194,212,0.12);padding:3px 11px;border-radius:20px;border:1px solid rgba(0,194,212,0.3)"></span>
 
-    <span id="hdr-season" onclick="_abrirSelectorTemporada()" title="Cambiar de temporada" style="display:none;align-items:center;gap:4px;cursor:pointer;font-size:11px;font-weight:700;color:#0e1f35;background:#ffb400;padding:3px 11px;border-radius:20px;"></span>
+    <span id="hdr-season" onclick="_irAlModulo('temporada')" title="Cambiar de temporada" style="display:none;align-items:center;gap:4px;cursor:pointer;font-size:11px;font-weight:700;color:#0e1f35;background:#ffb400;padding:3px 11px;border-radius:20px;"></span>
     
     <span id="hdr-user" style="font-size:10px; font-weight:600; opacity:0.9; letter-spacing:0.5px; text-transform:uppercase;"></span>
 
     <span id="hdr-invite" style="display:none; font-size:10px; font-weight:900; color:#0e1f35; background:#ffb400; padding:3px 8px; border-radius:6px; letter-spacing:1px;"></span>
 
-    <a href="index.html" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 10px;font-size:11px;text-decoration:none;font-weight:600;letter-spacing:.3px;margin-right:2px">🏠<span class="hdr-full-label"> Inicio</span></a>
+    <a href="#" onclick="_irAlModulo('modulos');return false;" title="Menú principal" style="background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:4px 10px;font-size:11px;text-decoration:none;font-weight:600;letter-spacing:.3px;margin-right:2px">🏠<span class="hdr-full-label"> Inicio</span></a>
     <button id="hdr-logout" onclick="doLogout()" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.82);border:1.5px solid rgba(255,255,255,0.2);border-radius:var(--rs);padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;display:none;letter-spacing:0.3px;">Salir</button>
   </div>
 </header>
@@ -998,11 +998,27 @@ function _foroDepMet(nm){
 /* ═══════════════════════════════════════════
    STATE
 ═══════════════════════════════════════════ */
-/* Módulo activo dentro de la app: 'menu' (pantalla de inicio), 'puntajes'
-   (la app de siempre — Ronda/Entrenam/Parrilla/Análisis/Buscar) o
-   'rendimiento' (Fase 4). El logo STAT del header siempre vuelve a 'menu'. */
-let appModule = 'menu';
-function _irAlModulo(mod){ appModule = mod; render(); }
+/* Pantalla/módulo activo — cada uno vive en su propia URL (hash) para que
+   se puedan distinguir a simple vista y el botón atrás del navegador
+   funcione:
+     (sin hash) → 'temporada'  elegir/confirmar temporada (primer paso, SIEMPRE)
+     #modulos   → 'modulos'    elegir Puntajes o Rendimiento
+     #puntajes  → 'puntajes'   la app de siempre (Ronda/Entrenam/Parrilla/Análisis/Buscar)
+     #rendimiento → 'rendimiento'  Fase 4
+   El logo STAT y el botón "Inicio" del header siempre vuelven a 'modulos'. */
+const APP_SCREENS = ['temporada','modulos','puntajes','rendimiento'];
+let appModule = 'temporada';
+function _irAlModulo(mod){
+  appModule = APP_SCREENS.includes(mod) ? mod : 'temporada';
+  location.hash = appModule==='temporada' ? '' : appModule;
+  render();
+}
+window.addEventListener('hashchange', ()=>{
+  if(!usuarioActual) return; // el login no usa este ruteo
+  const h = (location.hash||'').replace('#','');
+  appModule = APP_SCREENS.includes(h) ? h : 'temporada';
+  render();
+});
 
 let tab='ronda';
 let lanzadaDetalle = null; // Almacenará el ID (L1, L2...) de la lanzada seleccionada
@@ -1321,11 +1337,18 @@ async function loadTeamData(){
   });
 
   if(Object.keys(updates).length) await db.ref().update(updates);
-  seasonsIndex = seasons;
+
+  // Solo se muestran/usan las temporadas OFICIALES (las de OFFICIAL_SEASONS).
+  // Si un equipo tiene alguna suelta en Firebase (ej. de cuando existía el
+  // botón de "crear temporada" a mano) queda ahí sin tocarse, simplemente
+  // se ignora — así nunca aparece duplicada ni hace falta borrar nada.
+  seasonsIndex = {};
+  Object.keys(OFFICIAL_SEASONS).forEach(id=>{ seasonsIndex[id] = seasons[id]; });
 
   let saved = null;
   try{ saved = localStorage.getItem('stat_season_'+currentTeamId); }catch(e){}
-  currentSeasonId = (saved && seasons[saved]) ? saved : (root.currentSeasonId || Object.keys(seasons)[0]);
+  const rootSeasonValida = root.currentSeasonId && seasonsIndex[root.currentSeasonId] ? root.currentSeasonId : null;
+  currentSeasonId = (saved && seasonsIndex[saved]) ? saved : (rootSeasonValida || Object.keys(seasonsIndex)[0]);
 
   _aplicarDatosTemporada(seasons[currentSeasonId]);
 
@@ -1354,25 +1377,14 @@ async function _cambiarTemporada(seasonId){
   render();
 }
 
-function _abrirSelectorTemporada(){
-  const items = Object.entries(seasonsIndex).map(([id,s])=>{
-    const activo = id===currentSeasonId;
-    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;${activo?'border-color:var(--teal)':''};cursor:pointer" onclick="_cambiarTemporada('${id}')">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <div><b>${s.meta.name}</b> <span style="color:var(--text3);font-size:12px">${s.meta.yearLabel||''}</span></div>
-        ${activo?'<span style="color:var(--teal);font-weight:800;font-size:11px;white-space:nowrap">✓ ACTUAL</span>':''}
-      </div>
-    </div>`;
-  }).join('');
-  openModal('📅 Temporadas', items);
-}
-
 function _actualizarBadgeTemporada(){
   const el = document.getElementById('hdr-season');
   if(!el) return;
   const s = seasonsIndex[currentSeasonId];
   el.innerHTML = s ? ('📅 '+s.meta.name) : '📅';
-  el.style.display = (usuarioActual && usuarioActual.rol !== 'jugador') ? 'inline-flex' : 'none';
+  // No tiene sentido mostrarla en la propia pantalla de elegir temporada
+  // (todavía no hay nada "activo" que mostrar ahí).
+  el.style.display = (usuarioActual && appModule!=='temporada') ? 'inline-flex' : 'none';
 }
 
 /* ── Real-time listener: update if another device saves ──
@@ -1609,7 +1621,9 @@ async function accesoPermitido(datos) {
   currentTeamName = datos.teamName;
   
   await loadTeamData();
-  appModule = 'menu';
+  appModule = 'temporada';
+  _seasonPending = currentSeasonId;
+  location.hash = '';
 
   document.getElementById('login-wrap').style.display = 'none';
   document.getElementById('hdr-team').textContent = datos.teamName;
@@ -2097,10 +2111,14 @@ function render() {
   // no le gana, hay que apagarlo con la misma prioridad.
   if (appModule !== 'puntajes') {
     if (tabsBar) tabsBar.style.setProperty('display', 'none', 'important');
-    el.innerHTML = appModule === 'rendimiento' ? renderRendimiento() : renderHomeMenu();
+    if (appModule === 'rendimiento') el.innerHTML = renderRendimiento();
+    else if (appModule === 'modulos') el.innerHTML = renderModulosMenu();
+    else el.innerHTML = renderTemporadaPicker();
+    _actualizarBadgeTemporada();
     return;
   }
   if (tabsBar) tabsBar.style.removeProperty('display');
+  _actualizarBadgeTemporada();
 
   // --- ENRUTADOR CORREGIDO ---
   if (tab === 'ronda') el.innerHTML = renderRonda();
@@ -2114,32 +2132,50 @@ function render() {
 }
 
 /* ── Pantalla de inicio: elegir temporada + módulo ── */
-function renderHomeMenu(){
-  const esAdmin = esAdminActual();
-  const seasonActual = seasonsIndex[currentSeasonId];
-  const seasonBlock = esAdmin
-    ? `<div class="an-nav-grid">
-        ${Object.entries(seasonsIndex).map(([id,s])=>{
-          const activo = id===currentSeasonId;
-          return `<div class="an-navcard${activo?' active':''}" onclick="_cambiarTemporada('${id}')">
-            <span class="an-navicon">📅</span><span class="an-navlbl">${s.meta.name}</span>
-          </div>`;
-        }).join('')}
-      </div>`
-    : `<div style="font-size:13px;color:var(--text2);font-weight:700">📅 ${seasonActual ? seasonActual.meta.name : ''}</div>`;
-
+/* ── Paso 1: elegir temporada (SIEMPRE lo primero en cada sesión) ──
+   Tocar una tarjeta solo la PRESELECCIONA (_seasonPending) — todavía no
+   cambia nada. Hace falta tocar "Continuar" para que se active de verdad.
+   Así cambiar de temporada nunca es un toque accidental. Cualquiera
+   (incluido un jugador) puede elegir y ENTRAR a cualquier temporada para
+   consultarla; solo entrenador/superadmin dejan esa elección puesta como
+   la temporada por defecto del equipo (eso ya lo resuelve _cambiarTemporada). */
+let _seasonPending = null;
+function _preseleccionarTemporada(id){ _seasonPending = id; render(); }
+async function _confirmarTemporada(){
+  if(!_seasonPending || !seasonsIndex[_seasonPending]) return;
+  await _cambiarTemporada(_seasonPending);
+  _irAlModulo('modulos');
+}
+function renderTemporadaPicker(){
+  if(_seasonPending===null || !seasonsIndex[_seasonPending]) _seasonPending = currentSeasonId;
+  const cards = Object.entries(seasonsIndex).map(([id,s])=>{
+    const sel = id===_seasonPending;
+    return `<div class="an-navcard${sel?' active':''}" onclick="_preseleccionarTemporada('${id}')">
+      <span class="an-navicon">📅</span><span class="an-navlbl">${s.meta.name}</span>
+    </div>`;
+  }).join('');
   return `
     <div style="animation:fadeIn 0.3s ease;max-width:480px;margin:0 auto">
       <div style="text-align:center;margin-bottom:24px">
         <img src="images/icon_stat.png" alt="" style="height:56px;width:56px;border-radius:14px;object-fit:cover;margin-bottom:10px">
         <h1 style="margin:0;font-size:24px;font-weight:900;color:var(--heading)">STAT</h1>
-        <div style="font-size:12px;color:var(--text3);margin-top:2px">¿Qué quieres hacer hoy?</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">¿Con qué temporada quieres trabajar?</div>
       </div>
+      <div class="an-nav-grid">${cards}</div>
+      <button class="btn btn-cyan" style="width:100%;margin-top:18px;padding:16px;font-size:15px;font-weight:800" onclick="_confirmarTemporada()">Continuar →</button>
+    </div>`;
+}
 
-      <div class="an-group-lbl" style="margin-top:0">Temporada</div>
-      ${seasonBlock}
-
-      <div class="an-group-lbl">Módulos</div>
+/* ── Paso 2: elegir módulo, ya con la temporada activa ── */
+function renderModulosMenu(){
+  const s = seasonsIndex[currentSeasonId];
+  return `
+    <div style="animation:fadeIn 0.3s ease;max-width:480px;margin:0 auto">
+      <div style="text-align:center;margin-bottom:24px">
+        <img src="images/icon_stat.png" alt="" style="height:56px;width:56px;border-radius:14px;object-fit:cover;margin-bottom:10px">
+        <h1 style="margin:0;font-size:24px;font-weight:900;color:var(--heading)">STAT</h1>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">📅 ${s?s.meta.name:''} · ¿Qué quieres hacer?</div>
+      </div>
       <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
         <div class="card" style="cursor:pointer;padding:20px" onclick="_irAlModulo('puntajes')">
           <div style="font-size:32px;line-height:1;margin-bottom:8px">📊</div>
@@ -2152,6 +2188,7 @@ function renderHomeMenu(){
           <div style="font-size:12px;color:var(--text3);margin-top:4px">Pruebas del robot y bitácora de ajustes</div>
         </div>
       </div>
+      <button class="btn btn-sm" style="width:100%;margin-top:16px" onclick="_irAlModulo('temporada')">← Cambiar de temporada</button>
     </div>`;
 }
 
@@ -2170,7 +2207,7 @@ function renderRendimiento(){
   const bar = (k,l)=>`<button class="sub-tbtn ${rendimientoSubTab===k?'active':''}" onclick="_setRendimientoSubTab('${k}')">${l}</button>`;
   const body = rendimientoSubTab==='bitacora' ? _renderBitacora(esAdmin) : _renderPruebasList(esAdmin);
   return `<div style="animation:fadeIn 0.3s ease">
-    <button onclick="_irAlModulo('menu')" class="btn btn-sm" style="margin-bottom:15px">← Menú principal</button>
+    <button onclick="_irAlModulo('modulos')" class="btn btn-sm" style="margin-bottom:15px">← Menú principal</button>
     <h1 style="margin:0 0 16px;font-size:22px;font-weight:800;color:var(--heading)">🧪 Pruebas de Rendimiento</h1>
     <div class="sub-tabs">
       ${bar('pruebas','🧪 Pruebas')}
@@ -2180,55 +2217,101 @@ function renderRendimiento(){
   </div>`;
 }
 
+/* Dos tipos de prueba:
+   - "robot": un número simple por intento (línea recta, giros, etc.) — con
+     3 botones de prueba rápida ya listos para no tener que escribir nada.
+   - "lanzada": una rutina que intenta un grupo de misiones; cada intento
+     marca ✓/✗ por misión (reusa los mismos botones .chkbtn de Ronda) y la
+     tarjeta muestra el % de éxito acumulado de cada misión de la rutina. */
 function _renderPruebasList(esAdmin){
   const addBtn = esAdmin ? `<button class="btn btn-cyan" style="width:100%;margin-bottom:14px" onclick="_abrirFormPrueba()">＋ Nueva prueba</button>` : '';
   if(!perfTests.length) return addBtn + `<div class="empty">Todavía no hay pruebas registradas.</div>`;
 
-  const cards = perfTests.map(t=>{
-    const attempts = perfAttempts.filter(a=>a.testId===t.id).sort((a,b)=>a.ts-b.ts);
-    const key = 'perf_'+t.id;
-    const isOpen = !!statsOpen[key];
-    const last = attempts[attempts.length-1];
-    const chartId = 'chartPerf_'+t.id;
-    return `<div class="coll-card" style="margin-bottom:10px">
-      <div class="coll-hdr" onclick="toggleOpen('${key}')">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:700">${t.name}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">${t.metric}${t.unit?' ('+t.unit+')':''} · ${attempts.length} intento${attempts.length!==1?'s':''}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          ${last?`<div style="text-align:right"><div style="font-size:18px;font-weight:900;color:var(--teal)">${last.value}</div><div style="font-size:9px;color:var(--text3)">último</div></div>`:''}
-          ${_arrow(key)}
-        </div>
-      </div>
-      ${isOpen?`<div class="coll-body">
-        ${attempts.length>1?`<div style="height:130px;margin-bottom:12px"><canvas id="${chartId}"></canvas></div>`:''}
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <button class="btn btn-cyan btn-sm" onclick="_abrirFormIntento('${t.id}')">＋ Registrar intento</button>
-          ${esAdmin?`<button class="btn btn-sm" style="color:var(--red)" onclick="_borrarPrueba('${t.id}')">Borrar prueba</button>`:''}
-        </div>
-        ${attempts.length?attempts.slice().reverse().map(a=>`
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
-            <div style="min-width:0">
-              <div style="font-size:13px;font-weight:700">${a.value}${t.unit?' '+t.unit:''}</div>
-              <div style="font-size:10px;color:var(--text3)">📅 ${fmtTs(a.ts)}${a.notes?' · '+a.notes:''}</div>
-            </div>
-            ${esAdmin?`<button class="btn btn-sm" style="color:var(--red);flex-shrink:0" onclick="_borrarIntento('${t.id}','${a.id}')">✕</button>`:''}
-          </div>`).join(''):'<div class="empty">Sin intentos todavía.</div>'}
-      </div>`:''}
-    </div>`;
+  const grupos = [['robot','🤖 Pruebas del Robot'],['lanzada','🎯 Pruebas de Lanzada']];
+  const body = grupos.map(([cat,label])=>{
+    const tests = perfTests.filter(t=>(t.category||'robot')===cat);
+    if(!tests.length) return '';
+    return `<div class="an-group-lbl" style="margin-top:16px">${label}</div>` + tests.map(t=>_renderPruebaCard(t,esAdmin)).join('');
   }).join('');
 
-  // Gráficas de las pruebas abiertas con 2+ intentos (mismo patrón que dibujarGrafica en el resto de la app).
+  // Gráficas de las pruebas de robot abiertas con 2+ intentos (mismo patrón
+  // que dibujarGrafica en el resto de la app). Las de lanzada no llevan
+  // gráfica — su resumen es el % de éxito por misión, ya calculado abajo.
   perfTests.forEach(t=>{
-    if(!statsOpen['perf_'+t.id]) return;
+    if((t.category||'robot')!=='robot' || !statsOpen['perf_'+t.id]) return;
     const attempts = perfAttempts.filter(a=>a.testId===t.id).sort((a,b)=>a.ts-b.ts);
     if(attempts.length>1){
       dibujarGrafica('chartPerf_'+t.id, 'line', attempts.map((_,i)=>String(i+1)), attempts.map(a=>Number(a.value)||0), '#0D6E8A', t.metric);
     }
   });
 
-  return addBtn + cards;
+  return addBtn + body;
+}
+
+function _renderPruebaCard(t, esAdmin){
+  const attempts = perfAttempts.filter(a=>a.testId===t.id).sort((a,b)=>a.ts-b.ts);
+  const key = 'perf_'+t.id;
+  const isOpen = !!statsOpen[key];
+  const isLz = (t.category||'robot')==='lanzada';
+  const last = attempts[attempts.length-1];
+  const headerRight = isLz
+    ? `<div style="font-size:11px;color:var(--text3)">${attempts.length} intento${attempts.length!==1?'s':''}</div>`
+    : (last?`<div style="text-align:right"><div style="font-size:18px;font-weight:900;color:var(--teal)">${last.value}</div><div style="font-size:9px;color:var(--text3)">último</div></div>`:'');
+  return `<div class="coll-card" style="margin-bottom:10px">
+    <div class="coll-hdr" onclick="toggleOpen('${key}')">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:700">${t.name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${isLz ? (t.missions||[]).join(', ') : (t.metric+(t.unit?' ('+t.unit+')':''))} · ${attempts.length} intento${attempts.length!==1?'s':''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${headerRight}${_arrow(key)}</div>
+    </div>
+    ${isOpen?_renderPruebaBody(t, attempts, esAdmin, isLz):''}
+  </div>`;
+}
+
+function _renderPruebaBody(t, attempts, esAdmin, isLz){
+  let content;
+  if(isLz){
+    const porMision = {};
+    (t.missions||[]).forEach(code=>{ porMision[code] = {ok:0, total:0}; });
+    attempts.forEach(a=>{
+      Object.entries(a.results||{}).forEach(([code,val])=>{
+        if(!porMision[code]) porMision[code] = {ok:0,total:0};
+        porMision[code].total++;
+        if(val) porMision[code].ok++;
+      });
+    });
+    content = Object.entries(porMision).map(([code,st])=>{
+      const m = MISSIONS.find(mm=>mm.code===code);
+      const pct = st.total ? Math.round(st.ok/st.total*100) : 0;
+      const col = !st.total ? 'var(--text3)' : pct>=70?'var(--green)':pct>=40?'var(--amber)':'var(--red)';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:12px">${code} — ${m?m.name:''}</span>
+        <span style="font-size:13px;font-weight:800;color:${col}">${st.ok}/${st.total}${st.total?' ('+pct+'%)':''}</span>
+      </div>`;
+    }).join('');
+  } else {
+    content = attempts.length>1 ? `<div style="height:130px;margin-bottom:12px"><canvas id="chartPerf_${t.id}"></canvas></div>` : '';
+  }
+  const addAttemptBtn = isLz
+    ? `<button class="btn btn-cyan btn-sm" onclick="_abrirFormIntentoLanzada('${t.id}')">＋ Registrar intento</button>`
+    : `<button class="btn btn-cyan btn-sm" onclick="_abrirFormIntento('${t.id}')">＋ Registrar intento</button>`;
+  const history = !isLz && attempts.length ? attempts.slice().reverse().map(a=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="min-width:0">
+        <div style="font-size:13px;font-weight:700">${a.value}${t.unit?' '+t.unit:''}</div>
+        <div style="font-size:10px;color:var(--text3)">📅 ${fmtTs(a.ts)}${a.notes?' · '+a.notes:''}</div>
+      </div>
+      ${esAdmin?`<button class="btn btn-sm" style="color:var(--red);flex-shrink:0" onclick="_borrarIntento('${t.id}','${a.id}')">✕</button>`:''}
+    </div>`).join('') : '';
+  return `<div class="coll-body">
+    ${content}
+    <div style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap">
+      ${addAttemptBtn}
+      ${esAdmin?`<button class="btn btn-sm" style="color:var(--red)" onclick="_borrarPrueba('${t.id}')">Borrar prueba</button>`:''}
+    </div>
+    ${history}
+  </div>`;
 }
 
 function _renderBitacora(esAdmin){
@@ -2250,18 +2333,61 @@ function _renderBitacora(esAdmin){
 /* ── Formularios (modal genérico ya existente) ── */
 function _abrirFormPrueba(){
   openModal('🧪 Nueva prueba', `
-    <div class="fg"><div class="field-lbl">Nombre</div><input type="text" id="pf-name" placeholder="ej. Precisión línea negra"></div>
-    <div class="fg"><div class="field-lbl">Qué se mide</div><input type="text" id="pf-metric" placeholder="ej. % de éxito, cm de error, segundos"></div>
-    <div class="fg"><div class="field-lbl">Unidad (opcional)</div><input type="text" id="pf-unit" placeholder="ej. %, cm, s"></div>
-    <button class="btn btn-cyan" style="width:100%" onclick="_crearPrueba()">Crear prueba</button>
+    <div class="field-lbl">Tipo de prueba</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn btn-cyan btn-sm" style="flex:1" onclick="_mostrarFormRobot()">🤖 Del robot</button>
+      <button class="btn btn-sm" style="flex:1" onclick="_mostrarFormLanzada()">🎯 De lanzada</button>
+    </div>
+    <div id="pf-body"></div>
   `);
+  _mostrarFormRobot();
 }
-function _crearPrueba(){
+function _mostrarFormRobot(){
+  document.getElementById('pf-body').innerHTML = `
+    <div class="field-lbl">Pruebas rápidas</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn btn-sm" onclick="_crearPruebaPreset('Línea recta')">Línea recta</button>
+      <button class="btn btn-sm" onclick="_crearPruebaPreset('Giro llanta fija')">Giro llanta fija</button>
+      <button class="btn btn-sm" onclick="_crearPruebaPreset('Giro pivot')">Giro pivot</button>
+    </div>
+    <div class="field-lbl">O personalizada</div>
+    <div class="fg"><input type="text" id="pf-name" placeholder="Nombre"></div>
+    <div class="fg"><input type="text" id="pf-metric" placeholder="Qué se mide, ej. % de éxito, cm de error"></div>
+    <div class="fg"><input type="text" id="pf-unit" placeholder="Unidad (opcional): %, cm, s..."></div>
+    <button class="btn btn-cyan" style="width:100%" onclick="_crearPruebaRobot()">Crear prueba</button>
+  `;
+}
+function _crearPruebaPreset(name){
+  perfTests.push({id:uid(), category:'robot', name, metric:'% de precisión', unit:'%', createdAt:Date.now()});
+  save(); closeModal(); render();
+}
+function _crearPruebaRobot(){
   const name = document.getElementById('pf-name').value.trim();
   const metric = document.getElementById('pf-metric').value.trim();
   const unit = document.getElementById('pf-unit').value.trim();
   if(!name || !metric){ alert('Completa el nombre y qué se mide.'); return; }
-  perfTests.push({id:uid(), name, metric, unit, createdAt:Date.now()});
+  perfTests.push({id:uid(), category:'robot', name, metric, unit, createdAt:Date.now()});
+  save(); closeModal(); render();
+}
+function _mostrarFormLanzada(){
+  const opts = MISSIONS.map(m=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">
+      <input type="checkbox" value="${m.code}" class="pf-lz-mission">
+      <span style="font-size:13px">${m.code} — ${m.name}</span>
+    </label>`).join('');
+  document.getElementById('pf-body').innerHTML = `
+    <div class="fg"><div class="field-lbl">Nombre de la rutina</div><input type="text" id="pf-name" placeholder="ej. Rutina base roja v1"></div>
+    <div class="field-lbl">Misiones que intenta</div>
+    <div style="max-height:220px;overflow-y:auto;border:1.5px solid var(--border2);border-radius:var(--rs);padding:6px 12px;margin-bottom:14px">${opts}</div>
+    <button class="btn btn-cyan" style="width:100%" onclick="_crearPruebaLanzada()">Crear prueba</button>
+  `;
+}
+function _crearPruebaLanzada(){
+  const name = document.getElementById('pf-name').value.trim();
+  const missions = [...document.querySelectorAll('.pf-lz-mission:checked')].map(el=>el.value);
+  if(!name){ alert('Ponle un nombre a la rutina.'); return; }
+  if(!missions.length){ alert('Elige al menos una misión.'); return; }
+  perfTests.push({id:uid(), category:'lanzada', name, missions, createdAt:Date.now()});
   save(); closeModal(); render();
 }
 function _borrarPrueba(testId){
@@ -2289,6 +2415,49 @@ function _registrarIntento(){
   perfAttempts.push({id:uid(), testId, ts:Date.now(), value:Number(value), notes, savedBy: usuarioActual?usuarioActual.username:''});
   save(); closeModal(); render();
 }
+
+/* Intento de una "prueba de lanzada": un ✓/✗ rápido por misión, reusando
+   los mismos botones .chkbtn que ya se usan al anotar una ronda — nada de
+   UI nueva. El estado de cada fila vive en su propio data-value hasta que
+   se guarda, así no hace falta re-renderizar el modal en cada click. */
+function _abrirFormIntentoLanzada(testId){
+  const t = perfTests.find(x=>x.id===testId);
+  if(!t) return;
+  const rows = (t.missions||[]).map(code=>{
+    const m = MISSIONS.find(mm=>mm.code===code);
+    return `<div class="prow" data-mcode="${code}">
+      <span class="pdesc" style="cursor:default">${code} — ${m?m.name:''}</span>
+      <div class="chkbtns">
+        <button type="button" class="chkbtn ok" onclick="_toggleLzResultado(this,true)">✓</button>
+        <button type="button" class="chkbtn bad" onclick="_toggleLzResultado(this,false)">✗</button>
+      </div>
+    </div>`;
+  }).join('');
+  openModal('🎯 Registrar intento — '+t.name, `
+    <input type="hidden" id="pf-testid" value="${testId}">
+    ${rows}
+    <div class="fg" style="margin-top:12px"><div class="field-lbl">Notas (opcional)</div><input type="text" id="pf-notes" placeholder="ej. falló la garra en M07"></div>
+    <button class="btn btn-cyan" style="width:100%" onclick="_registrarIntentoLanzada()">Guardar intento</button>
+  `);
+}
+function _toggleLzResultado(btn, val){
+  const row = btn.closest('.prow');
+  row.querySelectorAll('.chkbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  row.dataset.value = val ? 'true' : 'false';
+}
+function _registrarIntentoLanzada(){
+  const testId = document.getElementById('pf-testid').value;
+  const notes = document.getElementById('pf-notes').value.trim();
+  const results = {};
+  document.querySelectorAll('#modal-root .prow[data-mcode]').forEach(row=>{
+    if(row.dataset.value!==undefined) results[row.dataset.mcode] = row.dataset.value==='true';
+  });
+  if(!Object.keys(results).length){ alert('Marca al menos una misión.'); return; }
+  perfAttempts.push({id:uid(), testId, ts:Date.now(), results, notes, savedBy: usuarioActual?usuarioActual.username:''});
+  save(); closeModal(); render();
+}
+
 function _borrarIntento(testId, attemptId){
   perfAttempts = perfAttempts.filter(a=>a.id!==attemptId);
   save(); render();
