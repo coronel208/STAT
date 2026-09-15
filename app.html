@@ -205,6 +205,26 @@ body{
 }
 .tbtn:hover:not(.active){color:var(--text2);background:rgba(14,31,53,0.03);}
 
+/* En celular el menú principal se ve mejor abajo, como una app nativa —
+   pulgar más cerca, y deja de competir con el header por espacio arriba.
+   Va DESPUÉS de las reglas base de .tabs/.tbtn a propósito: así sus
+   declaraciones ganan en la cascada en vez de quedar tapadas por ellas. */
+@media(max-width:640px){
+  .tabs{
+    position:fixed;left:0;right:0;top:auto;bottom:0;
+    border-bottom:none;border-top:2px solid var(--border);
+    box-shadow:0 -2px 8px rgba(14,31,53,0.08);
+    padding-bottom:env(safe-area-inset-bottom) !important;
+  }
+  /* Nota: en <button> el color de "border" no siempre se pinta de forma
+     confiable entre navegadores (herencia rara del estilo nativo) — por
+     eso el acento de la pestaña activa usa box-shadow, no border-color. */
+  .tbtn{border-bottom:none !important;border-top:none;margin:0;box-shadow:none;}
+  .tbtn.active{box-shadow:inset 0 3px 0 0 var(--cyan);}
+  .main{padding-bottom:calc(64px + env(safe-area-inset-bottom)) !important;}
+  #conn-indicator{bottom:calc(56px + env(safe-area-inset-bottom) + 8px) !important;}
+}
+
 .main{max-width:960px;margin:0 auto;padding:20px 16px 80px;}
 
 /* ══ PHYSICAL BLOCK MIXIN — applied to interactive elements ══ */
@@ -639,6 +659,12 @@ body.modo-oscuro input, body.modo-oscuro select, body.modo-oscuro textarea{color
 body.modo-oscuro .hdr, body.modo-oscuro .tabs{background:rgba(21,21,28,0.94) !important;backdrop-filter:blur(12px);}
 body.modo-oscuro .tabs{border-bottom-color:rgba(65,105,225,0.4) !important;}
 body.modo-oscuro .tbtn.active{color:#6C8CF5 !important;border-bottom-color:#6C8CF5 !important;background:rgba(65,105,225,0.12) !important;}
+@media(max-width:640px){
+  /* Mismo motivo que arriba: box-shadow en vez de border-color, y hay que
+     repetirlo aquí porque el tema de superadmin (arriba) pinta
+     border-bottom-color con !important sobre el botón. */
+  body.modo-oscuro .tbtn.active{border-bottom-color:transparent !important;box-shadow:inset 0 3px 0 0 #6C8CF5 !important;}
+}
 body.modo-oscuro .tbtn:not(.active):hover{color:#8FA6F2 !important;}
 body.modo-oscuro .sec-lbl{color:#6C8CF5 !important;}
 body.modo-oscuro .hub-btn{border-color:#3B5BDB !important;}
@@ -1712,6 +1738,110 @@ function _aplicarBuscar(){
   _buscarFilter.text = _buscarPending.text !== undefined ? _buscarPending.text : _buscarFilter.text;
   _buscarFilter.minScore = _buscarPending.minScore !== undefined ? _buscarPending.minScore : _buscarFilter.minScore;
   _buscarFilter.maxScore = _buscarPending.maxScore !== undefined ? _buscarPending.maxScore : _buscarFilter.maxScore;
+  render();
+}
+function _limpiarBuscar(){
+  _buscarFilter = _emptyBuscarFilter();
+  _buscarPending = {text:'', minScore:'', maxScore:''};
+  render();
+}
+
+/* ── Buscar por período ── */
+function _bqSetPeriod(preset){
+  const now=Date.now(), day=86400000;
+  if(preset==='todo'){ _buscarFilter.dateFromTs=null; _buscarFilter.dateToTs=null; _buscarFilter.rangeLabel=''; render(); return; }
+  const presets={
+    hoy:      {from:new Date(new Date().setHours(0,0,0,0)).getTime(), label:'Hoy'},
+    semana:   {from:now-7*day,  label:'Últimos 7 días'},
+    mes:      {from:now-30*day, label:'Últimos 30 días'},
+    temporada:{from:new Date(new Date().getFullYear()-(new Date().getMonth()<7?1:0),7,1).getTime(), label:'Esta temporada'}
+  };
+  const p=presets[preset]; if(!p) return;
+  _buscarFilter.dateFromTs=p.from; _buscarFilter.dateToTs=now; _buscarFilter.rangeLabel=p.label;
+  render();
+}
+function _bqSetCustomFrom(v){
+  _buscarFilter.dateFromTs = v ? new Date(v+'T00:00:00').getTime() : null;
+  _buscarFilter.rangeLabel = 'Rango personalizado';
+  render();
+}
+function _bqSetCustomTo(v){
+  _buscarFilter.dateToTs = v ? new Date(v+'T23:59:59').getTime() : null;
+  _buscarFilter.rangeLabel = 'Rango personalizado';
+  render();
+}
+
+/* ── Buscar por pareja: arrastrar y soltar (mouse + touch) ──
+   Estas funciones se referenciaban desde renderBuscar() pero nunca se
+   habían escrito — por eso no se podía soltar un jugador ahí, ni con mouse
+   ni con el dedo. */
+let _bqDragPid=null;
+function bqDragStart(e,pid){
+  _bqDragPid=pid;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',pid);
+  setTimeout(()=>{const el=document.getElementById('bqchip_'+pid);if(el)el.classList.add('dragging');},0);
+}
+function bqDragEnd(e){
+  if(_bqDragPid){const el=document.getElementById('bqchip_'+_bqDragPid);if(el)el.classList.remove('dragging');}
+  _bqDragPid=null;
+}
+function bqDragOver(e,zoneId){e.preventDefault();const el=document.getElementById(zoneId);if(el)el.classList.add('over');}
+function bqDragLeave(zoneId){const el=document.getElementById(zoneId);if(el)el.classList.remove('over');}
+function bqDropToPool(e){e.preventDefault();}
+function bqDropTo(e,slot){
+  e.preventDefault();
+  const pid=e.dataTransfer.getData('text/plain')||_bqDragPid;
+  if(!pid) return;
+  const zone=e.currentTarget; if(zone) zone.classList.remove('over');
+  if(_buscarFilter[slot]===pid){ _bqDragPid=null; return; }
+  _buscarFilter[slot]=pid;
+  _bqDragPid=null;
+  render();
+}
+let _bqTouchPid=null,_bqTouchClone=null,_bqTouchEl=null;
+function bqTouchStart(e,pid){
+  _bqTouchPid=pid;_bqDragPid=pid;
+  const el=e.currentTarget;_bqTouchEl=el;
+  _bqTouchClone=el.cloneNode(true);
+  _bqTouchClone.style.cssText='position:fixed;opacity:.8;pointer-events:none;z-index:9999;transition:none;';
+  document.body.appendChild(_bqTouchClone);
+  el.classList.add('dragging');
+  const t=e.touches[0];
+  _bqTouchClone.style.left=(t.clientX-40)+'px';
+  _bqTouchClone.style.top=(t.clientY-20)+'px';
+}
+function bqTouchMove(e){
+  if(!_bqTouchClone) return;
+  e.preventDefault();
+  const t=e.touches[0];
+  _bqTouchClone.style.left=(t.clientX-40)+'px';
+  _bqTouchClone.style.top=(t.clientY-20)+'px';
+  document.querySelectorAll('#bq-slot1,#bq-slot2').forEach(z=>{
+    const r=z.getBoundingClientRect();
+    z.classList.toggle('over',t.clientX>=r.left&&t.clientX<=r.right&&t.clientY>=r.top&&t.clientY<=r.bottom);
+  });
+}
+function bqTouchEnd(e){
+  if(!_bqTouchClone||!_bqTouchPid) return;
+  const t=e.changedTouches[0];
+  _bqTouchClone.style.display='none';
+  const target=document.elementFromPoint(t.clientX,t.clientY);
+  _bqTouchClone.style.display='';
+  if(target){
+    const zone=target.closest('#bq-slot1,#bq-slot2');
+    if(zone){
+      const slot = zone.id==='bq-slot1' ? 'bqP1' : 'bqP2';
+      _buscarFilter[slot]=_bqTouchPid;
+    }
+  }
+  _bqTouchClone.remove();
+  _bqTouchClone=null;
+  if(_bqTouchEl) _bqTouchEl.classList.remove('dragging');
+  _bqTouchEl=null;
+  _bqTouchPid=null;
+  _bqDragPid=null;
+  document.querySelectorAll('#bq-slot1,#bq-slot2').forEach(z=>z.classList.remove('over'));
   render();
 }
 
@@ -4958,16 +5088,13 @@ function _computeAwards(){
   // viejas guardadas solo por pareja quedaban sub-contados.
   const roundBases = runsFiltradas.map(r=>({r, ro:_runBasePlayers(r,'roja'), az:_runBasePlayers(r,'azul')}));
 
-  // Igual que renderEfectividadJugadores/renderSubPaginaJugador: si la misma
-  // persona quedó anotada en AMBAS bases del mismo registro de ronda, cuenta
-  // como 2 lanzadas (una por base), no como 1 — así "Rondas" siempre coincide
-  // con lo que ya muestra el resto de la app (base roja + base azul).
+  // Una lanzada = una ronda jugada, sin importar si esa ronda quedó anotada
+  // en las dos bases a la vez — cuenta 1, no 2.
   const playerStats=players.map(p=>{
     if(!checkEsUsuario(p.id)) return null;
     const entries=[];
     roundBases.forEach(({r,ro,az})=>{
-      if(ro[0]===p.id||ro[1]===p.id) entries.push({ts:r.ts||0, score:Number(r.score)||0});
-      if(az[0]===p.id||az[1]===p.id) entries.push({ts:r.ts||0, score:Number(r.score)||0});
+      if(ro[0]===p.id||ro[1]===p.id||az[0]===p.id||az[1]===p.id) entries.push({ts:r.ts||0, score:Number(r.score)||0});
     });
     if(!entries.length) return null;
     const scores=entries.map(e=>e.score);
@@ -5909,11 +6036,13 @@ function renderEfectividadJugadores(wd) {
   const sk='an_jugadores';
   const raw = players.map(p => {
     if (!checkEsUsuario(p.id)) return null;
-    let rojaR = 0, azulR = 0; const scores=[];
-    wd.forEach(r => { if(r.rojaP1===p.id || r.rojaP2===p.id){ rojaR++; scores.push(Number(r.score)||0); } if(r.azulP1===p.id || r.azulP2===p.id){ azulR++; scores.push(Number(r.score)||0); } });
-    if(rojaR===0 && azulR===0) return null;
+    // Una ronda cuenta 1 vez aunque la misma persona haya quedado anotada en
+    // las dos bases de ese registro — "Rondas" es lanzadas, no apariciones.
+    const scores=[]; let rounds=0;
+    wd.forEach(r => { if(r.rojaP1===p.id || r.rojaP2===p.id || r.azulP1===p.id || r.azulP2===p.id){ rounds++; scores.push(Number(r.score)||0); } });
+    if(!rounds) return null;
     const created = parseInt((p.id||'').slice(0,-3),36)||0;
-    return {p, scores, rounds:rojaR+azulR, name:p.name, created};
+    return {p, scores, rounds, name:p.name, created};
   }).filter(x=>x);
   const sorted = _applySort(raw, sk, 'score');
   if(!sorted.length) return `<div style="animation: fadeIn 0.3s ease;"><div class="empty">Sin datos suficientes.</div></div>`;
@@ -6119,7 +6248,10 @@ function renderSubPaginaJugador(wd, id) {
       const rc=subset.filter(r=>r[base+'LanzadorId']&&r[base+'LanzadorId']!==p.id).length;
       return (lz||rc) ? `<div style="font-size:11px; color:var(--text3); margin-top:6px; font-weight:600;">🚀 ${lz} lanzador · 🤲 ${rc} recibidor</div>` : '';
     };
-    const allScores=[...rRoja,...rAzul].map(r=>Number(r.score));
+    // Unión sin duplicados: si la misma ronda quedó anotada en las dos bases,
+    // "Rondas" la cuenta 1 vez (las tarjetas de cada base sí muestran su
+    // propio conteo por separado, eso no cambia).
+    const allScores=[...new Set([...rRoja,...rAzul])].map(r=>Number(r.score));
     const summaryBlock = allScores.length ? `
       <div class="metric-grid" style="margin-bottom:15px">
         <div class="metric-box"><div class="lbl">Rondas</div><div class="val">${allScores.length}</div></div>
@@ -6182,7 +6314,7 @@ function renderEfectividadParejas(wd) {
     <div class="card" onclick="parejaDetalle='${p.id}'; parejaDetalleTab='base'; render();" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
          <div class="bpill" style="background:var(--surface2); border-color:var(--border2); color:var(--text); font-size:13px; padding:6px 12px;">👥 ${p.name}</div>
-         <div style="font-size:10px; color:var(--text3); font-weight:800;">${p.rR + p.aR} RONDAS JUNTOS</div>
+         <div style="font-size:10px; color:var(--text3); font-weight:800;">${new Set(p.refs).size} RONDAS JUNTOS</div>
       </div>
       <div style="font-size:12px;color:var(--text3);margin-top:8px">Mejor: <strong style="color:var(--green)">${bv}</strong> · Promedio: <strong>${av}</strong></div>
     </div>`;
@@ -6208,7 +6340,7 @@ function renderSubPaginaPareja(wd, id) {
       contentHTML = `${renderDesgloseMisiones(rRoja, 'Roja', 'var(--red)')}${renderDesgloseMisiones(rAzul, 'Azul', 'var(--blue)')}`;
     }
   } else {
-    const allScores=[...rRoja,...rAzul].map(r=>Number(r.score));
+    const allScores=[...new Set([...rRoja,...rAzul])].map(r=>Number(r.score));
     const summaryBlock = allScores.length ? `
       <div class="metric-grid" style="margin-bottom:15px">
         <div class="metric-box"><div class="lbl">Rondas juntos</div><div class="val">${allScores.length}</div></div>
@@ -6492,7 +6624,7 @@ function renderBuscar(){
   function bqSlotHtml(pid,slot){
     if(!pid) return `<span style="font-size:12px;color:var(--text3)">Arrastra un jugador</span>`;
     const p=getPlayer(pid);
-    return `<div class="player-chip in-pair" style="cursor:default">${p?p.name:'?'}<button class="chip-remove" onclick="_buscarFilter['${slot}']='';_applyBqPair();render()" type="button" style="margin-left:4px">×</button></div>`;
+    return `<div class="player-chip in-pair" style="cursor:default">${p?p.name:'?'}<button class="chip-remove" onclick="_buscarFilter['${slot}']='';render()" type="button" style="margin-left:4px">×</button></div>`;
   }
 
   let matchedPairInfo='';
@@ -6617,6 +6749,22 @@ function renderBuscar(){
           style="width:72px;border:none;background:transparent;text-align:center;outline:none;">
       </div>
       ${chips.length?`<div style="display:flex;gap:4px;flex-wrap:wrap">${chips.join('')}</div>`:''}
+    </div>
+
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px">📅 Buscar por período</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        ${[['todo','Todo'],['hoy','Hoy'],['semana','7 días'],['mes','30 días'],['temporada','Temporada']].map(([k,l])=>{
+          const active = k==='todo' ? (!_buscarFilter.dateFromTs && !_buscarFilter.dateToTs) : _buscarFilter.rangeLabel===l;
+          return `<button class="btn btn-sm" onclick="_bqSetPeriod('${k}')" style="${active?'background:var(--teal);border-color:var(--teal);color:#fff':''}">${l}</button>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text3)">Personalizado:</span>
+        <input type="date" onchange="_bqSetCustomFrom(this.value)" style="font-size:12px;padding:5px 8px;width:auto">
+        <span style="font-size:11px;color:var(--text3)">→</span>
+        <input type="date" onchange="_bqSetCustomTo(this.value)" style="font-size:12px;padding:5px 8px;width:auto">
+      </div>
     </div>
 
     <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:12px">
