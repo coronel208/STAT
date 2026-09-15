@@ -822,6 +822,8 @@ body.modo-oscuro .invite-badge-top{background:#4169E1 !important;border-color:#6
     </button>
 
     <span id="hdr-team" style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.88);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:rgba(0,194,212,0.12);padding:3px 11px;border-radius:20px;border:1px solid rgba(0,194,212,0.3)"></span>
+
+    <span id="hdr-season" onclick="_abrirSelectorTemporada()" title="Cambiar de temporada" style="display:none;align-items:center;gap:4px;cursor:pointer;font-size:11px;font-weight:700;color:#0e1f35;background:#ffb400;padding:3px 11px;border-radius:20px;"></span>
     
     <span id="hdr-user" style="font-size:10px; font-weight:600; opacity:0.9; letter-spacing:0.5px; text-transform:uppercase;"></span>
 
@@ -854,7 +856,7 @@ const MAX_SCORE=545;
 const TIMER_TOTAL=150; // 2:30 in seconds
 const CIRC=+(2*Math.PI*110).toFixed(2); // r=110
 
-const MISSIONS=[
+const MISSIONS_UNEARTHED=[
   {code:'INS',name:'Inspección de Equipo',amber:true,params:[
     {id:'ins_ok',label:'Equipo cabe en una sola área de lanzamiento (≤305mm)',pts:20,type:'check'}]},
   {code:'M01',name:'Cepillado de superficie',noEquip:true,params:[
@@ -898,6 +900,16 @@ const MISSIONS=[
   {code:'FP',name:'Fichas de precisión',amber:true,params:[
     {id:'fp_tok',label:'Fichas restantes al final de la partida',pts:0,type:'token'}]},
 ];
+
+/* Cada temporada de FLL trae sus propias 15 misiones — este mapa es lo que
+   permite tener varias temporadas guardadas sin pisarse entre sí. MISSIONS
+   (abajo) es la que está activa; cambia cuando se cambia de temporada
+   (ver _cargarTemporada). Por ahora solo existe 'unearthed'; las próximas
+   temporadas (ej. 'bioglow') se agregan aquí cuando estén listas. */
+const MISSIONS_BY_SEASON = {
+  unearthed: MISSIONS_UNEARTHED
+};
+let MISSIONS = MISSIONS_UNEARTHED;
 
 /* Cada objeto del Foro (M14) sale de completar otra misión primero — no tiene
    sentido dejar poder marcarlo logrado si esa misión de origen no se hizo
@@ -1088,9 +1100,12 @@ function _setDbDot(ok){ _setDot('dot-db', ok, 'Base de datos'); }
 db.ref('.info/connected').on('value', snap => { _setDbDot(snap.val()===true); });
 _setNetDot(navigator.onLine);
 
-/* ── Firebase save (debounced 800ms) + BLINDAJE OFFLINE ── */
+/* ── Firebase save (debounced 800ms) + BLINDAJE OFFLINE ──
+   players/pairs son del EQUIPO (no cambian entre temporadas). runs/trainings/
+   lanzadas/missionOverrides son de LA TEMPORADA activa — viven aparte para
+   que cambiar de temporada no toque ni arriesgue los datos de las demás. */
 function save() {
-  if (!currentTeamId) return;
+  if (!currentTeamId || !currentSeasonId) return;
   clearTimeout(syncTimeout);
   _setSyncText('↑ Procesando…');
 
@@ -1098,7 +1113,7 @@ function save() {
     // 1. SI NO HAY INTERNET (Guardado en Caja Fuerte Local)
     if (!navigator.onLine) {
       _setSyncText('⚠ Guardado local');
-      const backup = { players, pairs, trainings, runs };
+      const backup = { players, pairs, trainings, runs, currentSeasonId };
       localStorage.setItem('stat_respaldo_offline', JSON.stringify(backup));
       return; // Detenemos aquí para no hacer chocar a Firebase
     }
@@ -1107,13 +1122,14 @@ function save() {
     try {
       _setSyncText('↑ Subiendo a nube…');
 
+      const seasonPath = `teams/${currentTeamId}/seasons/${currentSeasonId}/data`;
       const updates = {
         [`teams/${currentTeamId}/data/players`]: players,
         [`teams/${currentTeamId}/data/pairs`]: pairs,
-        [`teams/${currentTeamId}/data/trainings`]: trainings,
-        [`teams/${currentTeamId}/data/runs`]: runs,
-        [`teams/${currentTeamId}/data/lanzadas`]: lanzadasConfiguradas,
-        [`teams/${currentTeamId}/data/missionOverrides`]: missionOverrides
+        [`${seasonPath}/trainings`]: trainings,
+        [`${seasonPath}/runs`]: runs,
+        [`${seasonPath}/lanzadas`]: lanzadasConfiguradas,
+        [`${seasonPath}/missionOverrides`]: missionOverrides
       };
 
       await db.ref().update(updates);
@@ -1126,7 +1142,7 @@ function save() {
       console.error('Firebase save error', e);
       // Si Firebase falla porque el WiFi parpadeó (aunque navigator.onLine diga que hay)
       _setSyncText('⚠ Guardado local (Red Inestable)');
-      const backup = { players, pairs, trainings, runs };
+      const backup = { players, pairs, trainings, runs, currentSeasonId };
       localStorage.setItem('stat_respaldo_offline', JSON.stringify(backup));
     }
   }, 800);
@@ -1159,20 +1175,62 @@ window.addEventListener('offline', () => {
   _setSyncText('⚠ Offline');
 });
 
+/* ── Temporadas ──
+   players/pairs siguen en teams/{id}/data — son del equipo, no de la
+   temporada. runs/trainings/lanzadas/missionOverrides viven bajo
+   teams/{id}/seasons/{seasonId}/data. currentSeasonId + seasonsIndex se
+   llenan en loadTeamData() y se usan en toda la UI del selector. */
+let currentSeasonId = null;
+let seasonsIndex = {};
+
+function _aplicarDatosTemporada(seasonObj){
+  const d = (seasonObj && seasonObj.data) || {};
+  trainings = d.trainings || [];
+  runs = d.runs || [];
+  lanzadasConfiguradas = d.lanzadas || [];
+  missionOverrides = d.missionOverrides || {};
+  const key = (seasonObj && seasonObj.meta && seasonObj.meta.missionSetKey) || 'unearthed';
+  MISSIONS = MISSIONS_BY_SEASON[key] || MISSIONS_UNEARTHED;
+}
+
 /* ── Load team data from Firebase ── */
 async function loadTeamData(){
-  const snap = await db.ref('teams/'+currentTeamId+'/data').get();
-  if(snap.exists()){
-    const d = snap.val();
-    players  = d.players   || [];
-    pairs    = d.pairs     || [];
-    trainings= d.trainings || [];
-    runs     = d.runs      || [];
-    lanzadasConfiguradas = d.lanzadas || [];
-    missionOverrides = d.missionOverrides || {};
-  } else {
-    players=[]; pairs=[]; trainings=[]; runs=[]; lanzadasConfiguradas=[]; missionOverrides={};
+  const rootSnap = await db.ref('teams/'+currentTeamId).get();
+  const root = rootSnap.exists() ? rootSnap.val() : {};
+  const oldData = root.data || {};
+  players = oldData.players || [];
+  pairs   = oldData.pairs   || [];
+
+  let seasons = root.seasons || null;
+  if(!seasons){
+    // MIGRACIÓN ÚNICA (una sola vez por equipo): la estructura vieja tenía
+    // runs/trainings/lanzadas/missionOverrides bajo /data junto con
+    // players/pairs. Se copian a la temporada "Unearthed" SIN TOCAR NI
+    // BORRAR /data — queda intacto de respaldo para siempre.
+    const seasonId = 'unearthed_2025_26';
+    const legacyData = {
+      runs: oldData.runs || [],
+      trainings: oldData.trainings || [],
+      lanzadas: oldData.lanzadas || [],
+      missionOverrides: oldData.missionOverrides || {}
+    };
+    const meta = {name:'Unearthed', yearLabel:'2025-26', missionSetKey:'unearthed', createdAt:Date.now()};
+    await db.ref().update({
+      [`teams/${currentTeamId}/seasons/${seasonId}/meta`]: meta,
+      [`teams/${currentTeamId}/seasons/${seasonId}/data`]: legacyData,
+      [`teams/${currentTeamId}/currentSeasonId`]: seasonId
+    });
+    seasons = { [seasonId]: { meta, data: legacyData } };
+    root.currentSeasonId = seasonId;
   }
+  seasonsIndex = seasons;
+
+  let saved = null;
+  try{ saved = localStorage.getItem('stat_season_'+currentTeamId); }catch(e){}
+  currentSeasonId = (saved && seasons[saved]) ? saved : (root.currentSeasonId || Object.keys(seasons)[0]);
+
+  _aplicarDatosTemporada(seasons[currentSeasonId]);
+
   // MIGRACIÓN: versiones previas guardaban las lanzadas solo en localStorage de
   // este dispositivo. Si Firebase no tiene nada todavía, las subimos una vez.
   if(!lanzadasConfiguradas.length){
@@ -1184,10 +1242,66 @@ async function loadTeamData(){
   if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
 }
 
+/* Cambia a otra temporada ya existente (o recién creada) y reinicia el
+   listener en vivo para que apunte a su propio nodo de datos. */
+async function _cambiarTemporada(seasonId){
+  if(!seasonsIndex[seasonId] || seasonId===currentSeasonId){ closeModal(); return; }
+  currentSeasonId = seasonId;
+  try{ localStorage.setItem('stat_season_'+currentTeamId, seasonId); }catch(e){}
+  if(esAdminActual()){ try{ await db.ref('teams/'+currentTeamId+'/currentSeasonId').set(seasonId); }catch(e){} }
+  _aplicarDatosTemporada(seasonsIndex[seasonId]);
+  startRealtimeSync();
+  closeModal();
+  _actualizarBadgeTemporada();
+  render();
+}
+
+/* Crea una temporada nueva vacía y se cambia a ella. Por ahora el único
+   conjunto de misiones disponible es 'unearthed' — cuando exista otro
+   (ej. BioGlow) esto debe dejar elegir cuál usar. */
+async function _crearTemporada(){
+  const name = prompt('Nombre de la nueva temporada (ej. BioGlow):');
+  if(!name || !name.trim()) return;
+  const yearLabel = prompt('Años de la temporada (ej. 2026-27):') || '';
+  const seasonId = _normStr(name).replace(/\s+/g,'_') + '_' + Date.now().toString(36);
+  const meta = {name:name.trim(), yearLabel:yearLabel.trim(), missionSetKey:'unearthed', createdAt:Date.now()};
+  try{
+    await db.ref('teams/'+currentTeamId+'/seasons/'+seasonId+'/meta').set(meta);
+    seasonsIndex[seasonId] = {meta, data:{}};
+    await _cambiarTemporada(seasonId);
+    if(typeof showToast==='function') showToast('✓ Temporada "'+meta.name+'" creada');
+  }catch(e){ alert('Error al crear la temporada: '+e.message); }
+}
+
+function _abrirSelectorTemporada(){
+  const esAdmin = esAdminActual();
+  const items = Object.entries(seasonsIndex).map(([id,s])=>{
+    const activo = id===currentSeasonId;
+    return `<div class="card" style="padding:12px 14px;margin-bottom:8px;${activo?'border-color:var(--teal)':''};cursor:pointer" onclick="_cambiarTemporada('${id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div><b>${s.meta.name}</b> <span style="color:var(--text3);font-size:12px">${s.meta.yearLabel||''}</span></div>
+        ${activo?'<span style="color:var(--teal);font-weight:800;font-size:11px;white-space:nowrap">✓ ACTUAL</span>':''}
+      </div>
+    </div>`;
+  }).join('');
+  const addBtn = esAdmin ? `<button class="btn btn-cyan" style="width:100%;margin-top:4px" onclick="closeModal();_crearTemporada();">＋ Nueva temporada</button>` : '';
+  openModal('📅 Temporadas', items + addBtn);
+}
+
+function _actualizarBadgeTemporada(){
+  const el = document.getElementById('hdr-season');
+  if(!el) return;
+  const s = seasonsIndex[currentSeasonId];
+  el.innerHTML = s ? ('📅 '+s.meta.name) : '📅';
+  el.style.display = (usuarioActual && usuarioActual.rol !== 'jugador') ? 'inline-flex' : 'none';
+}
+
 /* ── Real-time listener: update if another device saves ── */
 let realtimeListener = null;
+let realtimeSeasonListener = null;
 function startRealtimeSync(){
   if(realtimeListener) realtimeListener();
+  if(realtimeSeasonListener) realtimeSeasonListener();
   realtimeListener = db.ref('teams/'+currentTeamId+'/data').on('value', snap=>{
     // Only update if we're not mid-edit (no pending save)
     if(syncTimeout) return;
@@ -1195,6 +1309,14 @@ function startRealtimeSync(){
       const d = snap.val();
       players  = d.players   || [];
       pairs    = d.pairs     || [];
+      if(typeof _ensureRunPairs==='function' && _ensureRunPairs()) save();
+      render();
+    }
+  });
+  realtimeSeasonListener = db.ref('teams/'+currentTeamId+'/seasons/'+currentSeasonId+'/data').on('value', snap=>{
+    if(syncTimeout) return;
+    if(snap.exists()){
+      const d = snap.val();
       trainings= d.trainings || [];
       runs     = d.runs      || [];
       lanzadasConfiguradas = d.lanzadas || [];
@@ -1392,10 +1514,11 @@ async function accesoPermitido(datos) {
   currentTeamId = datos.teamId;
   currentTeamName = datos.teamName;
   
-  await loadTeamData(); 
-  
+  await loadTeamData();
+
   document.getElementById('login-wrap').style.display = 'none';
   document.getElementById('hdr-team').textContent = datos.teamName;
+  _actualizarBadgeTemporada();
   
   const isCoach = (datos.rol === 'entrenador' || datos.rol === 'superadmin');
   const colorUsuario = isCoach ? '#ffb400' : '#00c2d4'; 
@@ -2457,24 +2580,39 @@ async function _admDelTeamConfirm(k){
   }catch(e){ alert('Error: '+e.message); }
 }
 
-/* ── Estrategias (lanzadas) de cualquier equipo (solo superadmin) ── */
+/* ── Estrategias (lanzadas) de cualquier equipo (solo superadmin) ──
+   _admTeamsCache trae el árbol COMPLETO de /teams, así que ya incluye
+   seasons/currentSeasonId una vez que ese equipo migró. Si un equipo
+   nunca inició sesión desde que existen temporadas, cae de regreso a la
+   ruta vieja /data — así nunca se rompe el panel por un equipo sin migrar. */
+function _admTeamLanzadasPath(teamKey){
+  const t = _admTeamsCache[teamKey]||{};
+  const sid = t.currentSeasonId;
+  return (sid && t.seasons && t.seasons[sid]) ? `teams/${teamKey}/seasons/${sid}/data/lanzadas` : `teams/${teamKey}/data/lanzadas`;
+}
+function _admTeamLanzadas(teamKey){
+  const t = _admTeamsCache[teamKey]||{};
+  const sid = t.currentSeasonId;
+  const d = (sid && t.seasons && t.seasons[sid]) ? (t.seasons[sid].data||{}) : (t.data||{});
+  return d.lanzadas || [];
+}
 function _admNewLanzada(teamKey){
   _admTargetTeamId=teamKey;
-  _admLzList=[...(((_admTeamsCache[teamKey]||{}).data||{}).lanzadas||[])];
+  _admLzList=[..._admTeamLanzadas(teamKey)];
   editandoLanzadaId=null; showLanzadaForm=true;
   _admRerender();
 }
 function _admEditLanzada(teamKey,lzId){
   _admTargetTeamId=teamKey;
-  _admLzList=[...(((_admTeamsCache[teamKey]||{}).data||{}).lanzadas||[])];
+  _admLzList=[..._admTeamLanzadas(teamKey)];
   editandoLanzadaId=lzId; showLanzadaForm=true;
   _admRerender();
 }
 async function _admDeleteLanzadaFrom(teamKey,lzId){
   if(!confirm('¿Borrar esta estrategia?')) return;
-  const list=(((_admTeamsCache[teamKey]||{}).data||{}).lanzadas||[]).filter(x=>x.id!==lzId);
+  const list=_admTeamLanzadas(teamKey).filter(x=>x.id!==lzId);
   try{
-    await db.ref('teams/'+teamKey+'/data/lanzadas').set(list);
+    await db.ref(_admTeamLanzadasPath(teamKey)).set(list);
     if(typeof showToast==='function') showToast('✓ Estrategia eliminada');
     renderAdminPanel();
   }catch(e){ alert('Error: '+e.message); }
@@ -5694,7 +5832,7 @@ window.guardarLanzada = async function() {
   showLanzadaForm = false; editandoLanzadaId = null;
   if (_admTargetTeamId) {
     try{
-      await db.ref('teams/'+_admTargetTeamId+'/data/lanzadas').set(listaActiva);
+      await db.ref(_admTeamLanzadasPath(_admTargetTeamId)).set(listaActiva);
       if(typeof showToast === 'function') showToast('✓ Estrategia guardada');
     }catch(e){ alert('Error al guardar en Firebase: '+e.message); }
     _admTargetTeamId = null;
@@ -5709,7 +5847,7 @@ window.borrarLanzada = async function(id) {
   showLanzadaForm = false; editandoLanzadaId = null;
   if (_admTargetTeamId) {
     _admLzList = _admLzList.filter(x => x.id !== id);
-    try{ await db.ref('teams/'+_admTargetTeamId+'/data/lanzadas').set(_admLzList); }
+    try{ await db.ref(_admTeamLanzadasPath(_admTargetTeamId)).set(_admLzList); }
     catch(e){ alert('Error al borrar en Firebase: '+e.message); }
     _admTargetTeamId = null;
     renderAdminPanel();
