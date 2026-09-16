@@ -930,11 +930,11 @@ const MISSIONS_BIOGLOW=[
     {id:'m03_bonus',label:'Bono: la roca fue devuelta a su posición original',pts:10,type:'check',bonus:true,requires:'m03_flag'}]},
   {code:'M04',name:'Lucky Leaves',params:[
     {id:'m04_leaves',label:'Hojas completamente removidas, ya no tocan el nido',pts:10,type:'counter',max:2,perItem:'10 c/u'},
-    {id:'m04_katydid',label:'El katydid está al menos parcialmente en el hábitat de hojas (si no, la misión vale 0)',pts:0,type:'check'},
-    {id:'m04_bonus',label:'Bono: el katydid quedó en su posición original y no salió del hábitat durante toda la partida',pts:20,type:'check',bonus:true,requires:'m04_katydid'}]},
+    {id:'m04_katydid_full',label:'Bono: el katydid nunca se movió de su posición inicial (requiere las 2 hojas)',pts:20,type:'check',bonus:true,requires:'m04_leaves',requiresValue:2,group:'m04_katydid'},
+    {id:'m04_katydid_partial',label:'Bono: el katydid se movió pero fue devuelto a su hábitat designado (requiere las 2 hojas)',pts:10,type:'check',bonus:true,requires:'m04_leaves',requiresValue:2,group:'m04_katydid'}]},
   {code:'M05',name:'Reaching Roots',params:[
-    {id:'m05_partial',label:'La raíz está parcialmente extendida (solo una opción posible)',pts:10,type:'check'},
-    {id:'m05_complete',label:'La raíz está completamente extendida (solo una opción posible)',pts:20,type:'check'}]},
+    {id:'m05_partial',label:'La raíz está parcialmente extendida',pts:10,type:'check',group:'m05_extend'},
+    {id:'m05_complete',label:'La raíz está completamente extendida',pts:20,type:'check',group:'m05_extend'}]},
   {code:'M06',name:'Leafcutter Frenzy',params:[
     {id:'m06_ant',label:'La hormiga toca el nido (requisito para los fragmentos)',pts:0,type:'check'},
     {id:'m06_frag',label:'Fragmentos de hoja contenidos en el nido',pts:10,type:'counter',max:4,perItem:'10 c/u',requires:'m06_ant'}]},
@@ -959,14 +959,14 @@ const MISSIONS_BIOGLOW=[
     {id:'m13_combo',label:'Tu especie clave está en la plataforma de restauración Y los árboles jóvenes están levantados',pts:30,type:'check'}]},
   {code:'M14',name:'Seeds of Renewal',params:[
     {id:'m14_seeds',label:'Semillas contenidas en la estación de replantación',pts:5,type:'counter',max:4,perItem:'5 c/u'},
-    {id:'m14_bonus',label:'Bono: esas semillas también tocan el tapete',pts:5,type:'counter',max:4,perItem:'5 c/u',bonus:true,requires:'m14_seeds'}]},
+    {id:'m14_bonus',label:'Bono: esas semillas también tocan el tapete',pts:5,type:'counter',max:4,perItem:'5 c/u',bonus:true,capBy:'m14_seeds'}]},
   {code:'M15',name:'Biocentric Architecture',params:[
     {id:'m15_canopy',label:'El dosel de anidación está levantado',pts:10,type:'check'},
     {id:'m15_skylight',label:'El tragaluz del jardín está completamente adentro',pts:10,type:'check'},
     {id:'m15_compost',label:'La compuerta de composta está completamente abierta, tocando el tapete',pts:10,type:'check'},
-    {id:'m15_mine',label:'Bono ambiental — dock de Mina (dosel de anidación)',pts:10,type:'check',bonus:true},
-    {id:'m15_city',label:'Bono ambiental — dock de Ciudad (tragaluz del jardín)',pts:10,type:'check',bonus:true},
-    {id:'m15_farm',label:'Bono ambiental — dock de Granja (compuerta de composta)',pts:10,type:'check',bonus:true}]},
+    {id:'m15_mine',label:'Bono ambiental — dock de Mina (dosel de anidación)',pts:10,type:'check',bonus:true,group:'m15_env'},
+    {id:'m15_city',label:'Bono ambiental — dock de Ciudad (tragaluz del jardín)',pts:10,type:'check',bonus:true,group:'m15_env'},
+    {id:'m15_farm',label:'Bono ambiental — dock de Granja (compuerta de composta)',pts:10,type:'check',bonus:true,group:'m15_env'}]},
   {code:'FP',name:'Precision Tokens',amber:true,params:[
     {id:'fp_tok',label:'Fichas restantes al final de la partida',pts:0,type:'token'}]},
 ];
@@ -1764,11 +1764,26 @@ function _counterPts(v,pts){
   if(arr) return arr.filter(x=>x===true).length*pts;
   return (v||0)*pts;
 }
+function _reqMet(p,ms){
+  if(!p.requires) return true;
+  const v=ms[p.requires];
+  if(p.requiresValue!==undefined) return v===p.requiresValue;
+  return !!v;
+}
+function _effCounterVal(p,ms){
+  const v=ms[p.id];
+  if(p.capBy!==undefined && !_triArr(v)) return Math.min(v||0, ms[p.capBy]||0);
+  return v;
+}
+function _findParam(id){
+  for(const m of MISSIONS){ for(const p of m.params){ if(p.id===id) return p; } }
+  return null;
+}
 function calcScore(ms){
   let t=0;
   MISSIONS.forEach(m=>m.params.forEach(p=>{
-    if(p.type==='check'){if(ms[p.id]){if(p.requires&&!ms[p.requires])return;t+=p.pts;}}
-    else if(p.type==='counter')t+=_counterPts(ms[p.id],p.pts);
+    if(p.type==='check'){if(ms[p.id]){if(!_reqMet(p,ms))return;t+=p.pts;}}
+    else if(p.type==='counter'){ if(!_reqMet(p,ms))return; t+=_counterPts(_effCounterVal(p,ms),p.pts); }
     else if(p.type==='token')t+=TOKEN_SCORES[ms[p.id]??6]||0;
   }));
   return t;
@@ -1786,19 +1801,24 @@ function extraerFechaDeRonda(nombre) {
 function mScoreFor(m,ms){
   let t=0;
   m.params.forEach(p=>{
-    if(p.type==='check'){if(ms[p.id]){if(p.requires&&!ms[p.requires])return;t+=p.pts;}}
-    else if(p.type==='counter')t+=_counterPts(ms[p.id],p.pts);
+    if(p.type==='check'){if(ms[p.id]){if(!_reqMet(p,ms))return;t+=p.pts;}}
+    else if(p.type==='counter'){ if(!_reqMet(p,ms))return; t+=_counterPts(_effCounterVal(p,ms),p.pts); }
     else if(p.type==='token')t+=TOKEN_SCORES[ms[p.id]??6]||0;
   });
   return t;
 }
 function mMaxScore(m){
   let t=0;
+  const groupMax={};
   m.params.forEach(p=>{
-    if(p.type==='check')t+=p.pts; // count bonus pts too (theoretical max)
+    if(p.type==='check'){ // count bonus pts too (theoretical max)
+      if(p.group) groupMax[p.group]=Math.max(groupMax[p.group]||0,p.pts);
+      else t+=p.pts;
+    }
     else if(p.type==='counter')t+=(p.max||0)*p.pts;
     else if(p.type==='token')t+=50; // max token score
   });
+  Object.values(groupMax).forEach(v=>t+=v);
   return t;
 }
 function getMissionResults(ms){
@@ -3826,7 +3846,7 @@ function renderMissions(){
     const ms=mScoreFor(m,mState);
     const params=m.params.map(p=>{
       if(p.type==='check'){
-        const dis=p.requires&&!mState[p.requires];
+        const dis=p.requires&&!_reqMet(p,mState);
         return`<div id="pr_${p.id}" class="prow"${dis?' style="opacity:.35;pointer-events:none"':''}>
           <div class="pleft">
             <div class="pdesc">${p.bonus?`<span class="btag">BONO</span>`:''}${p.label}</div>
@@ -3862,18 +3882,21 @@ function renderMissions(){
             }).join('')}
           </div>`;
         }
-        const val=mState[p.id]||0;
-        return`<div class="prow">
+        const cdis=p.requires&&!_reqMet(p,mState);
+        const cap=p.capBy!==undefined?(mState[p.capBy]||0):(p.max||99);
+        const val=Math.min(mState[p.id]||0,cap);
+        mState[p.id]=val;
+        return`<div id="pr_${p.id}" class="prow"${cdis?' style="opacity:.35;pointer-events:none"':''}>
           <div style="flex:1;min-width:0">
             <div class="pdesc">${p.label}</div>
             ${p.hint?`<div class="hint">${p.hint}</div>`:''}
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-            <span class="ppts-lbl">${p.perItem}·máx ${p.max}</span>
+            <span class="ppts-lbl" id="cvmax_${p.id}">${p.perItem}·máx ${cap}</span>
             <div class="ctr">
-              <button class="cbtn" type="button" onclick="mCounter('${p.id}',-1,${p.max})">−</button>
+              <button class="cbtn" type="button" onclick="mCounter('${p.id}',-1)">−</button>
               <span class="cval" id="cv_${p.id}">${val}</span>
-              <button class="cbtn" type="button" onclick="mCounter('${p.id}',1,${p.max})">+</button>
+              <button class="cbtn" type="button" onclick="mCounter('${p.id}',1)">+</button>
             </div>
           </div>
         </div>`;
@@ -3953,7 +3976,7 @@ function _refreshMissions(){
         if(p.requires){
           const row=document.getElementById('pr_'+p.id);
           if(row){
-            const dis=!mState[p.requires];
+            const dis=!_reqMet(p,mState);
             row.style.opacity=dis?'0.35':'1';
             row.style.pointerEvents=dis?'none':'';
           }
@@ -3978,8 +4001,20 @@ function _refreshMissions(){
             }
           });
         } else {
+          const cap=p.capBy!==undefined?(mState[p.capBy]||0):(p.max||99);
+          if((mState[p.id]||0)>cap) mState[p.id]=cap;
           const cv=document.getElementById('cv_'+p.id);
           if(cv)cv.textContent=mState[p.id]||0;
+          const cm=document.getElementById('cvmax_'+p.id);
+          if(cm)cm.textContent=p.perItem+'·máx '+cap;
+          if(p.requires){
+            const row=document.getElementById('pr_'+p.id);
+            if(row){
+              const dis=!_reqMet(p,mState);
+              row.style.opacity=dis?'0.35':'1';
+              row.style.pointerEvents=dis?'none':'';
+            }
+          }
         }
       } else if(p.type==='token'){
         const val=mState[p.id]??6;
@@ -3996,8 +4031,12 @@ function _refreshMissions(){
 /* Marca una parte de misión tipo check como lograda (true) o fallida (false).
    Volver a pulsar el mismo botón la desmarca (vuelve a null = sin marcar). */
 function mSetCheck(id,val){
+  const p=_findParam(id);
   mState[id] = (mState[id]===val) ? null : val;
-  if(mState[id]!==true) MISSIONS.forEach(m=>m.params.forEach(p=>{if(p.requires===id)mState[p.id]=null;}));
+  if(mState[id]===true && p && p.group){
+    MISSIONS.forEach(m=>m.params.forEach(q=>{ if(q.group===p.group && q.id!==id) mState[q.id]=null; }));
+  }
+  if(mState[id]!==true) MISSIONS.forEach(m=>m.params.forEach(q=>{if(q.requires===id)mState[q.id]=null;}));
   _refreshMissions();
 }
 /* Igual que mSetCheck pero para una sub-acción nombrada dentro de un
@@ -4010,8 +4049,14 @@ function mSetNamedItem(id,idx,val){
   arr[idx] = (arr[idx]===val) ? null : val;
   _refreshMissions();
 }
-function mCounter(id,d,max){
-  mState[id]=Math.max(0,Math.min(max||99,(mState[id]||0)+d));
+function mCounter(id,d){
+  const p=_findParam(id);
+  if(p && p.requires && !_reqMet(p,mState)) return;
+  const cap=p&&p.capBy!==undefined?(mState[p.capBy]||0):((p&&p.max)||99);
+  mState[id]=Math.max(0,Math.min(cap,(mState[id]||0)+d));
+  MISSIONS.forEach(m=>m.params.forEach(q=>{
+    if(q.capBy===id && (mState[q.id]||0)>(mState[id]||0)) mState[q.id]=mState[id]||0;
+  }));
   _refreshMissions();
 }
 function mToken(n){mState['fp_tok']=n;_refreshMissions();}
