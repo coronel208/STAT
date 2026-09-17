@@ -939,9 +939,10 @@ const MISSIONS_BIOGLOW=[
     {id:'m03_flag',label:'La bandera de investigación está abajo',pts:20,type:'check'},
     {id:'m03_bonus',label:'Bono: la roca fue devuelta a su posición original',pts:10,type:'check',bonus:true,requires:'m03_flag'}]},
   {code:'M04',name:'Lucky Leaves',params:[
-    {id:'m04_habitat_fail',label:'El katydid terminó fuera del hábitat de hojas (aunque sea parcialmente) — anula toda la misión',pts:0,type:'check',zeroesMission:true},
     {id:'m04_leaves',label:'Al menos una hoja completamente removida, ya no toca el nido',pts:10,type:'check'},
-    {id:'m04_bonus',label:'Bono: la segunda hoja también removida Y el katydid sigue en su posición inicial',pts:20,type:'check',bonus:true,requires:'m04_leaves'}]},
+    {id:'m04_bonus_full',label:'Bono: la segunda hoja también removida Y el katydid nunca se movió del nido',pts:20,type:'check',bonus:true,requires:'m04_leaves',group:'m04_katydid_bonus'},
+    {id:'m04_katydid_out',label:'Saqué / moví al katydid del nido (anula la misión salvo que lo regreses al hábitat)',pts:0,type:'check',zeroesMission:true,unless:'m04_katydid_returned'},
+    {id:'m04_katydid_returned',label:'Bono: devolví al katydid al hábitat de la misión',pts:10,type:'check',bonus:true,requires:'m04_katydid_out',group:'m04_katydid_bonus'}]},
   {code:'M05',name:'Reaching Roots',params:[
     {id:'m05_partial',label:'La raíz está parcialmente extendida',pts:10,type:'check',group:'m05_extend'},
     {id:'m05_complete',label:'La raíz está completamente extendida',pts:20,type:'check',group:'m05_extend'}]},
@@ -1790,7 +1791,7 @@ function _findParam(id){
   return null;
 }
 function _missionZeroed(m,ms){
-  return m.params.some(p=>p.zeroesMission && ms[p.id]===true);
+  return m.params.some(p=>p.zeroesMission && ms[p.id]===true && !(p.unless && ms[p.unless]===true));
 }
 function calcScore(ms){
   let t=0;
