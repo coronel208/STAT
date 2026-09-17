@@ -939,11 +939,9 @@ const MISSIONS_BIOGLOW=[
     {id:'m03_flag',label:'La bandera de investigación está abajo',pts:20,type:'check'},
     {id:'m03_bonus',label:'Bono: la roca fue devuelta a su posición original',pts:10,type:'check',bonus:true,requires:'m03_flag'}]},
   {code:'M04',name:'Lucky Leaves',params:[
-    {id:'m04_leaf1',label:'Hoja 1 removida (no es el katydid)',pts:10,type:'check'},
-    {id:'m04_leaf2_normal',label:'Hoja 2 removida (no es el katydid)',pts:10,type:'check',group:'m04_leaf2',implies:'m04_bonus_full'},
-    {id:'m04_leaf2_katydid',label:'La hoja 2 era el katydid',pts:10,type:'check',group:'m04_leaf2'},
-    {id:'m04_bonus_full',label:'Bono: el katydid nunca se movió de su posición inicial',pts:20,type:'check',bonus:true,hidden:true,requires:'m04_leaf1',group:'m04_katydid_bonus'},
-    {id:'m04_katydid_returned',label:'Regresé el katydid a la zona de la misión',pts:10,type:'check',bonus:true,requires:'m04_leaf2_katydid',group:'m04_katydid_bonus'}]},
+    {id:'m04_habitat_fail',label:'El katydid terminó fuera del hábitat de hojas (aunque sea parcialmente) — anula toda la misión',pts:0,type:'check',zeroesMission:true},
+    {id:'m04_leaves',label:'Al menos una hoja completamente removida, ya no toca el nido',pts:10,type:'check'},
+    {id:'m04_bonus',label:'Bono: la segunda hoja también removida Y el katydid sigue en su posición inicial',pts:20,type:'check',bonus:true,requires:'m04_leaves'}]},
   {code:'M05',name:'Reaching Roots',params:[
     {id:'m05_partial',label:'La raíz está parcialmente extendida',pts:10,type:'check',group:'m05_extend'},
     {id:'m05_complete',label:'La raíz está completamente extendida',pts:20,type:'check',group:'m05_extend'}]},
@@ -1791,13 +1789,19 @@ function _findParam(id){
   for(const m of MISSIONS){ for(const p of m.params){ if(p.id===id) return p; } }
   return null;
 }
+function _missionZeroed(m,ms){
+  return m.params.some(p=>p.zeroesMission && ms[p.id]===true);
+}
 function calcScore(ms){
   let t=0;
-  MISSIONS.forEach(m=>m.params.forEach(p=>{
-    if(p.type==='check'){if(ms[p.id]){if(!_reqMet(p,ms))return;t+=p.pts;}}
-    else if(p.type==='counter'){ if(!_reqMet(p,ms))return; t+=_counterPts(_effCounterVal(p,ms),p.pts); }
-    else if(p.type==='token')t+=TOKEN_SCORES[ms[p.id]??6]||0;
-  }));
+  MISSIONS.forEach(m=>{
+    if(_missionZeroed(m,ms)) return;
+    m.params.forEach(p=>{
+      if(p.type==='check'){if(ms[p.id]){if(!_reqMet(p,ms))return;t+=p.pts;}}
+      else if(p.type==='counter'){ if(!_reqMet(p,ms))return; t+=_counterPts(_effCounterVal(p,ms),p.pts); }
+      else if(p.type==='token')t+=TOKEN_SCORES[ms[p.id]??6]||0;
+    });
+  });
   return t;
 }
 function extraerFechaDeRonda(nombre) {
@@ -1811,6 +1815,7 @@ function extraerFechaDeRonda(nombre) {
   return null;
 }
 function mScoreFor(m,ms){
+  if(_missionZeroed(m,ms)) return 0;
   let t=0;
   m.params.forEach(p=>{
     if(p.type==='check'){if(ms[p.id]){if(!_reqMet(p,ms))return;t+=p.pts;}}
@@ -3858,7 +3863,6 @@ function renderMissions(){
     const ms=mScoreFor(m,mState);
     const params=m.params.map(p=>{
       if(p.type==='check'){
-        if(p.hidden) return ''; // estado interno (ej. auto-derivado de otra casilla), no se dibuja
         const dis=p.requires&&!_reqMet(p,mState);
         return`<div id="pr_${p.id}" class="prow"${dis?' style="opacity:.35;pointer-events:none"':''}>
           <div class="pleft">
@@ -4048,7 +4052,6 @@ function _clearDependents(id){
   MISSIONS.forEach(m=>m.params.forEach(q=>{
     if(q.requires===id && mState[q.id]!=null){
       mState[q.id]=null;
-      if(q.implies) mState[q.implies]=null;
       _clearDependents(q.id);
     }
   }));
@@ -4060,14 +4063,8 @@ function mSetCheck(id,val){
   mState[id] = (mState[id]===val) ? null : val;
   if(mState[id]===true && p && p.group){
     MISSIONS.forEach(m=>m.params.forEach(q=>{
-      if(q.group===p.group && q.id!==id){ mState[q.id]=null; if(q.implies) mState[q.implies]=null; _clearDependents(q.id); }
+      if(q.group===p.group && q.id!==id){ mState[q.id]=null; _clearDependents(q.id); }
     }));
-  }
-  if(p && p.implies){
-    // El requires propio del campo implicado (si tiene) ya lo filtra al
-    // sumar puntos — aquí solo se espeja el estado, sin importar el orden
-    // en que se marquen las casillas.
-    mState[p.implies] = (mState[id]===true) ? true : null;
   }
   if(mState[id]!==true) _clearDependents(id);
   _refreshMissions();
